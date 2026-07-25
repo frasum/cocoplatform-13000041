@@ -6,7 +6,6 @@ import {
   type PtRelease,
   type PtShift,
   type PtStaff,
-  type PtStaffLocation,
 } from "./planungstafel";
 
 const DAYS = ["2026-07-25", "2026-07-26", "2026-07-27"];
@@ -21,13 +20,6 @@ const STAFF: PtStaff[] = [
   { id: "s3", displayName: "Cara" },
 ];
 
-const SL: PtStaffLocation[] = [
-  { staffId: "s1", locationId: "loc-a", department: "service" },
-  { staffId: "s2", locationId: "loc-a", department: "kitchen" },
-  { staffId: "s3", locationId: "loc-b", department: "service" },
-];
-
-// Voll-Freigabe für alle Bereiche beider Standorte im Fenster.
 const FULL_RELEASES: PtRelease[] = [LOC_A, LOC_B].flatMap((l) =>
   (["kitchen", "service", "gl"] as const).map((area) => ({
     locationId: l.id,
@@ -37,10 +29,25 @@ const FULL_RELEASES: PtRelease[] = [LOC_A, LOC_B].flatMap((l) =>
   })),
 );
 
+function svc(
+  staffId: string,
+  shiftDate: string,
+  locationId: string,
+  skillName: string | null = "Service",
+): PtShift {
+  return { staffId, shiftDate, locationId, area: "service", skillName };
+}
+function kit(
+  staffId: string,
+  shiftDate: string,
+  locationId: string,
+  skillName: string | null = null,
+): PtShift {
+  return { staffId, shiftDate, locationId, area: "kitchen", skillName };
+}
+
 describe("buildPlanungstafelData", () => {
   it("markiert Tage ohne Release als not_released", () => {
-    // Nur Küche/Service bei loc-a freigegeben (GL kennt keine eigene Freigabe).
-    // Tag 2026-07-27 liegt außerhalb — dort alle Zeilen not_released.
     const releases: PtRelease[] = [
       { locationId: "loc-a", area: "kitchen", startDate: DAYS[0], endDate: DAYS[1] },
       { locationId: "loc-a", area: "service", startDate: DAYS[0], endDate: DAYS[1] },
@@ -49,14 +56,12 @@ describe("buildPlanungstafelData", () => {
       days: DAYS,
       locations: [LOC_A],
       staff: STAFF,
-      staffLocations: SL,
       shifts: [],
       absences: [],
       releases,
     });
     const [block] = out;
     const gl = block.areas.find((a) => a.area === "gl")!;
-    // GL folgt „mindestens ein Bereich freigegeben" — hier: freigegeben, leer.
     expect(gl.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
     expect(gl.cellsByDate[DAYS[2]]).toEqual({ kind: "not_released" });
     const service = block.areas.find((a) => a.area === "service")!;
@@ -65,16 +70,11 @@ describe("buildPlanungstafelData", () => {
   });
 
   it("setzt Cross-Standort-Punkt für Schicht am anderen Standort", () => {
-    const shifts: PtShift[] = [
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "service" },
-      // Anna ist am selben Tag auch bei loc-b im Service.
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-b", area: "service" },
-    ];
+    const shifts: PtShift[] = [svc("s1", DAYS[0], "loc-a"), svc("s1", DAYS[0], "loc-b")];
     const out = buildPlanungstafelData({
       days: DAYS,
       locations: LOCS,
       staff: STAFF,
-      staffLocations: SL,
       shifts,
       absences: [],
       releases: FULL_RELEASES,
@@ -89,17 +89,11 @@ describe("buildPlanungstafelData", () => {
   });
 
   it("kein Cross-Punkt bei Schicht nur am eigenen Standort", () => {
-    const shifts: PtShift[] = [
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "service" },
-      // Zweite Schicht am gleichen Standort, anderer Bereich (kein gl, damit
-      // die Dedup-Regel Anna nicht aus Service in die GL-Zeile verschiebt).
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "kitchen" },
-    ];
+    const shifts: PtShift[] = [svc("s1", DAYS[0], "loc-a"), kit("s1", DAYS[0], "loc-a")];
     const out = buildPlanungstafelData({
       days: DAYS,
       locations: [LOC_A],
       staff: STAFF,
-      staffLocations: SL,
       shifts,
       absences: [],
       releases: FULL_RELEASES,
@@ -109,30 +103,28 @@ describe("buildPlanungstafelData", () => {
     expect(cell.entries[0].crossLocation).toBe(false);
   });
 
-  it("nimmt abwesende MA in den eigenen Bereich auf", () => {
+  it("blendet abwesende MA komplett aus (kein Rendering, keine Symbole)", () => {
+    // Ben hat eine Küchen-Schicht UND Urlaub am selben Tag — er darf
+    // NICHT gerendert werden.
+    const shifts: PtShift[] = [kit("s2", DAYS[0], "loc-a")];
     const absences: PtAbsence[] = [{ staffId: "s2", date: DAYS[0], type: "urlaub" }];
     const out = buildPlanungstafelData({
       days: DAYS,
       locations: [LOC_A],
       staff: STAFF,
-      staffLocations: SL,
-      shifts: [],
+      shifts,
       absences,
       releases: FULL_RELEASES,
     });
     const kitchen = out[0].areas.find((a) => a.area === "kitchen")!;
-    const cell = kitchen.cellsByDate[DAYS[0]];
-    if (cell.kind !== "roster") throw new Error("erwartet roster");
-    expect(cell.entries).toHaveLength(1);
-    expect(cell.entries[0]).toMatchObject({ staffName: "Ben", absent: "urlaub" });
+    expect(kitchen.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
   });
 
-  it("leere Zelle bei Freigabe ohne Einteilung/Abwesenheit", () => {
+  it("leere Zelle bei Freigabe ohne Einteilung", () => {
     const out = buildPlanungstafelData({
       days: DAYS,
       locations: [LOC_A],
       staff: STAFF,
-      staffLocations: SL,
       shifts: [],
       absences: [],
       releases: FULL_RELEASES,
@@ -142,7 +134,6 @@ describe("buildPlanungstafelData", () => {
   });
 
   it("GL-Zeile ist freigegeben, sobald mindestens ein Bereich freigegeben ist", () => {
-    // Nur Service bei loc-a am DAYS[0] — GL-Zeile trotzdem freigegeben.
     const releases: PtRelease[] = [
       { locationId: "loc-a", area: "service", startDate: DAYS[0], endDate: DAYS[0] },
     ];
@@ -150,7 +141,6 @@ describe("buildPlanungstafelData", () => {
       days: [DAYS[0]],
       locations: [LOC_A],
       staff: STAFF,
-      staffLocations: SL,
       shifts: [],
       absences: [],
       releases,
@@ -159,18 +149,15 @@ describe("buildPlanungstafelData", () => {
     expect(gl.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
   });
 
-  it("GL-Schichten landen in der GL-Zeile und werden aus Küche/Service dedupliziert", () => {
-    // Anna hat am selben Tag eine Service- und eine GL-Schicht bei loc-a.
-    // Ergebnis: sie erscheint NUR in der GL-Zeile.
+  it("GL wird über skillName='gl' erkannt und aus Service dedupliziert", () => {
     const shifts: PtShift[] = [
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "service" },
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "gl" },
+      svc("s1", DAYS[0], "loc-a", "Service"),
+      svc("s1", DAYS[0], "loc-a", "GL"),
     ];
     const out = buildPlanungstafelData({
       days: [DAYS[0]],
       locations: [LOC_A],
       staff: STAFF,
-      staffLocations: SL,
       shifts,
       absences: [],
       releases: FULL_RELEASES,
@@ -180,5 +167,99 @@ describe("buildPlanungstafelData", () => {
     expect(service).toEqual({ kind: "empty" });
     if (gl.kind !== "roster") throw new Error("erwartet roster");
     expect(gl.entries.map((e) => e.staffId)).toEqual(["s1"]);
+  });
+
+  it("Golden Sa 25.07. Spicery — Küche/Service/GL wie im Screenshot", () => {
+    const day = "2026-07-25";
+    const spicery: PtLocation = { id: "spi", name: "Spicery" };
+    const staff: PtStaff[] = [
+      { id: "baeng", displayName: "BÄNG" },
+      { id: "eh", displayName: "EH" },
+      { id: "elson", displayName: "Elson" },
+      { id: "jit", displayName: "JIT" },
+      { id: "nat", displayName: "NAT" },
+      { id: "dereje", displayName: "DEREJE" },
+      { id: "gig_k", displayName: "GIG" },
+      { id: "cherry", displayName: "CHERRY" },
+      { id: "gigsrv", displayName: "GIG SERVICE" },
+      { id: "joy", displayName: "JOY" },
+      { id: "wit", displayName: "WIT" },
+      { id: "coco", displayName: "COCO" },
+      { id: "lam", displayName: "LAM" },
+      { id: "pon", displayName: "PON" },
+      { id: "mo", displayName: "MO" },
+    ];
+    const shifts: PtShift[] = [
+      kit("baeng", day, "spi"),
+      kit("eh", day, "spi"),
+      kit("elson", day, "spi"),
+      kit("jit", day, "spi"),
+      kit("nat", day, "spi"),
+      // Abwesend, mit Schicht-Zeile: dürfen NICHT erscheinen.
+      kit("dereje", day, "spi"),
+      kit("gig_k", day, "spi"),
+      svc("cherry", day, "spi", "Service"),
+      svc("gigsrv", day, "spi", "Service"),
+      svc("joy", day, "spi", "Service"),
+      svc("wit", day, "spi", "Service"),
+      // Abwesend im Service: dürfen NICHT erscheinen.
+      svc("coco", day, "spi", "Service"),
+      svc("lam", day, "spi", "Service"),
+      svc("pon", day, "spi", "Service"),
+      // MO trägt den GL-Skill: gehört NUR in die GL-Zeile.
+      svc("mo", day, "spi", "GL"),
+    ];
+    const absences: PtAbsence[] = [
+      { staffId: "dereje", date: day, type: "krank" },
+      { staffId: "gig_k", date: day, type: "urlaub" },
+      { staffId: "coco", date: day, type: "krank" },
+      { staffId: "lam", date: day, type: "urlaub" },
+      { staffId: "pon", date: day, type: "urlaub" },
+    ];
+    const releases: PtRelease[] = [
+      { locationId: "spi", area: "kitchen", startDate: day, endDate: day },
+      { locationId: "spi", area: "service", startDate: day, endDate: day },
+    ];
+    const out = buildPlanungstafelData({
+      days: [day],
+      locations: [spicery],
+      staff,
+      shifts,
+      absences,
+      releases,
+    });
+    const block = out[0];
+    const kitchen = block.areas.find((a) => a.area === "kitchen")!.cellsByDate[day];
+    const service = block.areas.find((a) => a.area === "service")!.cellsByDate[day];
+    const gl = block.areas.find((a) => a.area === "gl")!.cellsByDate[day];
+    if (kitchen.kind !== "roster" || service.kind !== "roster" || gl.kind !== "roster") {
+      throw new Error("erwartet roster in allen drei Zeilen");
+    }
+    expect(kitchen.entries.map((e) => e.staffName)).toEqual(["BÄNG", "EH", "Elson", "JIT", "NAT"]);
+    expect(service.entries.map((e) => e.staffName)).toEqual([
+      "CHERRY",
+      "GIG SERVICE",
+      "JOY",
+      "WIT",
+    ]);
+    expect(gl.entries.map((e) => e.staffName)).toEqual(["MO"]);
+  });
+
+  it("Tausch: Schicht liegt auf Person B — Tafel zeigt B (Paritäts-Beweis)", () => {
+    // Nach einem Tausch trägt roster_shifts.staff_id die neue Person; der
+    // gemeinsame Loader liefert genau diesen Stand.
+    const day = DAYS[0];
+    const shifts: PtShift[] = [svc("s2", day, "loc-a", "Service")];
+    const out = buildPlanungstafelData({
+      days: [day],
+      locations: [LOC_A],
+      staff: STAFF,
+      shifts,
+      absences: [],
+      releases: FULL_RELEASES,
+    });
+    const service = out[0].areas.find((a) => a.area === "service")!.cellsByDate[day];
+    if (service.kind !== "roster") throw new Error("erwartet roster");
+    expect(service.entries.map((e) => e.staffId)).toEqual(["s2"]);
   });
 });

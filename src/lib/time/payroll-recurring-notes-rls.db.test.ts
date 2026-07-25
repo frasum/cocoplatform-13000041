@@ -33,7 +33,7 @@ describe.skipIf(!dbTestsEnabled)("payroll_recurring_notes RLS (RN1-T)", () => {
       .insert({
         organization_id: org.orgId,
         staff_id: managerStaffId,
-        kind: "note",
+        kind: "dauer",
         first_period_start: "2026-07-01",
         text: seededText,
       })
@@ -59,7 +59,7 @@ describe.skipIf(!dbTestsEnabled)("payroll_recurring_notes RLS (RN1-T)", () => {
     const { error } = await client.from("payroll_recurring_notes").insert({
       organization_id: org.orgId,
       staff_id: managerStaffId,
-      kind: "note",
+      kind: "dauer",
       first_period_start: "2026-08-01",
       text: "hack-insert",
     });

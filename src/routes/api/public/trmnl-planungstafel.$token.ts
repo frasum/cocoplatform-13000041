@@ -238,10 +238,8 @@ function renderPage(input: {
     timeZone: "Europe/Berlin",
   });
 
-  // Spaltenbreiten: Heute/Morgen breit, Übermorgen schmal.
-  const widths = input.days.map((_, i) => (i < 2 ? 2 : 1));
-  const widthSum = widths.reduce((a, b) => a + b, 0);
-  const gridCols = `320px ${widths.map((w) => `${w}fr`).join(" ")}`;
+  // EP2-7: alle Tage gleich breit — der vierte Tag soll so lesbar sein wie der erste.
+  const gridCols = `320px repeat(${input.days.length}, 1fr)`;
 
   const headerCells = input.days
     .map((iso) => {
@@ -299,7 +297,7 @@ function renderPage(input: {
   .loc-title { grid-column: 1 / -1; font-size: 28px; font-weight: 800; border-top: 4px solid #000; border-bottom: 2px solid #000; padding: 10px 12px; background: #f2f2f2; }
   .row-head { font-size: 22px; font-weight: 700; }
   .row-head .sub { font-size: 15px; font-weight: 500; opacity: 0.7; }
-  .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 72px; }
+  .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 130px; }
   .cell:last-child { border-right: none; }
   .cell.not-released { color: #000; opacity: 0.45; font-style: italic; font-size: 18px; }
   .cell.empty { opacity: 0.35; }
@@ -315,7 +313,7 @@ function renderPage(input: {
 <body>
   <header class="header">
     <h1>Planungstafel</h1>
-    <div class="right"><div>${escapeHtml(stamp)} Uhr</div><div class="muted">${input.days.length} Tage · ${widthSum} Spalten</div></div>
+    <div class="right"><div>${escapeHtml(stamp)} Uhr</div><div class="muted">${input.days.length} Tage</div></div>
   </header>
   <div class="grid">
     <div class="col-head row-head"><span class="col-head-cell muted">Standort · Bereich</span></div>

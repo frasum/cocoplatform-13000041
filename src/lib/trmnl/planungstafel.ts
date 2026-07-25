@@ -98,11 +98,7 @@ function isReleased(
 // GL ist keine Release-Area (WZ2 — die Schicht trägt den Typ). Die GL-Zeile
 // gilt als freigegeben, sobald für den Standort am Tag mindestens ein
 // Bereich (Küche oder Service) freigegeben ist.
-function isAnyReleased(
-  releases: readonly PtRelease[],
-  locationId: string,
-  date: string,
-): boolean {
+function isAnyReleased(releases: readonly PtRelease[], locationId: string, date: string): boolean {
   for (const r of releases) {
     if (
       r.locationId === locationId &&

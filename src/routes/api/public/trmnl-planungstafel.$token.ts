@@ -341,7 +341,7 @@ function renderPage(input: {
     ${bodyHtml}
   </div>
   <footer class="footer">
-    <span>● Cross-Standort · ⛱ Urlaub · ✚ krank · Nicht freigegebene Tage sind ausgegraut.</span>
+    <span>● Cross-Standort · Abwesende (Urlaub/krank) werden nicht angezeigt.</span>
     <span>Abruf ${escapeHtml(stamp)} Uhr</span>
   </footer>
 </body>

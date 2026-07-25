@@ -337,22 +337,25 @@ function renderLocationBlock(block: PtLocationBlock, days: readonly string[]): s
     .map((row) => {
       const rowLabel = PT_AREAS.find((a) => a.area === row.area)?.label ?? row.area;
       const head = `<div class="row-head"><div>${escapeHtml(rowLabel)}</div><div class="sub">${escapeHtml(block.locationName)}</div></div>`;
-      const cells = days.map((iso) => renderCell(row.cellsByDate[iso], iso)).join("");
+      const cells = days
+        .map((iso, i) => renderCell(row.cellsByDate[iso], iso, i === days.length - 1))
+        .join("");
       return `${head}${cells}`;
     })
     .join("");
   return `${title}${rows}`;
 }
 
-function renderCell(cell: PtCell | undefined, iso: string): string {
+function renderCell(cell: PtCell | undefined, iso: string, isLast: boolean): string {
   const d = new Date(iso + "T00:00:00Z");
   const dow = d.getUTCDay();
   const we = dow === 0 || dow === 6 ? " we" : "";
+  const last = isLast ? " last-col" : "";
   if (!cell || cell.kind === "not_released") {
-    return `<div class="cell not-released${we}">— noch nicht freigegeben —</div>`;
+    return `<div class="cell not-released${we}${last}">— noch nicht freigegeben —</div>`;
   }
   if (cell.kind === "empty") {
-    return `<div class="cell empty${we}">—</div>`;
+    return `<div class="cell empty${we}${last}">—</div>`;
   }
   const entriesHtml = cell.entries
     .map((e) => {
@@ -360,5 +363,5 @@ function renderCell(cell: PtCell | undefined, iso: string): string {
       return `<span class="entry">${dot}${escapeHtml(e.staffName)}</span>`;
     })
     .join("");
-  return `<div class="cell${we}">${entriesHtml}</div>`;
+  return `<div class="cell${we}${last}">${entriesHtml}</div>`;
 }

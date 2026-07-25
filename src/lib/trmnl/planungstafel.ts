@@ -95,6 +95,27 @@ function isReleased(
   return false;
 }
 
+// GL ist keine Release-Area (WZ2 — die Schicht trägt den Typ). Die GL-Zeile
+// gilt als freigegeben, sobald für den Standort am Tag mindestens ein
+// Bereich (Küche oder Service) freigegeben ist.
+function isAnyReleased(
+  releases: readonly PtRelease[],
+  locationId: string,
+  date: string,
+): boolean {
+  for (const r of releases) {
+    if (
+      r.locationId === locationId &&
+      (r.area === "kitchen" || r.area === "service") &&
+      r.startDate <= date &&
+      date <= r.endDate
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function buildPlanungstafelData(input: {
   days: readonly string[];
   locations: readonly PtLocation[];
@@ -154,20 +175,48 @@ export function buildPlanungstafelData(input: {
   const out: PtLocationBlock[] = [];
   for (const loc of input.locations) {
     const areas: PtAreaRow[] = [];
+    // GL-Zeile pro Tag zuerst bestimmen, damit Küche/Service die dort
+    // gelisteten Personen deduplizieren können.
+    const glEntryIdsByDate = new Map<string, Set<string>>();
+    for (const date of input.days) {
+      if (!isAnyReleased(input.releases, loc.id, date)) continue;
+      const glShiftIds = shiftsByCell.get(`${loc.id}|gl|${date}`) ?? new Set<string>();
+      const glAreaStaff = staffByLocArea.get(`${loc.id}|gl`) ?? new Set<string>();
+      const ids = new Set<string>(glShiftIds);
+      for (const staffId of glAreaStaff) {
+        if (absenceByKey.has(`${staffId}|${date}`)) ids.add(staffId);
+      }
+      glEntryIdsByDate.set(date, ids);
+    }
+
     for (const { area, label } of PT_AREAS) {
       const cellsByDate: Record<string, PtCell> = {};
       for (const date of input.days) {
-        if (!isReleased(input.releases, loc.id, area, date)) {
+        const released =
+          area === "gl"
+            ? isAnyReleased(input.releases, loc.id, date)
+            : isReleased(input.releases, loc.id, area, date);
+        if (!released) {
           cellsByDate[date] = { kind: "not_released" };
           continue;
         }
-        const scheduledIds = shiftsByCell.get(`${loc.id}|${area}|${date}`) ?? new Set<string>();
-        const areaStaff = staffByLocArea.get(`${loc.id}|${area}`) ?? new Set<string>();
-
-        const entryIds = new Set<string>(scheduledIds);
-        // Abwesende (Urlaub/krank) mit passendem Bereich am Standort dazu.
-        for (const staffId of areaStaff) {
-          if (absenceByKey.has(`${staffId}|${date}`)) entryIds.add(staffId);
+        let entryIds: Set<string>;
+        if (area === "gl") {
+          entryIds = new Set<string>(glEntryIdsByDate.get(date) ?? []);
+        } else {
+          const scheduledIds = shiftsByCell.get(`${loc.id}|${area}|${date}`) ?? new Set<string>();
+          const areaStaff = staffByLocArea.get(`${loc.id}|${area}`) ?? new Set<string>();
+          entryIds = new Set<string>(scheduledIds);
+          // Abwesende (Urlaub/krank) mit passendem Bereich am Standort dazu.
+          for (const staffId of areaStaff) {
+            if (absenceByKey.has(`${staffId}|${date}`)) entryIds.add(staffId);
+          }
+          // Personen, die in der GL-Zeile dieses (Standort, Tag) erscheinen,
+          // NICHT zusätzlich unter Küche/Service listen (Dedup).
+          const glIds = glEntryIdsByDate.get(date);
+          if (glIds) {
+            for (const id of glIds) entryIds.delete(id);
+          }
         }
 
         if (entryIds.size === 0) {

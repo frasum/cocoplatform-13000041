@@ -39,8 +39,8 @@ const FULL_RELEASES: PtRelease[] = [LOC_A, LOC_B].flatMap((l) =>
 
 describe("buildPlanungstafelData", () => {
   it("markiert Tage ohne Release als not_released", () => {
-    // Nur Küche/Service bei loc-a freigegeben, GL nicht — Tag 2026-07-27
-    // liegt zusätzlich außerhalb der Freigabe (endet am 26.).
+    // Nur Küche/Service bei loc-a freigegeben (GL kennt keine eigene Freigabe).
+    // Tag 2026-07-27 liegt außerhalb — dort alle Zeilen not_released.
     const releases: PtRelease[] = [
       { locationId: "loc-a", area: "kitchen", startDate: DAYS[0], endDate: DAYS[1] },
       { locationId: "loc-a", area: "service", startDate: DAYS[0], endDate: DAYS[1] },
@@ -56,7 +56,9 @@ describe("buildPlanungstafelData", () => {
     });
     const [block] = out;
     const gl = block.areas.find((a) => a.area === "gl")!;
-    expect(gl.cellsByDate[DAYS[0]]).toEqual({ kind: "not_released" });
+    // GL folgt „mindestens ein Bereich freigegeben" — hier: freigegeben, leer.
+    expect(gl.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
+    expect(gl.cellsByDate[DAYS[2]]).toEqual({ kind: "not_released" });
     const service = block.areas.find((a) => a.area === "service")!;
     expect(service.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
     expect(service.cellsByDate[DAYS[2]]).toEqual({ kind: "not_released" });
@@ -89,8 +91,9 @@ describe("buildPlanungstafelData", () => {
   it("kein Cross-Punkt bei Schicht nur am eigenen Standort", () => {
     const shifts: PtShift[] = [
       { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "service" },
-      // Zweite Schicht am gleichen Standort, anderer Bereich → kein Cross.
-      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "gl" },
+      // Zweite Schicht am gleichen Standort, anderer Bereich (kein gl, damit
+      // die Dedup-Regel Anna nicht aus Service in die GL-Zeile verschiebt).
+      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "kitchen" },
     ];
     const out = buildPlanungstafelData({
       days: DAYS,
@@ -136,5 +139,46 @@ describe("buildPlanungstafelData", () => {
     });
     const service = out[0].areas.find((a) => a.area === "service")!;
     expect(service.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
+  });
+
+  it("GL-Zeile ist freigegeben, sobald mindestens ein Bereich freigegeben ist", () => {
+    // Nur Service bei loc-a am DAYS[0] — GL-Zeile trotzdem freigegeben.
+    const releases: PtRelease[] = [
+      { locationId: "loc-a", area: "service", startDate: DAYS[0], endDate: DAYS[0] },
+    ];
+    const out = buildPlanungstafelData({
+      days: [DAYS[0]],
+      locations: [LOC_A],
+      staff: STAFF,
+      staffLocations: SL,
+      shifts: [],
+      absences: [],
+      releases,
+    });
+    const gl = out[0].areas.find((a) => a.area === "gl")!;
+    expect(gl.cellsByDate[DAYS[0]]).toEqual({ kind: "empty" });
+  });
+
+  it("GL-Schichten landen in der GL-Zeile und werden aus Küche/Service dedupliziert", () => {
+    // Anna hat am selben Tag eine Service- und eine GL-Schicht bei loc-a.
+    // Ergebnis: sie erscheint NUR in der GL-Zeile.
+    const shifts: PtShift[] = [
+      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "service" },
+      { staffId: "s1", shiftDate: DAYS[0], locationId: "loc-a", area: "gl" },
+    ];
+    const out = buildPlanungstafelData({
+      days: [DAYS[0]],
+      locations: [LOC_A],
+      staff: STAFF,
+      staffLocations: SL,
+      shifts,
+      absences: [],
+      releases: FULL_RELEASES,
+    });
+    const service = out[0].areas.find((a) => a.area === "service")!.cellsByDate[DAYS[0]];
+    const gl = out[0].areas.find((a) => a.area === "gl")!.cellsByDate[DAYS[0]];
+    expect(service).toEqual({ kind: "empty" });
+    if (gl.kind !== "roster") throw new Error("erwartet roster");
+    expect(gl.entries.map((e) => e.staffId)).toEqual(["s1"]);
   });
 });

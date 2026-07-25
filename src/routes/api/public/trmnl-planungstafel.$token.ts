@@ -285,7 +285,6 @@ function renderPage(input: {
   .grid > * { border-bottom: 1.5px solid #000; padding: 8px 12px; }
   .grid > .row-head { border-right: 1.5px solid #000; }
   .grid > .col-head { border-right: 1.5px solid #000; }
-  .grid > .col-head:last-child { border-right: none; }
   .col-head-cell { display: block; }
   .day-head { text-align: left; }
   .day-head .lbl { font-size: 30px; font-weight: 800; }
@@ -298,7 +297,8 @@ function renderPage(input: {
   .row-head { font-size: 22px; font-weight: 700; }
   .row-head .sub { font-size: 15px; font-weight: 500; opacity: 0.7; }
   .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 130px; }
-  .cell:last-child { border-right: none; }
+  /* EP2b: Tafel rechts offen wie links — kein Randstrich hinter der letzten Spalte. */
+  .grid > .last-col { border-right: none; }
   .cell.not-released { color: #000; opacity: 0.45; font-style: italic; font-size: 18px; }
   .cell.empty { opacity: 0.35; }
   .cell.we { background: #eee; }

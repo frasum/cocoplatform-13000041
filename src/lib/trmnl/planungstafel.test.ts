@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPlanungstafelData,
+  dayHeader,
   type PtAbsence,
   type PtLocation,
   type PtRelease,
@@ -261,5 +262,47 @@ describe("buildPlanungstafelData", () => {
     const service = out[0].areas.find((a) => a.area === "service")!.cellsByDate[day];
     if (service.kind !== "roster") throw new Error("erwartet roster");
     expect(service.entries.map((e) => e.staffId)).toEqual(["s2"]);
+  });
+});
+
+describe("dayHeader", () => {
+  it("Offset 0/1/2 → Heute/Morgen/Übermorgen, human mit Wochentag", () => {
+    const today = "2026-07-25"; // Samstag
+    const h0 = dayHeader(today, today);
+    expect(h0.label).toBe("Heute");
+    expect(h0.human).toBe("Samstag, 25. Juli");
+    expect(h0.dow).toBe(6);
+
+    const h1 = dayHeader("2026-07-26", today); // Sonntag
+    expect(h1.label).toBe("Morgen");
+    expect(h1.human).toBe("Sonntag, 26. Juli");
+    expect(h1.dow).toBe(0);
+
+    const h2 = dayHeader("2026-07-27", today); // Montag
+    expect(h2.label).toBe("Übermorgen");
+    expect(h2.human).toBe("Montag, 27. Juli");
+    expect(h2.dow).toBe(1);
+  });
+
+  it("Offset 3 → Wochentagsname, human ohne Wochentag", () => {
+    const h = dayHeader("2026-07-28", "2026-07-25"); // Dienstag
+    expect(h.label).toBe("Dienstag");
+    expect(h.human).toBe("28. Juli");
+    expect(h.dow).toBe(2);
+  });
+
+  it("Offset 3 über Monatsgrenze", () => {
+    const h = dayHeader("2026-08-02", "2026-07-30"); // Sonntag
+    expect(h.label).toBe("Sonntag");
+    expect(h.human).toBe("02. August");
+    expect(h.dow).toBe(0);
+  });
+
+  it("Offset 3 über Sommerzeit-Grenze — kein Tag-Sprung", () => {
+    // 2026-10-25 ist der Umstellungstag in Europa. UTC-Basis darf nichts verschieben.
+    const h = dayHeader("2026-10-27", "2026-10-24");
+    expect(h.label).toBe("Dienstag");
+    expect(h.human).toBe("27. Oktober");
+    expect(h.dow).toBe(2);
   });
 });

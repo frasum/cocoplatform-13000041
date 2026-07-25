@@ -16,6 +16,7 @@ import { todayIso as todayIsoBerlin } from "@/lib/format";
 import { getHolidayName } from "@/lib/roster/holidays-display";
 import {
   buildPlanungstafelData,
+  dayHeader,
   PT_AREAS,
   type PtArea,
   type PtCell,
@@ -26,10 +27,9 @@ import {
   type PtStaff,
 } from "@/lib/trmnl/planungstafel";
 
-// Spalten-Anzahl. Dritter Tag (Übermorgen) bleibt an; ob er auf dem echten
-// Panel lesbar bleibt, entscheidet der Geräte-Klicktest — Abschalten hier
-// durch `3 → 2`.
-const DAY_COUNT = 3;
+// EP2 — vier Tage. Der vierte Tag trägt den Wochentagsnamen (siehe
+// dayHeader in @/lib/trmnl/planungstafel). Spalten sind gleich breit.
+const DAY_COUNT = 4;
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -61,21 +61,6 @@ function nextDays(startIso: string, count: number): string[] {
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return out;
-}
-
-function dayHeader(iso: string, todayIso: string): { label: string; human: string; dow: number } {
-  const d = new Date(iso + "T00:00:00Z");
-  const dow = d.getUTCDay();
-  const wd = d.toLocaleDateString("de-DE", { weekday: "long", timeZone: "UTC" });
-  const dm = d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", timeZone: "UTC" });
-  let label: string;
-  if (iso === todayIso) label = "Heute";
-  else {
-    const t = new Date(todayIso + "T00:00:00Z");
-    t.setUTCDate(t.getUTCDate() + 1);
-    label = iso === t.toISOString().slice(0, 10) ? "Morgen" : "Übermorgen";
-  }
-  return { label, human: `${wd}, ${dm}`, dow };
 }
 
 export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
@@ -253,10 +238,8 @@ function renderPage(input: {
     timeZone: "Europe/Berlin",
   });
 
-  // Spaltenbreiten: Heute/Morgen breit, Übermorgen schmal.
-  const widths = input.days.map((_, i) => (i < 2 ? 2 : 1));
-  const widthSum = widths.reduce((a, b) => a + b, 0);
-  const gridCols = `320px ${widths.map((w) => `${w}fr`).join(" ")}`;
+  // EP2-7: alle Tage gleich breit — der vierte Tag soll so lesbar sein wie der erste.
+  const gridCols = `320px repeat(${input.days.length}, 1fr)`;
 
   const headerCells = input.days
     .map((iso) => {
@@ -314,7 +297,7 @@ function renderPage(input: {
   .loc-title { grid-column: 1 / -1; font-size: 28px; font-weight: 800; border-top: 4px solid #000; border-bottom: 2px solid #000; padding: 10px 12px; background: #f2f2f2; }
   .row-head { font-size: 22px; font-weight: 700; }
   .row-head .sub { font-size: 15px; font-weight: 500; opacity: 0.7; }
-  .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 72px; }
+  .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 130px; }
   .cell:last-child { border-right: none; }
   .cell.not-released { color: #000; opacity: 0.45; font-style: italic; font-size: 18px; }
   .cell.empty { opacity: 0.35; }
@@ -330,7 +313,7 @@ function renderPage(input: {
 <body>
   <header class="header">
     <h1>Planungstafel</h1>
-    <div class="right"><div>${escapeHtml(stamp)} Uhr</div><div class="muted">${input.days.length} Tage · ${widthSum} Spalten</div></div>
+    <div class="right"><div>${escapeHtml(stamp)} Uhr</div><div class="muted">${input.days.length} Tage</div></div>
   </header>
   <div class="grid">
     <div class="col-head row-head"><span class="col-head-cell muted">Standort · Bereich</span></div>

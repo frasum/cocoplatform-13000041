@@ -242,7 +242,7 @@ function renderPage(input: {
   const gridCols = `320px repeat(${input.days.length}, 1fr)`;
 
   const headerCells = input.days
-    .map((iso) => {
+    .map((iso, i) => {
       const h = dayHeader(iso, input.todayIso);
       const holiday = getHolidayName(iso);
       const cls = [
@@ -250,6 +250,7 @@ function renderPage(input: {
         h.dow === 0 || h.dow === 6 ? "we" : "",
         iso === input.todayIso ? "today" : "",
         holiday ? "holiday" : "",
+        i === input.days.length - 1 ? "last-col" : "",
       ]
         .filter(Boolean)
         .join(" ");
@@ -285,7 +286,6 @@ function renderPage(input: {
   .grid > * { border-bottom: 1.5px solid #000; padding: 8px 12px; }
   .grid > .row-head { border-right: 1.5px solid #000; }
   .grid > .col-head { border-right: 1.5px solid #000; }
-  .grid > .col-head:last-child { border-right: none; }
   .col-head-cell { display: block; }
   .day-head { text-align: left; }
   .day-head .lbl { font-size: 30px; font-weight: 800; }
@@ -298,7 +298,8 @@ function renderPage(input: {
   .row-head { font-size: 22px; font-weight: 700; }
   .row-head .sub { font-size: 15px; font-weight: 500; opacity: 0.7; }
   .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 130px; }
-  .cell:last-child { border-right: none; }
+  /* EP2b: Tafel rechts offen wie links — kein Randstrich hinter der letzten Spalte. */
+  .grid > .last-col { border-right: none; }
   .cell.not-released { color: #000; opacity: 0.45; font-style: italic; font-size: 18px; }
   .cell.empty { opacity: 0.35; }
   .cell.we { background: #eee; }
@@ -336,22 +337,25 @@ function renderLocationBlock(block: PtLocationBlock, days: readonly string[]): s
     .map((row) => {
       const rowLabel = PT_AREAS.find((a) => a.area === row.area)?.label ?? row.area;
       const head = `<div class="row-head"><div>${escapeHtml(rowLabel)}</div><div class="sub">${escapeHtml(block.locationName)}</div></div>`;
-      const cells = days.map((iso) => renderCell(row.cellsByDate[iso], iso)).join("");
+      const cells = days
+        .map((iso, i) => renderCell(row.cellsByDate[iso], iso, i === days.length - 1))
+        .join("");
       return `${head}${cells}`;
     })
     .join("");
   return `${title}${rows}`;
 }
 
-function renderCell(cell: PtCell | undefined, iso: string): string {
+function renderCell(cell: PtCell | undefined, iso: string, isLast: boolean): string {
   const d = new Date(iso + "T00:00:00Z");
   const dow = d.getUTCDay();
   const we = dow === 0 || dow === 6 ? " we" : "";
+  const last = isLast ? " last-col" : "";
   if (!cell || cell.kind === "not_released") {
-    return `<div class="cell not-released${we}">— noch nicht freigegeben —</div>`;
+    return `<div class="cell not-released${we}${last}">— noch nicht freigegeben —</div>`;
   }
   if (cell.kind === "empty") {
-    return `<div class="cell empty${we}">—</div>`;
+    return `<div class="cell empty${we}${last}">—</div>`;
   }
   const entriesHtml = cell.entries
     .map((e) => {
@@ -359,5 +363,5 @@ function renderCell(cell: PtCell | undefined, iso: string): string {
       return `<span class="entry">${dot}${escapeHtml(e.staffName)}</span>`;
     })
     .join("");
-  return `<div class="cell${we}">${entriesHtml}</div>`;
+  return `<div class="cell${we}${last}">${entriesHtml}</div>`;
 }

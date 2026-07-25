@@ -1,12 +1,12 @@
 // BM1 — MailerSend Inbound-Webhook.
 //
 // Der HTTP-Adapter ist bewusst dünn: er reicht Raw-Body/Signature/Env an
-// `processInboundEmail` (siehe webhook-core.ts) durch, damit die Kernlogik
+// `processInboundEmail` (siehe -webhook-core.ts) durch, damit die Kernlogik
 // unter DB-Integrationstest steht. Erfolgs-/Ignore-Antworten sind 200,
 // damit MailerSend keine Retry-Kaskade auslöst.
 
 import { createFileRoute } from "@tanstack/react-router";
-import { processInboundEmail } from "./webhook-core";
+import { processInboundEmail } from "./-webhook-core";
 
 const FORWARD_TO_EMAIL = "buchhaltung@yum-thai.de";
 

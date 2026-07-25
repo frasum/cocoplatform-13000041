@@ -275,6 +275,7 @@ jobs:
             echo "SUPABASE_SERVICE_ROLE_KEY=$SUPA_SVC"
             echo "VITE_SUPABASE_URL=$SUPA_URL"
             echo "VITE_SUPABASE_PUBLISHABLE_KEY=$SUPA_ANON"
+            echo "SUPABASE_PUBLISHABLE_KEY=$SUPA_ANON"
           } >> "$GITHUB_ENV"
       - name: Reset DB (apply all migrations cleanly)
         run: |

@@ -12,6 +12,11 @@ import { resolveCellKind } from "@/lib/display/cell";
 import { currentPeriodEnd, nextPeriodEnd, periodLabel } from "@/lib/display/period-split";
 import { computeCrossBookingFlags, type ShiftForFlag } from "@/lib/roster/cross-booking";
 import {
+  loadRosterShiftsRaw,
+  loadRosterAbsencesRaw,
+  loadSkillsByIds,
+} from "@/lib/display/roster-window.server";
+import {
   remindersForBusinessDate,
   type Reminder,
   type ReminderColor,
@@ -279,20 +284,21 @@ export async function buildDisplayData(
   const rowStaffIds = Array.from(new Set(rowEntries.map((r) => r.staffId)));
   const idSafe = rowStaffIds.length ? rowStaffIds : ["00000000-0000-0000-0000-000000000000"];
 
-  const { data: shiftRows, error: shiftErr } = await supabaseAdmin
-    .from("roster_shifts")
-    .select("staff_id, shift_date, area, skill_id, service_period")
-    .eq("organization_id", organizationId)
-    .eq("location_id", locationId)
-    .gte("shift_date", countStart)
-    .lte("shift_date", countEnd);
-  if (shiftErr) return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
+  const shiftLoad = await loadRosterShiftsRaw(supabaseAdmin, {
+    organizationId,
+    locationIds: [locationId],
+    from: countStart,
+    to: countEnd,
+  });
+  if (!shiftLoad.ok)
+    return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
+  const shiftRows = shiftLoad.rows;
 
   const shiftMap = new Map<string, string | null>();
   const skillIdSet = new Set<string>();
   const periodCounts = new Map<string, { cur: number; next: number }>();
   const periodSeen = new Set<string>();
-  for (const sh of shiftRows ?? []) {
+  for (const sh of shiftRows) {
     const staffId = sh.staff_id as string;
     const date = sh.shift_date as string;
     const rawArea = sh.area as string;
@@ -330,16 +336,15 @@ export async function buildDisplayData(
   // DP1 — Cross-Booking-Flags: org-weit Schichten dieser MA im
   // Anzeigefenster laden und je Bereich (kitchen/service) einen
   // Flag-Set berechnen. Nur boolesch, keine Detailinfos.
-  const { data: orgShiftRows, error: orgShiftErr } = await supabaseAdmin
-    .from("roster_shifts")
-    .select("staff_id, shift_date, location_id, area")
-    .eq("organization_id", organizationId)
-    .in("staff_id", idSafe)
-    .gte("shift_date", windowStart)
-    .lte("shift_date", windowEnd);
-  if (orgShiftErr)
+  const orgShiftLoad = await loadRosterShiftsRaw(supabaseAdmin, {
+    organizationId,
+    staffIds: idSafe,
+    from: windowStart,
+    to: windowEnd,
+  });
+  if (!orgShiftLoad.ok)
     return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
-  const orgShifts: ShiftForFlag[] = (orgShiftRows ?? []).map((r) => ({
+  const orgShifts: ShiftForFlag[] = orgShiftLoad.rows.map((r) => ({
     staffId: r.staff_id as string,
     shiftDate: r.shift_date as string,
     locationId: r.location_id as string,
@@ -351,29 +356,18 @@ export async function buildDisplayData(
   };
 
   const skillIds = Array.from(skillIdSet);
-  const skillMap = new Map<string, { name: string; color: string | null }>();
-  if (skillIds.length) {
-    const { data: skRows, error: skErr } = await supabaseAdmin
-      .from("skills")
-      .select("id, name, color")
-      .in("id", skillIds);
-    if (skErr) return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
-    for (const sk of skRows ?? []) {
-      skillMap.set(sk.id as string, {
-        name: sk.name as string,
-        color: (sk.color as string | null) ?? null,
-      });
-    }
-  }
+  const skillLoad = await loadSkillsByIds(supabaseAdmin, skillIds);
+  if (!skillLoad.ok)
+    return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
+  const skillMap = skillLoad.byId;
 
-  const [absRes, wishRes, availRes] = await Promise.all([
-    supabaseAdmin
-      .from("roster_absence")
-      .select("staff_id, date, type")
-      .eq("organization_id", organizationId)
-      .in("staff_id", idSafe)
-      .gte("date", windowStart)
-      .lte("date", windowEnd),
+  const [absLoad, wishRes, availRes] = await Promise.all([
+    loadRosterAbsencesRaw(supabaseAdmin, {
+      organizationId,
+      staffIds: idSafe,
+      from: windowStart,
+      to: windowEnd,
+    }),
     supabaseAdmin
       .from("day_off_wishes")
       .select("staff_id, wish_date")
@@ -389,15 +383,12 @@ export async function buildDisplayData(
       .gte("date", windowStart)
       .lte("date", windowEnd),
   ]);
-  if (absRes.error || wishRes.error || availRes.error) {
+  if (!absLoad.ok || wishRes.error || availRes.error) {
     return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
   }
   const absenceMap = new Map<string, "urlaub" | "krank">();
-  for (const a of absRes.data ?? []) {
-    const t = a.type as string;
-    if (t === "urlaub" || t === "krank") {
-      absenceMap.set(`${a.staff_id as string}|${a.date as string}`, t);
-    }
+  for (const a of absLoad.rows) {
+    absenceMap.set(`${a.staff_id}|${a.date}`, a.type);
   }
   const wishSet = new Set<string>(
     (wishRes.data ?? []).map((w) => `${w.staff_id as string}|${w.wish_date as string}`),

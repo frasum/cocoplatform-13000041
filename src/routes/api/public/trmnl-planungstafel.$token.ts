@@ -17,8 +17,6 @@ import { getHolidayName } from "@/lib/roster/holidays-display";
 import {
   buildPlanungstafelData,
   PT_AREAS,
-  type PtAbsence,
-  type PtAbsenceType,
   type PtArea,
   type PtCell,
   type PtLocation,
@@ -26,9 +24,7 @@ import {
   type PtRelease,
   type PtShift,
   type PtStaff,
-  type PtStaffLocation,
 } from "@/lib/trmnl/planungstafel";
-import type { StaffDepartment } from "@/lib/staff-domain";
 
 // Spalten-Anzahl. Dritter Tag (Übermorgen) bleibt an; ob er auf dem echten
 // Panel lesbar bleibt, entscheidet der Geräte-Klicktest — Abschalten hier
@@ -163,47 +159,43 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
           });
         }
 
-        // Team-Zuordnungen (staff_locations) für die Zielstandorte.
-        const { data: slRows, error: slErr } = await supabaseAdmin
-          .from("staff_locations")
-          .select("staff_id, location_id, department")
-          .eq("organization_id", orgId)
-          .in("location_id", locIds);
-        if (slErr) return notFound();
-        const staffLocations: PtStaffLocation[] = (slRows ?? []).map((r) => ({
-          staffId: (r as { staff_id: string }).staff_id,
-          locationId: (r as { location_id: string }).location_id,
-          department: (r as { department: StaffDepartment }).department,
-        }));
+        // Gemeinsamer Loader (EP1b: Quellen-Parität mit trmnl-dienstplan).
+        // Cross-Location braucht Schichten ORGANISATIONSWEIT — nicht auf
+        // die Anzeige-Locations begrenzen.
+        const { loadRosterShiftsRaw, loadRosterAbsencesRaw, loadSkillsByIds } = await import(
+          "@/lib/display/roster-window.server"
+        );
+        const shiftsRes = await loadRosterShiftsRaw(supabaseAdmin, {
+          organizationId: orgId,
+          from: windowStart,
+          to: windowEnd,
+        });
+        if (!shiftsRes.ok) return notFound();
+        const skillIds = Array.from(
+          new Set(shiftsRes.rows.map((r) => r.skill_id).filter((v): v is string => !!v)),
+        );
+        const skillsRes = await loadSkillsByIds(supabaseAdmin, skillIds);
+        if (!skillsRes.ok) return notFound();
+        const shifts: PtShift[] = shiftsRes.rows
+          .filter((r) => r.area === "kitchen" || r.area === "service")
+          .map((r) => ({
+            staffId: r.staff_id,
+            shiftDate: r.shift_date,
+            locationId: r.location_id,
+            area: r.area as "kitchen" | "service",
+            skillName: r.skill_id ? (skillsRes.byId.get(r.skill_id)?.name ?? null) : null,
+          }));
 
-        // Cross-Location braucht Schichten ORGANISATIONSWEIT — nicht auf die
-        // zwei Anzeigen-Locations begrenzen.
-        const { data: shiftRows, error: shiftErr } = await supabaseAdmin
-          .from("roster_shifts")
-          .select("staff_id, shift_date, location_id, area")
-          .eq("organization_id", orgId)
-          .gte("shift_date", windowStart)
-          .lte("shift_date", windowEnd);
-        if (shiftErr) return notFound();
-        const shifts: PtShift[] = (shiftRows ?? []).map((r) => ({
-          staffId: (r as { staff_id: string }).staff_id,
-          shiftDate: (r as { shift_date: string }).shift_date,
-          locationId: (r as { location_id: string }).location_id,
-          area: (r as { area: PtArea }).area,
-        }));
-
-        const { data: absRows, error: absErr } = await supabaseAdmin
-          .from("roster_absence")
-          .select("staff_id, date, type")
-          .eq("organization_id", orgId)
-          .in("type", ["urlaub", "krank"])
-          .gte("date", windowStart)
-          .lte("date", windowEnd);
-        if (absErr) return notFound();
-        const absences: PtAbsence[] = (absRows ?? []).map((r) => ({
-          staffId: (r as { staff_id: string }).staff_id,
-          date: (r as { date: string }).date,
-          type: (r as { type: PtAbsenceType }).type,
+        const absencesRes = await loadRosterAbsencesRaw(supabaseAdmin, {
+          organizationId: orgId,
+          from: windowStart,
+          to: windowEnd,
+        });
+        if (!absencesRes.ok) return notFound();
+        const absences = absencesRes.rows.map((r) => ({
+          staffId: r.staff_id,
+          date: r.date,
+          type: r.type,
         }));
 
         // Namen für alle beteiligten MA (Schichten ∪ Abwesenheiten ∪
@@ -211,7 +203,6 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
         const staffIdSet = new Set<string>();
         for (const s of shifts) staffIdSet.add(s.staffId);
         for (const a of absences) staffIdSet.add(a.staffId);
-        for (const sl of staffLocations) staffIdSet.add(sl.staffId);
         const staffIds = Array.from(staffIdSet);
         let staff: PtStaff[] = [];
         if (staffIds.length > 0) {
@@ -231,7 +222,6 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
           days,
           locations: orderedLocations,
           staff,
-          staffLocations,
           shifts,
           absences,
           releases,
@@ -351,7 +341,7 @@ function renderPage(input: {
     ${bodyHtml}
   </div>
   <footer class="footer">
-    <span>● Cross-Standort · ⛱ Urlaub · ✚ krank · Nicht freigegebene Tage sind ausgegraut.</span>
+    <span>● Cross-Standort · Abwesende (Urlaub/krank) werden nicht angezeigt.</span>
     <span>Abruf ${escapeHtml(stamp)} Uhr</span>
   </footer>
 </body>
@@ -384,14 +374,7 @@ function renderCell(cell: PtCell | undefined, iso: string): string {
   const entriesHtml = cell.entries
     .map((e) => {
       const dot = e.crossLocation ? `<span class="dot"></span>` : "";
-      const sym =
-        e.absent === "urlaub"
-          ? `<span class="sym">⛱</span>`
-          : e.absent === "krank"
-            ? `<span class="sym">✚</span>`
-            : "";
-      const cls = ["entry", e.absent ? "absent" : ""].filter(Boolean).join(" ");
-      return `<span class="${cls}">${dot}${escapeHtml(e.staffName)}${sym}</span>`;
+      return `<span class="entry">${dot}${escapeHtml(e.staffName)}</span>`;
     })
     .join("");
   return `<div class="cell${we}">${entriesHtml}</div>`;

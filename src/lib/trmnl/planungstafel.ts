@@ -1,24 +1,38 @@
-// EP1a — Reine Aufbereitung der GL-Planungstafel für TRMNL X.
+// EP1b — Reine Aufbereitung der GL-Planungstafel für TRMNL X.
 // Zeilen: Standort → Bereich (Küche/Service/GL). Spalten: Kalendertage.
-// Zellen: Liste der eingeteilten Anzeigenamen mit Cross-Standort-Punkt
-// und Abwesenheits-Overlay; nicht freigegebene (location, area, date)
-// werden explizit als `not_released` markiert. Keine Uhrzeiten
-// (Entscheidung Frank 25.07.).
+// Nur ARBEITENDE werden gerendert — Urlauber/Kranke erscheinen NICHT
+// (Design Frank 25.07., ersetzt Dossier-Q3b-Teilregel). Abwesenheiten
+// werden hier ausschließlich als Filter genutzt, um Personen mit Urlaub/
+// krank an einem Tag NICHT anzuzeigen, falls trotzdem eine Schicht-Zeile
+// im Rohbestand liegt.
+//
+// GL-Zuordnung strikt über die Schicht selbst: eine Schicht ist eine
+// GL-Schicht, wenn `skillName` (case-insensitive) === "gl" — nicht über
+// staff_locations, nicht über area='gl' (WZ2: der Skill trägt den Typ).
+// GL-Personen erscheinen NUR in der GL-Zeile, nicht doppelt im Herkunfts-
+// bereich.
+//
+// Nicht freigegebene (location, area, date) werden als `not_released`
+// markiert. GL-Zeile gilt als freigegeben, sobald mindestens ein Bereich
+// (Küche oder Service) für den Standort am Tag freigegeben ist.
 //
 // Alle Eingaben sind flach — kein DB-, Netz- oder Zeit-Zugriff. Die Route
-// bereitet die Daten via supabaseAdmin auf und ruft diese Funktion.
-
-import type { StaffDepartment } from "@/lib/staff-domain";
+// bereitet die Daten via supabaseAdmin (gemeinsamer Loader, s.
+// display/roster-window.server.ts) auf und ruft diese Funktion.
 
 export type PtArea = "kitchen" | "service" | "gl";
-export type PtAbsenceType = "urlaub" | "krank";
 
 export type PtShift = {
   staffId: string;
   shiftDate: string;
   locationId: string;
-  area: PtArea;
+  // Bereich der Schicht laut roster_shifts (nur kitchen/service — GL wird
+  // über `skillName` erkannt, nicht über die Bereichs-Spalte).
+  area: "kitchen" | "service";
+  skillName: string | null;
 };
+
+export type PtAbsenceType = "urlaub" | "krank";
 
 export type PtAbsence = {
   staffId: string;
@@ -26,8 +40,6 @@ export type PtAbsence = {
   type: PtAbsenceType;
 };
 
-// Ein Release-Fenster: Für dieses (Standort, Bereich) ist der Zeitraum
-// [startDate, endDate] freigegeben. Aus roster_releases × periods gejoint.
 export type PtRelease = {
   locationId: string;
   area: PtArea;
@@ -38,18 +50,9 @@ export type PtRelease = {
 export type PtStaff = { id: string; displayName: string };
 export type PtLocation = { id: string; name: string };
 
-// Zuordnung MA → Standort/Bereich (aus staff_locations). Wird gebraucht,
-// damit abwesende MA ohne Schicht im richtigen Bereich gelistet werden.
-export type PtStaffLocation = {
-  staffId: string;
-  locationId: string;
-  department: StaffDepartment;
-};
-
 export type PtEntry = {
   staffId: string;
   staffName: string;
-  absent: PtAbsenceType | null;
   crossLocation: boolean;
 };
 
@@ -76,6 +79,10 @@ export const PT_AREAS: ReadonlyArray<{ area: PtArea; label: string }> = [
   { area: "gl", label: "GL" },
 ];
 
+function isGlSkill(skillName: string | null | undefined): boolean {
+  return !!skillName && skillName.trim().toLowerCase() === "gl";
+}
+
 function isReleased(
   releases: readonly PtRelease[],
   locationId: string,
@@ -95,9 +102,6 @@ function isReleased(
   return false;
 }
 
-// GL ist keine Release-Area (WZ2 — die Schicht trägt den Typ). Die GL-Zeile
-// gilt als freigegeben, sobald für den Standort am Tag mindestens ein
-// Bereich (Küche oder Service) freigegeben ist.
 function isAnyReleased(releases: readonly PtRelease[], locationId: string, date: string): boolean {
   for (const r of releases) {
     if (
@@ -116,7 +120,6 @@ export function buildPlanungstafelData(input: {
   days: readonly string[];
   locations: readonly PtLocation[];
   staff: readonly PtStaff[];
-  staffLocations: readonly PtStaffLocation[];
   shifts: readonly PtShift[];
   absences: readonly PtAbsence[];
   releases: readonly PtRelease[];
@@ -124,37 +127,33 @@ export function buildPlanungstafelData(input: {
   const nameById = new Map<string, string>();
   for (const s of input.staff) nameById.set(s.id, s.displayName);
 
-  // Abwesenheiten schnell nachschlagbar.
-  const absenceByKey = new Map<string, PtAbsenceType>();
-  for (const a of input.absences) absenceByKey.set(`${a.staffId}|${a.date}`, a.type);
+  // Abwesenheiten: Set von "staffId|date" — reines Filter-Signal.
+  const absentKey = new Set<string>();
+  for (const a of input.absences) absentKey.add(`${a.staffId}|${a.date}`);
 
-  // Für Cross-Location-Flag: alle Location-IDs je (staff, date).
+  // Für Cross-Location-Flag: alle Location-IDs je (staff, date). Abwesende
+  // Tage zählen dafür nicht mit (sie erscheinen nirgends).
   const locsByStaffDate = new Map<string, Set<string>>();
   for (const s of input.shifts) {
+    if (absentKey.has(`${s.staffId}|${s.shiftDate}`)) continue;
     const key = `${s.staffId}|${s.shiftDate}`;
     const set = locsByStaffDate.get(key) ?? new Set<string>();
     set.add(s.locationId);
     locsByStaffDate.set(key, set);
   }
 
-  // Schichten je (locationId|area|date) → staffIds.
+  // Schichten je (locationId|area|date) → staffIds — pro Zielbereich
+  // (kitchen, service, gl). GL wird strikt über die Schicht-Zeile selbst
+  // erkannt (skillName='gl'), nicht über die area-Spalte. Absente Personen
+  // werden hier gefiltert.
   const shiftsByCell = new Map<string, Set<string>>();
   for (const s of input.shifts) {
-    const key = `${s.locationId}|${s.area}|${s.shiftDate}`;
+    if (absentKey.has(`${s.staffId}|${s.shiftDate}`)) continue;
+    const targetArea: PtArea = isGlSkill(s.skillName) ? "gl" : s.area;
+    const key = `${s.locationId}|${targetArea}|${s.shiftDate}`;
     const set = shiftsByCell.get(key) ?? new Set<string>();
     set.add(s.staffId);
     shiftsByCell.set(key, set);
-  }
-
-  // Zuordnung Location → Area → StaffIds (aus staff_locations),
-  // damit abwesende MA in der richtigen Zeile erscheinen.
-  const staffByLocArea = new Map<string, Set<string>>();
-  for (const sl of input.staffLocations) {
-    const area: PtArea = sl.department;
-    const key = `${sl.locationId}|${area}`;
-    const set = staffByLocArea.get(key) ?? new Set<string>();
-    set.add(sl.staffId);
-    staffByLocArea.set(key, set);
   }
 
   function makeEntry(staffId: string, date: string, locationId: string): PtEntry {
@@ -163,7 +162,6 @@ export function buildPlanungstafelData(input: {
     return {
       staffId,
       staffName: nameById.get(staffId) ?? "—",
-      absent: absenceByKey.get(`${staffId}|${date}`) ?? null,
       crossLocation,
     };
   }
@@ -171,20 +169,6 @@ export function buildPlanungstafelData(input: {
   const out: PtLocationBlock[] = [];
   for (const loc of input.locations) {
     const areas: PtAreaRow[] = [];
-    // GL-Zeile pro Tag zuerst bestimmen, damit Küche/Service die dort
-    // gelisteten Personen deduplizieren können.
-    const glEntryIdsByDate = new Map<string, Set<string>>();
-    for (const date of input.days) {
-      if (!isAnyReleased(input.releases, loc.id, date)) continue;
-      const glShiftIds = shiftsByCell.get(`${loc.id}|gl|${date}`) ?? new Set<string>();
-      const glAreaStaff = staffByLocArea.get(`${loc.id}|gl`) ?? new Set<string>();
-      const ids = new Set<string>(glShiftIds);
-      for (const staffId of glAreaStaff) {
-        if (absenceByKey.has(`${staffId}|${date}`)) ids.add(staffId);
-      }
-      glEntryIdsByDate.set(date, ids);
-    }
-
     for (const { area, label } of PT_AREAS) {
       const cellsByDate: Record<string, PtCell> = {};
       for (const date of input.days) {
@@ -196,22 +180,15 @@ export function buildPlanungstafelData(input: {
           cellsByDate[date] = { kind: "not_released" };
           continue;
         }
-        let entryIds: Set<string>;
-        if (area === "gl") {
-          entryIds = new Set<string>(glEntryIdsByDate.get(date) ?? []);
-        } else {
-          const scheduledIds = shiftsByCell.get(`${loc.id}|${area}|${date}`) ?? new Set<string>();
-          const areaStaff = staffByLocArea.get(`${loc.id}|${area}`) ?? new Set<string>();
-          entryIds = new Set<string>(scheduledIds);
-          // Abwesende (Urlaub/krank) mit passendem Bereich am Standort dazu.
-          for (const staffId of areaStaff) {
-            if (absenceByKey.has(`${staffId}|${date}`)) entryIds.add(staffId);
-          }
-          // Personen, die in der GL-Zeile dieses (Standort, Tag) erscheinen,
-          // NICHT zusätzlich unter Küche/Service listen (Dedup).
-          const glIds = glEntryIdsByDate.get(date);
-          if (glIds) {
-            for (const id of glIds) entryIds.delete(id);
+        let entryIds = shiftsByCell.get(`${loc.id}|${area}|${date}`) ?? new Set<string>();
+        // Dedup: wer in der GL-Zeile am (Standort, Tag) erscheint, wird
+        // NICHT zusätzlich in Küche/Service gelistet.
+        if (area !== "gl") {
+          const glIds = shiftsByCell.get(`${loc.id}|gl|${date}`);
+          if (glIds && glIds.size > 0) {
+            const filtered = new Set<string>();
+            for (const id of entryIds) if (!glIds.has(id)) filtered.add(id);
+            entryIds = filtered;
           }
         }
 

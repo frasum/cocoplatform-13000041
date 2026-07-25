@@ -242,7 +242,7 @@ function renderPage(input: {
   const gridCols = `320px repeat(${input.days.length}, 1fr)`;
 
   const headerCells = input.days
-    .map((iso) => {
+    .map((iso, i) => {
       const h = dayHeader(iso, input.todayIso);
       const holiday = getHolidayName(iso);
       const cls = [
@@ -250,6 +250,7 @@ function renderPage(input: {
         h.dow === 0 || h.dow === 6 ? "we" : "",
         iso === input.todayIso ? "today" : "",
         holiday ? "holiday" : "",
+        i === input.days.length - 1 ? "last-col" : "",
       ]
         .filter(Boolean)
         .join(" ");

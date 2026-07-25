@@ -79,6 +79,38 @@ export const PT_AREAS: ReadonlyArray<{ area: PtArea; label: string }> = [
   { area: "gl", label: "GL" },
 ];
 
+// EP2 — dayHeader als reine, getestete Funktion. UTC-Mitternacht bewusst
+// (DST-freie Datums-Arithmetik). Label-Regel per Offset in Kalendertagen:
+//   0 → "Heute", 1 → "Morgen", 2 → "Übermorgen", sonst Wochentagsname.
+// Bei Wochentag-Label lässt `human` den Wochentag weg (keine Dopplung).
+export function dayHeader(
+  iso: string,
+  todayIso: string,
+): { label: string; human: string; dow: number } {
+  const d = new Date(iso + "T00:00:00Z");
+  const t = new Date(todayIso + "T00:00:00Z");
+  const dow = d.getUTCDay();
+  const offset = Math.round((d.getTime() - t.getTime()) / 86400000);
+  const weekday = d.toLocaleDateString("de-DE", { weekday: "long", timeZone: "UTC" });
+  const dm = d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", timeZone: "UTC" });
+  let label: string;
+  let human: string;
+  if (offset === 0) {
+    label = "Heute";
+    human = `${weekday}, ${dm}`;
+  } else if (offset === 1) {
+    label = "Morgen";
+    human = `${weekday}, ${dm}`;
+  } else if (offset === 2) {
+    label = "Übermorgen";
+    human = `${weekday}, ${dm}`;
+  } else {
+    label = weekday;
+    human = dm;
+  }
+  return { label, human, dow };
+}
+
 function isGlSkill(skillName: string | null | undefined): boolean {
   return !!skillName && skillName.trim().toLowerCase() === "gl";
 }

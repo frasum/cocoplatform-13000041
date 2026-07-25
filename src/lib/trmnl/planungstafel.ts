@@ -180,8 +180,17 @@ export function buildPlanungstafelData(input: {
           cellsByDate[date] = { kind: "not_released" };
           continue;
         }
-        const entryIds =
-          shiftsByCell.get(`${loc.id}|${area}|${date}`) ?? new Set<string>();
+        let entryIds = shiftsByCell.get(`${loc.id}|${area}|${date}`) ?? new Set<string>();
+        // Dedup: wer in der GL-Zeile am (Standort, Tag) erscheint, wird
+        // NICHT zusätzlich in Küche/Service gelistet.
+        if (area !== "gl") {
+          const glIds = shiftsByCell.get(`${loc.id}|gl|${date}`);
+          if (glIds && glIds.size > 0) {
+            const filtered = new Set<string>();
+            for (const id of entryIds) if (!glIds.has(id)) filtered.add(id);
+            entryIds = filtered;
+          }
+        }
 
         if (entryIds.size === 0) {
           cellsByDate[date] = { kind: "empty" };

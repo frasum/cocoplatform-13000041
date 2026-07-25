@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { dbTestsEnabled, seedOrg, type SeededOrg } from "@/test/db-setup";
-import { processInboundEmail } from "@/routes/api/public/mailersend/webhook-core";
+import { processInboundEmail } from "@/routes/api/public/mailersend/-webhook-core";
 
 const SECRET = "test-webhook-secret-per-location";
 

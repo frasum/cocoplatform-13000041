@@ -20,7 +20,7 @@ import {
   type SeededOrg,
   type SeededUser,
 } from "@/test/db-setup";
-import { processInboundEmail } from "@/routes/api/public/mailersend/webhook-core";
+import { processInboundEmail } from "@/routes/api/public/mailersend/-webhook-core";
 import { assignOrderReplyCore } from "./order-replies.functions";
 
 const SECRET = "test-webhook-secret-please-ignore";

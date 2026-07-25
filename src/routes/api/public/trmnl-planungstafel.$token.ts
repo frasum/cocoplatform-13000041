@@ -304,10 +304,11 @@ function renderPage(input: {
   .cell.empty { opacity: 0.35; }
   .cell.we { background: #eee; }
   .cell.today { outline: 3px solid #000; outline-offset: -3px; }
-  .entry { display: inline-flex; align-items: baseline; margin-right: 14px; margin-bottom: 4px; font-size: 22px; }
+  /* EP2c: Fernlesbarkeit — größer und fett. Zeilenumbruch in vollen Zellen ist gewollt. */
+  .entry { display: inline-flex; align-items: baseline; margin-right: 14px; margin-bottom: 6px; font-size: 28px; font-weight: 700; }
   .entry.absent { opacity: 0.45; text-decoration: line-through; }
-  .entry .dot { width: 10px; height: 10px; border-radius: 999px; background: #000; margin-right: 8px; display: inline-block; }
-  .entry .sym { margin-left: 6px; font-size: 18px; }
+  .entry .dot { width: 12px; height: 12px; border-radius: 999px; background: #000; margin-right: 8px; display: inline-block; }
+  .entry .sym { margin-left: 8px; font-size: 22px; }
   .footer { position: absolute; left: 36px; right: 36px; bottom: 16px; border-top: 2px solid #000; padding-top: 8px; font-size: 18px; display: flex; justify-content: space-between; }
 </style>
 </head>

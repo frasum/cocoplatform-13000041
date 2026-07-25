@@ -162,9 +162,8 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
         // Gemeinsamer Loader (EP1b: Quellen-Parität mit trmnl-dienstplan).
         // Cross-Location braucht Schichten ORGANISATIONSWEIT — nicht auf
         // die Anzeige-Locations begrenzen.
-        const { loadRosterShiftsRaw, loadRosterAbsencesRaw, loadSkillsByIds } = await import(
-          "@/lib/display/roster-window.server"
-        );
+        const { loadRosterShiftsRaw, loadRosterAbsencesRaw, loadSkillsByIds } =
+          await import("@/lib/display/roster-window.server");
         const shiftsRes = await loadRosterShiftsRaw(supabaseAdmin, {
           organizationId: orgId,
           from: windowStart,

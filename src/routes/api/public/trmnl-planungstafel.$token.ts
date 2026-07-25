@@ -16,6 +16,7 @@ import { todayIso as todayIsoBerlin } from "@/lib/format";
 import { getHolidayName } from "@/lib/roster/holidays-display";
 import {
   buildPlanungstafelData,
+  dayHeader,
   PT_AREAS,
   type PtArea,
   type PtCell,
@@ -26,10 +27,9 @@ import {
   type PtStaff,
 } from "@/lib/trmnl/planungstafel";
 
-// Spalten-Anzahl. Dritter Tag (Übermorgen) bleibt an; ob er auf dem echten
-// Panel lesbar bleibt, entscheidet der Geräte-Klicktest — Abschalten hier
-// durch `3 → 2`.
-const DAY_COUNT = 3;
+// EP2 — vier Tage. Der vierte Tag trägt den Wochentagsnamen (siehe
+// dayHeader in @/lib/trmnl/planungstafel). Spalten sind gleich breit.
+const DAY_COUNT = 4;
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -61,21 +61,6 @@ function nextDays(startIso: string, count: number): string[] {
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return out;
-}
-
-function dayHeader(iso: string, todayIso: string): { label: string; human: string; dow: number } {
-  const d = new Date(iso + "T00:00:00Z");
-  const dow = d.getUTCDay();
-  const wd = d.toLocaleDateString("de-DE", { weekday: "long", timeZone: "UTC" });
-  const dm = d.toLocaleDateString("de-DE", { day: "2-digit", month: "long", timeZone: "UTC" });
-  let label: string;
-  if (iso === todayIso) label = "Heute";
-  else {
-    const t = new Date(todayIso + "T00:00:00Z");
-    t.setUTCDate(t.getUTCDate() + 1);
-    label = iso === t.toISOString().slice(0, 10) ? "Morgen" : "Übermorgen";
-  }
-  return { label, human: `${wd}, ${dm}`, dow };
 }
 
 export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({

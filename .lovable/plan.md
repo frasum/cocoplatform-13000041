@@ -1,67 +1,61 @@
-# Antrags-Historie pro Mitarbeiter mit Feld-Diff
 
-## Wo
+## 1. Sofort-Wiederherstellung GIG SERVICE (Data-Change)
 
-Neuer Tab **„Anträge"** in `src/routes/_authenticated/admin/staff.$staffId.tsx` (nur für Rolle `admin`, konsistent mit „Personaldaten"/„Dokumente"). Kein Eingriff in `personal-antraege.tsx` (offene Anträge dort bleiben unverändert).
+Einmalige Wiederherstellung der am 04.07.2026 genehmigten Werte aus dem Audit-Log zurück in `staff_personal_details` (Zeile `staff_id = 93e44abe-d1d8-4763-b0a6-63cea7313687`, `organization_id = 77838674-…`).
 
-## Datenquellen
+Werte laut Audit `profile.request_approved` (Request `b87636cd-…`):
 
-- `staff_data_change_requests`: `id, status, payload, note, review_note, created_at, reviewed_at, reviewed_by` (per `staff_id`, DESC).
-- `audit_log`: Einträge mit `entity='staff_data_change_requests'` und `entity_id = request.id`, Aktionen `profile.request_approved` / `profile.request_rejected`. Beim Approve enthält `meta.diff = { field: { before, after } }` die **tatsächlich übernommenen** Werte inklusive Normalisierung, `meta.manualOnly` die manuell zu übernehmenden Felder (first/last_name). Beim Reject `meta.fields`.
-- `staff`-Join für Reviewer-Name (`reviewed_by → staff.display_name/first_name/last_name`).
+| Feld | Wert |
+|---|---|
+| `date_of_birth` | `1993-03-03` |
+| `place_of_birth` | `Thailand` |
+| `nationality` | `Thai` |
+| `health_insurance` | `AOK` |
+| `bank_name` | `Vr Bank münchen Land eG` |
+| `iban` | `DE22701664860000874230` |
+| `account_holder` | `Narisara Asa-sa-na` |
+| `tax_class` | `I` |
 
-## Server-Funktion
+Umsetzung: ein `UPDATE public.staff_personal_details SET … WHERE staff_id = … AND organization_id = …` über das insert-Tool. Andere Spalten bleiben unangetastet. Vorname/Nachname sind `manualOnly` und werden nicht angerührt.
 
-Neu in `src/lib/profile/profile-admin.functions.ts`:
+## 2. Ursachen-Fix im Speicherpfad (Sparse Patch)
 
-```ts
-export type ChangeRequestHistoryItem = {
-  id: string;
-  status: "pending" | "approved" | "rejected";
-  createdAt: string;
-  reviewedAt: string | null;
-  reviewerName: string | null;
-  note: string | null;
-  reviewNote: string | null;
-  fields: {
-    field: string;           // z.B. "iban"
-    requested: JsonPrimitive; // aus payload
-    applied: JsonPrimitive | null; // aus audit meta.diff[field].after (null für pending/rejected/manualOnly)
-    before: JsonPrimitive | null;  // aus audit meta.diff[field].before
-    manualOnly: boolean;     // first_name/last_name → nicht persistiert
-  }[];
-};
+### Diagnose
 
-export const listStaffChangeRequests = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(z.object({ staffId: z.string().uuid() }).parse)
-  .handler(async ({ data, context }): Promise<ChangeRequestHistoryItem[]> => { … });
-```
+`src/components/admin/PersonalDetailsTab.tsx`:
 
-Ablauf im Handler:
-1. `loadAdminCaller(..., "admin")`, Org-Scope prüfen.
-2. Requests des Mitarbeiters laden (DESC).
-3. Für approved/rejected Requests: `audit_log` einmalig per `entity_id IN (…)` laden.
-4. Pro Request: `payload`-Keys als Zeilenbasis; `applied/before` aus `audit.meta.diff` mappen; `manualOnly` aus `splitApplicableFields` bzw. `meta.manualOnly` ableiten.
-5. Reviewer-Namen aus `staff`-Batch-Query.
+- `mutation.mutationFn` ruft `toPatch(form)` und sendet **das gesamte Formular** an `upsertStaffPersonalDetails`.
+- `toPatch` mappt jedes leere Eingabefeld (`raw === "" || raw === null`) auf `null` — für **alle** Felder, nicht nur die, die der Nutzer aktiv geleert hat.
+- Der Server-Upsert schreibt jede übergebene Spalte. Ergebnis: sobald `form` einen leeren Wert für ein Feld enthält (z. B. weil es nach einem Remount/nachträglicher Approval noch mit dem alten leeren Stand geladen war, oder weil eine Sektion Felder aus anderen Sektionen nicht anzeigt), landet dort `NULL`.
 
-## UI
+Das erklärt den Zustand von GIG SERVICE: nach Approve wurden die Werte gesetzt, ein späterer Save der Personaldaten-Maske hat sie wieder auf `NULL` gedrückt (`updated_at = 2026-07-26 16:30:28`).
 
-Neue Komponente `src/components/admin/ChangeRequestsTab.tsx`:
-- `useQuery(["admin","staff",staffId,"change-requests"], …)`.
-- Chronologische Liste (neueste oben). Kopfzeile pro Antrag: Status-Badge (Übernahme mir bekanntem Muster aus `personal-antraege.tsx`), Beantragt-Datum, Freigabe-/Ablehnungs-Datum, Reviewer.
-- Expand/Collapse Details (Details-Element): Tabelle mit Spalten **Feld · Vorher · Beantragt · Übernommen** + Notiz/Review-Notiz.
-- `manualOnly`-Zeilen kursiv markiert („manuell zu übernehmen — nicht automatisch geschrieben").
-- Feldnamen und -werte über bestehende Formatter aus `profile-fields.ts` (Label + Value-Rendering) rendern, damit z.B. Datumsfelder deutsch angezeigt werden.
+### Fix
 
-Tab-Verkabelung: `Tab`-Union in `staff.$staffId.tsx` um `"antraege"` erweitern, Button „Anträge" (admin-only) hinzufügen, `{tab === "antraege" && isAdmin && <ChangeRequestsTab staffId={s.id} />}`.
+Nur wirklich geänderte Felder senden ("sparse patch"):
 
-## Zeitzonen / Formatierung
+1. Baseline speichern: `PersonalDetailsTab` merkt sich beim Betreten des Edit-Modus den geladenen Datenstand als `baseline: FormState`.
+2. `toPatch` erhält zusätzlich diese Baseline und liefert **nur Keys zurück, deren normalisierter Wert sich gegenüber der Baseline unterscheidet**.
+3. Ein aktiv geleertes Feld (Baseline hatte Wert, Formular jetzt `""`) → weiterhin `null` im Patch, so wie es sein soll.
+4. Ein Feld, das schon vorher `null` war und weiterhin leer ist → **nicht** im Patch → wird auf dem Server nicht überschrieben.
+5. Der `vacMutation`-Pfad war bereits sparse (nur `VACATION_KEYS`) und bleibt so.
+6. Wenn kein Feld geändert wurde: Mutation überspringen und Modal einfach schließen (Meldung „Keine Änderungen.").
 
-Datums-/Zeitangaben mit vorhandenem `formatDateTime`-Helper (Europe/Berlin) rendern; keine neue Zeitlogik.
+### Server-seitige Zusatzhärtung
 
-## Nicht enthalten
+`upsertStaffPersonalDetails` (`src/lib/admin/personal-details.functions.ts`) macht aktuell einen Full-Upsert. Ergänzung:
 
-- Keine Änderung an offener-Anträge-Ansicht.
-- Kein Schreibpfad — reine Anzeige.
-- Keine Schema-Migration; alle Daten liegen bereits in `staff_data_change_requests` und `audit_log`.
+- Wenn `data.fields` leer ist → früh mit `{ ok: true }` zurückkehren, keinen Upsert, keinen Audit-Eintrag.
+- Der Upsert selbst bleibt so, aber nur mit tatsächlich übergebenen Keys — das ist mit einem Sparse-Patch vom Client automatisch der Fall.
+
+## 3. Verifikation
+
+- Nach der Data-Migration in `/admin/staff/93e44abe-…` → Tab „Persönlich": Geburtsdatum, Geburtsort, Nationalität, Krankenkasse, Bankdaten und Steuerklasse sichtbar.
+- Reproduktionstest zum Fix: Personaldaten-Tab öffnen, ein einzelnes Feld ändern, speichern → nur dieses Feld ändert sich in `staff_personal_details`, alle anderen Werte (Bank, Geburtsdaten, …) bleiben erhalten.
+- `bunx tsgo --noEmit` grün.
+
+## 4. Nicht Teil dieses Schritts
+
+- Kein Schema-Change an `staff_personal_details`.
+- Keine Änderung an der Approve-Logik (`decideChangeRequest`).
+- Keine UI-Umbauten am Antrags-Verlauf-Tab.

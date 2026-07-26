@@ -13,7 +13,9 @@ import {
   validateDirectEditPayload,
   splitApplicableFields,
   normalizeIban,
+  normalizeRequestValue,
 } from "./profile-fields";
+import type { RequestField } from "./profile-fields";
 
 describe("Whitelist-Disjunktheit", () => {
   it("DIRECT ∩ REQUEST = ∅", () => {
@@ -85,6 +87,61 @@ describe("validateTaxClass", () => {
   it("lehnt 0 und 7 ab", () => {
     expect(validateTaxClass(0)).not.toBeNull();
     expect(validateTaxClass(7)).not.toBeNull();
+  });
+  it("akzeptiert römische Formen (inkl. Case/Trim)", () => {
+    for (const r of ["I", "II", "III", "IV", "V", "VI"]) {
+      expect(validateTaxClass(r)).toBeNull();
+    }
+    expect(validateTaxClass("iv")).toBeNull();
+    expect(validateTaxClass(" IV ")).toBeNull();
+  });
+  it("lehnt unbekannte römische/leere Formen ab", () => {
+    expect(validateTaxClass("VII")).not.toBeNull();
+    expect(validateTaxClass("X")).not.toBeNull();
+    expect(validateTaxClass("")).not.toBeNull();
+  });
+});
+
+describe("normalizeRequestValue tax_class", () => {
+  it("ist idempotent für Zahl und Römisch", () => {
+    expect(normalizeRequestValue("tax_class", 4)).toBe("IV");
+    expect(normalizeRequestValue("tax_class", "IV")).toBe("IV");
+    expect(normalizeRequestValue("tax_class", "iv")).toBe("IV");
+    const once = normalizeRequestValue("tax_class", 4);
+    expect(normalizeRequestValue("tax_class", once)).toEqual(once);
+  });
+});
+
+describe("Roundtrip-Invariante: validate(normalize(x)) bleibt gültig", () => {
+  const validSamples: Record<RequestField, unknown> = {
+    salutation: "Herr",
+    date_of_birth: "1990-05-01",
+    place_of_birth: "München",
+    nationality: "deutsch",
+    bank_name: "Sparkasse",
+    iban: "DE89 3704 0044 0532 0130 00",
+    account_holder: "Max Muster",
+    social_security_number: "15070649C103",
+    tax_id: "12345678901",
+    tax_class: 4,
+    church_tax_liable: true,
+    konfession: "rk",
+    children_count: 2,
+    child_tax_allowances: 1,
+    health_insurance: "TK",
+    first_name: "Max",
+    last_name: "Muster",
+  };
+  it("jedes REQUEST_FIELD: Payload gültig → normalisiert → wieder gültig, idempotent", () => {
+    for (const field of REQUEST_FIELDS) {
+      const sample = validSamples[field];
+      const first = validateChangeRequestPayload({ [field]: sample });
+      expect(first.ok, `Eingabe ungültig für ${field}`).toBe(true);
+      const normalized = normalizeRequestValue(field, sample);
+      const second = validateChangeRequestPayload({ [field]: normalized });
+      expect(second.ok, `Normalisierter Wert ungültig für ${field}`).toBe(true);
+      expect(normalizeRequestValue(field, normalized)).toEqual(normalized);
+    }
   });
 });
 

@@ -1,37 +1,37 @@
-## Ziel
+## Befund
 
-Safari soll PDF, Excel und CSV nicht mehr aus dem eingebetteten Lovable-Preview-Frame herunterladen müssen. Stattdessen wird beim Klick ein echter neuer Browser-Tab geöffnet und der Export per POST dorthin geschickt. Der bestehende `/api/export/download`-Endpunkt bleibt unverändert als Attachment-Auslieferung.
+Der Zeit-Eintrag von **DEAU** am 18.07. wurde in der Datenbank korrekt geändert: `started_at` steht auf 09:00 UTC statt vorher 13:00 UTC (+4 h), `updated_at` = 2026-07-26. Die Zusammenfassung zeigt trotzdem den alten Wert, bis die Seite hart neu geladen wird.
 
-## Warum dieser Ansatz
+## Ursache
 
-Die Diagnose zeigt `HTTP 200` und korrekte Attachment-Header. Der Endpunkt funktioniert also. Dass Safari trotzdem keinen Download startet, passt zu Safaris strenger Behandlung von Downloads aus eingebetteten Frames/Preview-Umgebungen. Deshalb wechseln wir den Browser-Kontext, nicht den Dateityp oder die Serverantwort.
+In `src/routes/_authenticated/admin/zeit-uebersicht.tsx` invalidieren die Wochenplan-Mutationen (`setShiftMut`, `createShiftMut`, `deleteEntryMut`) über `invalidateWeekly()` nur den React-Query-Cache-Schlüssel **`["weekly-entries"]`**.
 
-## Umsetzung
+Die Tabs **Zusammenfassung** und **Buchhaltung** hängen aber an einem anderen Server-Fn (`getTimeOverview` / `getTimeOverviewBatch`) mit den Query-Keys **`["time-overview", …]`**. Die werden nach einer Wochenplan-Änderung nirgends invalidiert, also bleibt der alte, gecachte Wert stehen. Genau dieses Muster ist in `BatchTimesCard.tsx` schon korrekt umgesetzt — dort werden beide Keys invalidiert.
 
-1. **Neuen Safari-sicheren Download-Flow in `weekly-export.ts` bauen**
-   - Direkt im Button-Klick synchron einen neuen Tab öffnen (`window.open`).
-   - Während PDF/Excel/CSV erzeugt wird, bleibt der Tab mit einer kurzen Warteseite offen.
-   - Danach wird ein verstecktes POST-Formular mit `target` auf diesen Tab an `/api/export/download` gesendet.
-   - Die Antwort ist weiterhin `Content-Disposition: attachment`, aber jetzt in einem echten Top-Level-Tab statt im Preview-Frame.
+Kein SFN-Aggregat, kein PostgREST-1000-Zeilen-Kappen (Zyklus hat nur 612 Zeilen) — reines Cache-Konsistenz-Problem.
 
-2. **Fallback beibehalten**
-   - Falls Safari/Browser den neuen Tab blockiert, fällt der Code auf den bisherigen Formular-Submit zurück.
-   - Fehler beim Erzeugen des Exports werden im geöffneten Tab sichtbar gemacht, damit nicht wieder nur „nichts passiert“.
+## Fix (nur Frontend, ein Bauplan-Schritt)
 
-3. **Alle Export-Buttons auf denselben Helfer lassen**
-   - PDF, Excel und CSV nutzen weiterhin denselben `downloadBlobAsAttachment`-Pfad.
-   - Keine getrennten Sonderlösungen pro Format.
+`invalidateWeekly()` in `zeit-uebersicht.tsx` erweitern, sodass alle Sichten, die auf denselben `time_entries`-Rohdaten hängen, mit-invalidiert werden. Danach ziehen Zusammenfassung, Buchhaltung und die SFN-abhängigen Tabs (Brutto/Netto) sofort nach einer Zeitkorrektur im Wochenplan.
 
-4. **Diagnose-UI vorerst behalten**
-   - Der Diagnose-Button bleibt drin, bis du Safari erfolgreich bestätigt hast.
-   - Danach können wir ihn separat entfernen.
+```ts
+function invalidateWeekly() {
+  void qc.invalidateQueries({ queryKey: ["weekly-entries"] });
+  void qc.invalidateQueries({ queryKey: ["time-overview"] });
+  void qc.invalidateQueries({ queryKey: ["time-sfn"] });         // falls Key so heißt
+  void qc.invalidateQueries({ queryKey: ["payroll-notes"] });     // Abwesenheits-Notizen hängen an Einträgen
+}
+```
 
-5. **Prüfung**
-   - HTTP-Endpunkt weiterhin auf `200`/Attachment prüfen.
-   - Chromium-Baseline für PDF/Excel/CSV-Download prüfen.
-   - Safari kann ich hier nicht nativ ausführen; der relevante Unterschied ist aber explizit adressiert: Download nicht mehr aus dem eingebetteten Preview-Frame, sondern aus einem echten neuen Tab.
+Vor dem Umbau die tatsächlichen Query-Keys für Brutto/Netto/Provision (SFN) und Payroll-Notes in derselben Datei kurz verifizieren und nur die real existierenden Keys aufnehmen — Ehrlichkeitsregel: kein Key auf Verdacht.
 
-## Dateien
+## Was NICHT dazugehört
 
-- `src/lib/time/weekly-export.ts`
-- Falls nötig nur kleine Anpassung in `src/routes/_authenticated/admin/zeit-uebersicht.tsx`, damit der Button-Klick den neuen synchronen Tab-Flow sauber anstößt.
+- Keine Server-Fn-Änderung, kein SQL, keine Migration.
+- Kein Umbau der Struktur (etwa gemeinsamer Root-Key `["time"]`) — das wäre ein separater Cleanup-Schritt.
+- DEAU-Daten selbst nicht anfassen; die DB ist bereits korrekt.
+
+## Verifikation
+
+1. `tsgo --noEmit` + Vitest laufen lassen.
+2. Manuell: im Wochenplan eine Zeit ändern → in Zusammenfassung/Buchhaltung/Brutto ohne Reload sofort neuer Wert sichtbar.

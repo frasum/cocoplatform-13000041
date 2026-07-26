@@ -92,9 +92,7 @@ export const listStaffChangeRequests = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("staff_data_change_requests")
-      .select(
-        "id, status, payload, note, review_note, created_at, reviewed_at, reviewed_by",
-      )
+      .select("id, status, payload, note, review_note, created_at, reviewed_at, reviewed_by")
       .eq("organization_id", caller.organizationId)
       .eq("staff_id", data.staffId)
       .order("created_at", { ascending: false });
@@ -123,9 +121,7 @@ export const listStaffChangeRequests = createServerFn({ method: "POST" })
     }
 
     // Audit-Einträge für Approve/Reject batchen.
-    const decidedIds = list
-      .filter((r) => r.status !== "pending")
-      .map((r) => r.id as string);
+    const decidedIds = list.filter((r) => r.status !== "pending").map((r) => r.id as string);
     type AuditMeta = {
       diff?: Record<string, { before?: unknown; after?: unknown }>;
       manualOnly?: string[];
@@ -167,8 +163,7 @@ export const listStaffChangeRequests = createServerFn({ method: "POST" })
         return {
           field,
           requested: toPrimitive(payload[field]),
-          before:
-            d && d.before !== undefined ? toPrimitive(d.before) : null,
+          before: d && d.before !== undefined ? toPrimitive(d.before) : null,
           applied:
             r.status === "approved" && !isManual && d && d.after !== undefined
               ? toPrimitive(d.after)

@@ -5,7 +5,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { listStaffChangeRequests, type ChangeRequestHistoryItem } from "@/lib/profile/profile-admin.functions";
+import {
+  listStaffChangeRequests,
+  type ChangeRequestHistoryItem,
+} from "@/lib/profile/profile-admin.functions";
 
 const FIELD_LABEL: Record<string, string> = {
   first_name: "Vorname",
@@ -58,9 +61,7 @@ function fmtDateTime(iso: string | null | undefined): string {
 
 function StatusBadge({ status }: { status: ChangeRequestHistoryItem["status"] }) {
   if (status === "approved")
-    return (
-      <Badge className="bg-emerald-600 hover:bg-emerald-600">Freigegeben</Badge>
-    );
+    return <Badge className="bg-emerald-600 hover:bg-emerald-600">Freigegeben</Badge>;
   if (status === "rejected") return <Badge variant="destructive">Abgelehnt</Badge>;
   return <Badge variant="secondary">Offen</Badge>;
 }

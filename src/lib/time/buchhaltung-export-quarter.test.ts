@@ -46,10 +46,10 @@ describe("buchhaltung-export — Viertelstunden-Abrundung", () => {
     };
     const csv = buildBuchhaltungCsv(input);
     // Person A: 178.37 → 178.25; 12.49 → 12.25; 7.99 → 7.75
-    expect(csv).toMatch(/A;;;178,25;0;12,25;0,00;7,75/);
+    expect(csv).toMatch(/A;;;178,25;;;;0;12,25;0,00;7,75/);
     // Person B: 30.24 → 30.00; 0.24 → 0.00; 0.50 → 0.50
-    expect(csv).toMatch(/B;;;30,00;0;0,00;0,00;0,50/);
+    expect(csv).toMatch(/B;;;30,00;;;;0;0,00;0,00;0,50/);
     // Summenzeile = 178.25 + 30.00 = 208.25 (nicht 208.61 aus Rohsummen)
-    expect(csv).toMatch(/Summe;;;208,25;0;12,25;0,00;8,25/);
+    expect(csv).toMatch(/Summe;;;208,25;;;;0;12,25;0,00;8,25/);
   });
 });

@@ -98,9 +98,11 @@ import {
   fmtIso,
   floorToQuarterHours,
   isoWeek,
+  aggregateHoursByStaffAndDept,
   mondayOf,
   parseIsoDate,
 } from "@/lib/time/zeit-uebersicht-core";
+import { primaryDepartment } from "@/lib/time/primary-department";
 import { PayrollTab } from "@/components/zeit/PayrollTab";
 import { activeNotesForPeriod, type RecurringNote } from "@/lib/time/recurring-notes";
 import { WeeklyPlan } from "@/components/zeit/WeeklyPlan";
@@ -294,9 +296,7 @@ function ZeitUebersichtPage() {
             cur[iso] = existing
               ? existing === area
                 ? existing
-                : (["kitchen", "service", "gl"] as Department[]).find(
-                    (d) => d === existing || d === area,
-                  )!
+                : primaryDepartment([existing, area])
               : area;
           }
           merged.rosterAreaByStaffDate![sid] = cur;
@@ -501,6 +501,91 @@ function ZeitUebersichtPage() {
       a.displayName.localeCompare(b.displayName, "de"),
     );
   }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId]);
+
+  // LG2 — Perioden-Roster (Union über Standorte) für die Payroll-Stunden-
+  // aufteilung nach Schichtart. Quelle: getTimeOverview (single) /
+  // getTimeOverviewBatch (all). Dieselben Signale wie im Wochenplan, aber
+  // über die ganze Abrechnungsperiode.
+  const periodRoster = useMemo(() => {
+    const staffDeptsByStaff = new Map<string, Department[]>();
+    const rosterAreaByStaffDate: Record<string, Record<string, Department>> = {};
+    const rosterGlByStaffDate: Record<string, Record<string, boolean>> = {};
+
+    const mergeAssigned = (
+      assigned: ReadonlyArray<{ staffId: string; staffDepts: Department[] }> | undefined,
+    ) => {
+      for (const a of assigned ?? []) {
+        const cur = staffDeptsByStaff.get(a.staffId) ?? [];
+        for (const d of a.staffDepts) if (!cur.includes(d)) cur.push(d);
+        staffDeptsByStaff.set(a.staffId, cur);
+      }
+    };
+    const mergeAreas = (
+      src: Record<string, Record<string, Department>> | undefined,
+    ) => {
+      for (const [sid, perDay] of Object.entries(src ?? {})) {
+        const cur = rosterAreaByStaffDate[sid] ?? {};
+        for (const [iso, area] of Object.entries(perDay)) {
+          const existing = cur[iso];
+          cur[iso] = existing ? primaryDepartment([existing, area]) : area;
+        }
+        rosterAreaByStaffDate[sid] = cur;
+      }
+    };
+    const mergeGl = (src: Record<string, Record<string, boolean>> | undefined) => {
+      for (const [sid, perDay] of Object.entries(src ?? {})) {
+        const cur = rosterGlByStaffDate[sid] ?? {};
+        for (const [iso, flag] of Object.entries(perDay)) {
+          if (flag) cur[iso] = true;
+        }
+        rosterGlByStaffDate[sid] = cur;
+      }
+    };
+
+    if (isAllLocations) {
+      const byLoc = (overviewBatchQ.data?.byLocation ?? {}) as Record<
+        string,
+        {
+          assignedStaff?: Array<{ staffId: string; staffDepts: Department[] }>;
+          rosterAreaByStaffDate?: Record<string, Record<string, Department>>;
+          rosterGlByStaffDate?: Record<string, Record<string, boolean>>;
+        }
+      >;
+      for (const lid of allLocationIds) {
+        const d = byLoc[lid];
+        if (!d) continue;
+        mergeAssigned(d.assignedStaff);
+        mergeAreas(d.rosterAreaByStaffDate);
+        mergeGl(d.rosterGlByStaffDate);
+      }
+    } else {
+      const d = overviewQ.data as
+        | {
+            assignedStaff?: Array<{ staffId: string; staffDepts: Department[] }>;
+            rosterAreaByStaffDate?: Record<string, Record<string, Department>>;
+            rosterGlByStaffDate?: Record<string, Record<string, boolean>>;
+          }
+        | undefined;
+      mergeAssigned(d?.assignedStaff);
+      mergeAreas(d?.rosterAreaByStaffDate);
+      mergeGl(d?.rosterGlByStaffDate);
+    }
+
+    return { staffDeptsByStaff, rosterAreaByStaffDate, rosterGlByStaffDate };
+  }, [isAllLocations, overviewBatchQ.data, overviewQ.data, allLocationIds]);
+
+  // LG2 — Stundenaufteilung nach Schichtart je Mitarbeiter über die
+  // Abrechnungsperiode (Wochenplan-Attribution, Union über alle Standorte).
+  const hoursByStaffAndDept = useMemo(
+    () =>
+      aggregateHoursByStaffAndDept({
+        entries: overviewEntries,
+        staffDeptsByStaff: periodRoster.staffDeptsByStaff,
+        rosterAreaByStaffDate: periodRoster.rosterAreaByStaffDate,
+        rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
+      }),
+    [overviewEntries, periodRoster],
+  );
 
   const byDept = useMemo(() => {
     const m = new Map<Department, StaffAgg[]>();
@@ -1078,6 +1163,9 @@ function ZeitUebersichtPage() {
         fullName: fullNameByStaffId.get(s.staffId) ?? "",
         persoNr: persoNrByStaffId.get(s.staffId) ?? null,
         totalHours: s.totalHours,
+        stundenGl: hoursByStaffAndDept.get(s.staffId)?.get("gl") ?? 0,
+        stundenKueche: hoursByStaffAndDept.get(s.staffId)?.get("kitchen") ?? 0,
+        stundenService: hoursByStaffAndDept.get(s.staffId)?.get("service") ?? 0,
         shifts: s.shiftDates.size,
         evening: b?.night25Hours ?? 0,
         night: b?.night40Hours ?? 0,
@@ -1103,6 +1191,7 @@ function ZeitUebersichtPage() {
     activeRecurringByStaff,
     fullNameByStaffId,
     persoNrByStaffId,
+    hoursByStaffAndDept,
   ]);
 
   const payrollSearchActive = payrollSearch.trim().length > 0;
@@ -1803,6 +1892,7 @@ function ZeitUebersichtPage() {
             rowsByDept={payrollFilteredByDept}
             staffRows={payrollRowsByStaff}
             totals={payrollTotals}
+            hoursByStaffAndDept={hoursByStaffAndDept}
             readOnly={isPayroll}
             fullNameByStaffId={fullNameByStaffId}
             persoNrByStaffId={persoNrByStaffId}

@@ -477,6 +477,8 @@ function PayrollRow({
         {vorschussLabel ?? "–"}
       </TableCell>
       <TableCell className="py-1.5">
+        {isPrimary === false ? null : (
+          <>
         {(recurring?.length ?? 0) > 0 && (
           <div className="mb-1 flex flex-wrap gap-1">
             {recurring!.map((r) => (

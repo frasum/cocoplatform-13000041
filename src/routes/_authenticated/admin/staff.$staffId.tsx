@@ -21,6 +21,7 @@ import { PersonalDetailsTab } from "@/components/admin/PersonalDetailsTab";
 import { PermissionsTab } from "@/components/admin/PermissionsTab";
 import { SofortmeldungBanner } from "@/components/admin/SofortmeldungBanner";
 import { DokumenteTab } from "@/components/admin/DokumenteTab";
+import { ChangeRequestsTab } from "@/components/admin/ChangeRequestsTab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,7 +48,15 @@ export const Route = createFileRoute("/_authenticated/admin/staff/$staffId")({
   component: StaffDetailPage,
 });
 
-type Tab = "basics" | "personal" | "pin" | "account" | "permissions" | "dokumente" | "lohn";
+type Tab =
+  | "basics"
+  | "personal"
+  | "pin"
+  | "account"
+  | "permissions"
+  | "dokumente"
+  | "antraege"
+  | "lohn";
 
 function StaffDetailPage() {
   const { staffId } = Route.useParams();
@@ -115,6 +124,7 @@ function StaffDetailPage() {
             ...(isAdmin ? ([["account", "Login"]] as [Tab, string][]) : []),
             ...(isAdmin ? ([["permissions", "Rechte"]] as [Tab, string][]) : []),
             ...(isAdmin ? ([["dokumente", "Dokumente"]] as [Tab, string][]) : []),
+            ...(isAdmin ? ([["antraege", "Anträge"]] as [Tab, string][]) : []),
             ...(isAdmin ? ([["lohn", "Lohn"]] as [Tab, string][]) : []),
           ] as [Tab, string][]
         ).map(([k, label]) => (
@@ -141,6 +151,7 @@ function StaffDetailPage() {
       {tab === "account" && isAdmin && <AccountTab staffId={s.id} staffEmail={s.email} />}
       {tab === "permissions" && isAdmin && <PermissionsTab staffId={s.id} />}
       {tab === "dokumente" && isAdmin && <DokumenteTab staffId={s.id} staffName={s.displayName} />}
+      {tab === "antraege" && isAdmin && <ChangeRequestsTab staffId={s.id} />}
       {tab === "lohn" && isAdmin && <PayslipsTab staffId={s.id} />}
     </div>
   );

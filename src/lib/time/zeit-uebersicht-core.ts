@@ -142,6 +142,7 @@ export function buildWeekColumns(fromIso: string, toIso: string): WeekCol[] {
 // verschoben aus src/routes/_authenticated/admin/zeit-uebersicht.tsx.
 
 import { berlinLocalToIso } from "@/lib/time/shift-hours";
+import { entryRowDepartment } from "@/lib/time/primary-department";
 
 export const DEPT_LABEL: Record<Department, string> = {
   kitchen: "Küche",
@@ -267,4 +268,53 @@ export function buildShiftIsosOrThrow(
 export function dayHeader(d: Date): string {
   const names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   return `${names[d.getUTCDay()]} ${ddmm(d)}`;
+}
+
+// LG2 (26.07.2026) — Stundenaufteilung nach Schichtart je Mitarbeiter für die
+// Buchhaltung. Nutzt exakt die Attribution des Wochenplans (entryRowDepartment
+// mit rosterArea + rosterHasGlSkill), damit die Departmental-Aufteilung 1:1
+// mit der Zeilen-Attribution im Grid übereinstimmt.
+//
+// Eingabe:
+//   entries — dieselben Perioden-Einträge, die die Payroll-Summen (totalHours)
+//     füttern. hoursWorked wird 1:1 verwendet (keine getrennte Rechnung).
+//   staffDeptsByStaff — Abteilungs-Zuordnungen der Person (Union über alle
+//     Standorte, bei "Alle Standorte").
+//   rosterAreaByStaffDate, rosterGlByStaffDate — Dienstplan-Realität der
+//     Periode (Union bei "Alle Standorte"); dieselben Signale wie im Grid.
+//
+// Ausgabe: staffId → (Department → Stunden). Nur befüllte Departments sind
+// enthalten (Konsument entscheidet über Anzeigelogik "eine Zahl vs.
+// Aufteilung").
+export function aggregateHoursByStaffAndDept(input: {
+  entries: ReadonlyArray<{
+    staffId: string;
+    businessDate: string;
+    hoursWorked: number;
+    rawDepartment?: Department | null;
+  }>;
+  staffDeptsByStaff: Map<string, Department[]>;
+  rosterAreaByStaffDate: Record<string, Record<string, Department>>;
+  rosterGlByStaffDate: Record<string, Record<string, boolean>>;
+}): Map<string, Map<Department, number>> {
+  const out = new Map<string, Map<Department, number>>();
+  for (const e of input.entries) {
+    if (!(e.hoursWorked > 0)) continue;
+    const staffDepts = input.staffDeptsByStaff.get(e.staffId) ?? [];
+    const rosterArea = input.rosterAreaByStaffDate[e.staffId]?.[e.businessDate] ?? null;
+    const rosterHasGlSkill = Boolean(
+      input.rosterGlByStaffDate[e.staffId]?.[e.businessDate],
+    );
+    const { department } = entryRowDepartment(e.rawDepartment ?? null, staffDepts, {
+      rosterArea,
+      rosterHasGlSkill,
+    });
+    let byDept = out.get(e.staffId);
+    if (!byDept) {
+      byDept = new Map();
+      out.set(e.staffId, byDept);
+    }
+    byDept.set(department, (byDept.get(department) ?? 0) + e.hoursWorked);
+  }
+  return out;
 }

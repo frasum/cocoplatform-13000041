@@ -313,6 +313,62 @@ export const getTimeOverview = createServerFn({ method: "GET" })
     // WZ1: bei "Alle Standorte" reduziert buildPrimaryDeptMap je Mitarbeiter
     // über ALLE Standort-Zuordnungen (gl > kitchen > service).
     const deptByStaff = buildPrimaryDeptMap(deptRows ?? []);
+    // LG2 — Alle Abteilungs-Zuordnungen je Mitarbeiter (für entryRowDepartment
+    // in der Payroll-Aggregation nach Schichtart).
+    const staffDeptsByStaff = buildStaffDeptsMap(deptRows ?? []);
+
+    // LG2 — Dienstplan-Realität der Periode je Mitarbeiter (roster_shifts):
+    // rosterAreaByStaffDate + rosterGlByStaffDate identisch zur Wochen-Variante,
+    // damit die Payroll-Aggregation die Schicht-Typ-Attribution (Tages-Skill)
+    // konsistent zum Wochenplan-Grid berechnen kann.
+    let rosterQuery = supabaseAdmin
+      .from("roster_shifts")
+      .select("staff_id, area, skill_id, shift_date")
+      .eq("organization_id", caller.organizationId)
+      .gte("shift_date", data.fromDate)
+      .lte("shift_date", data.toDate);
+    if (data.locationId != null) {
+      rosterQuery = rosterQuery.eq("location_id", data.locationId);
+    }
+    const { data: rosterRows, error: rosterErr } = await rosterQuery;
+    if (rosterErr) throw rosterErr;
+
+    const glSkillIds = new Set<string>();
+    {
+      const { data: glSkillRows, error: glSkillErr } = await supabaseAdmin
+        .from("skills")
+        .select("id")
+        .eq("organization_id", caller.organizationId)
+        .eq("category", "gl");
+      if (glSkillErr) throw glSkillErr;
+      for (const s of glSkillRows ?? []) glSkillIds.add(s.id as string);
+    }
+
+    const rosterAreaByStaffDate: Record<string, Record<string, Department>> = {};
+    const rosterGlByStaffDate: Record<string, Record<string, boolean>> = {};
+    for (const r of rosterRows ?? []) {
+      const sid = r.staff_id as string;
+      const area = r.area as Department | null;
+      const skillId = r.skill_id as string | null;
+      const iso = r.shift_date as string;
+      if (area) {
+        const perStaff = rosterAreaByStaffDate[sid] ?? {};
+        const existing = perStaff[iso];
+        perStaff[iso] = existing ? primaryDepartment([existing, area]) : area;
+        rosterAreaByStaffDate[sid] = perStaff;
+      }
+      if (skillId && glSkillIds.has(skillId)) {
+        const perStaff = rosterGlByStaffDate[sid] ?? {};
+        perStaff[iso] = true;
+        rosterGlByStaffDate[sid] = perStaff;
+      }
+    }
+
+    // LG2 — assignedStaff mit staffDepts (für Client-Attribution). Bei "Alle
+    // Standorte" ohne Filter, sonst nur der gewählte Standort.
+    const assignedStaff = Array.from(
+      staffDeptsByStaff.entries(),
+    ).map(([staffId, depts]) => ({ staffId, staffDepts: depts }));
 
     const entries = (rows ?? []).map((r) => {
       const started = new Date(r.started_at).getTime();
@@ -361,7 +417,13 @@ export const getTimeOverview = createServerFn({ method: "GET" })
         openShifts: openShifts ?? 0,
       };
     }
-    return { entries, gaps };
+    return {
+      entries,
+      gaps,
+      assignedStaff,
+      rosterAreaByStaffDate,
+      rosterGlByStaffDate,
+    };
   });
 
 // SFN-Zuschlagsberechnung pro Mitarbeiter für Standort × Zeitraum.
@@ -833,7 +895,7 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId);
     if (deptErr) throw deptErr;
-    // Primär-Abteilung je Mitarbeiter (Priorität kitchen > service > gl) —
+    // Primär-Abteilung je Mitarbeiter (Priorität gl > kitchen > service) —
     // entries.department wird darauf gemappt, damit alle Stunden einer
     // Person deterministisch auf EINER Zeile auflaufen (time_entries hat
     // keine Abteilungs-Dimension).
@@ -908,7 +970,7 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
       if (area) {
         const perStaff = rosterAreaByStaffDate[sid] ?? {};
         const existing = perStaff[iso];
-        // primaryDepartment liefert kitchen>service>gl — hier für den seltenen
+        // primaryDepartment liefert gl>kitchen>service — hier für den seltenen
         // Fall zweier Schichten desselben Mitarbeiters am selben Tag mit
         // unterschiedlichen Areas.
         perStaff[iso] = existing ? primaryDepartment([existing, area]) : area;
@@ -1020,8 +1082,9 @@ export const getTimeOverviewBatch = createServerFn({ method: "GET" })
       .in("location_id", data.locationIds);
     if (deptErr) throw deptErr;
 
-    // Pro Standort die Primary-Dept-Map bauen (Priorität kitchen>service>gl).
+    // Pro Standort die Primary-Dept-Map bauen (Priorität gl>kitchen>service).
     const deptByLoc = new Map<string, Map<string, Department>>();
+    const staffDeptsByLoc = new Map<string, Map<string, Department[]>>();
     const rowsByLoc = new Map<string, Array<{ staff_id: string; department: string }>>();
     for (const r of deptRows ?? []) {
       const lid = r.location_id as string;
@@ -1029,7 +1092,30 @@ export const getTimeOverviewBatch = createServerFn({ method: "GET" })
       arr.push({ staff_id: r.staff_id as string, department: r.department as string });
       rowsByLoc.set(lid, arr);
     }
-    for (const [lid, arr] of rowsByLoc) deptByLoc.set(lid, buildPrimaryDeptMap(arr));
+    for (const [lid, arr] of rowsByLoc) {
+      deptByLoc.set(lid, buildPrimaryDeptMap(arr));
+      staffDeptsByLoc.set(lid, buildStaffDeptsMap(arr));
+    }
+
+    // LG2 — Roster + GL-Skills für die ganze Periode über alle Standorte.
+    const { data: rosterRows, error: rosterErr } = await supabaseAdmin
+      .from("roster_shifts")
+      .select("location_id, staff_id, area, skill_id, shift_date")
+      .eq("organization_id", caller.organizationId)
+      .in("location_id", data.locationIds)
+      .gte("shift_date", data.fromDate)
+      .lte("shift_date", data.toDate);
+    if (rosterErr) throw rosterErr;
+    const glSkillIds = new Set<string>();
+    {
+      const { data: glSkillRows, error: glSkillErr } = await supabaseAdmin
+        .from("skills")
+        .select("id")
+        .eq("organization_id", caller.organizationId)
+        .eq("category", "gl");
+      if (glSkillErr) throw glSkillErr;
+      for (const s of glSkillRows ?? []) glSkillIds.add(s.id as string);
+    }
 
     const byLocation: Record<
       string,
@@ -1045,9 +1131,43 @@ export const getTimeOverviewBatch = createServerFn({ method: "GET" })
           hoursWorked: number;
           source: string;
         }>;
+        assignedStaff: Array<{ staffId: string; staffDepts: Department[] }>;
+        rosterAreaByStaffDate: Record<string, Record<string, Department>>;
+        rosterGlByStaffDate: Record<string, Record<string, boolean>>;
       }
     > = {};
-    for (const lid of data.locationIds) byLocation[lid] = { entries: [] };
+    for (const lid of data.locationIds) {
+      const staffDeptsMap = staffDeptsByLoc.get(lid) ?? new Map<string, Department[]>();
+      byLocation[lid] = {
+        entries: [],
+        assignedStaff: Array.from(staffDeptsMap.entries()).map(([staffId, depts]) => ({
+          staffId,
+          staffDepts: depts,
+        })),
+        rosterAreaByStaffDate: {},
+        rosterGlByStaffDate: {},
+      };
+    }
+    for (const r of rosterRows ?? []) {
+      const lid = r.location_id as string;
+      const bucket = byLocation[lid];
+      if (!bucket) continue;
+      const sid = r.staff_id as string;
+      const area = r.area as Department | null;
+      const skillId = r.skill_id as string | null;
+      const iso = r.shift_date as string;
+      if (area) {
+        const perStaff = bucket.rosterAreaByStaffDate[sid] ?? {};
+        const existing = perStaff[iso];
+        perStaff[iso] = existing ? primaryDepartment([existing, area]) : area;
+        bucket.rosterAreaByStaffDate[sid] = perStaff;
+      }
+      if (skillId && glSkillIds.has(skillId)) {
+        const perStaff = bucket.rosterGlByStaffDate[sid] ?? {};
+        perStaff[iso] = true;
+        bucket.rosterGlByStaffDate[sid] = perStaff;
+      }
+    }
 
     for (const r of rows) {
       const lid = r.location_id as string;

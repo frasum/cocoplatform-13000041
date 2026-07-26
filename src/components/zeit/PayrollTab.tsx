@@ -26,6 +26,13 @@ import {
   type Department,
 } from "@/lib/time/zeit-uebersicht-core";
 
+// LG2 — Kompakte Codes für die Departmental-Splitline in der Payroll-Zeile.
+const DEPT_SHORT: Record<Department, string> = {
+  gl: "GL",
+  kitchen: "KÜ",
+  service: "SV",
+};
+
 export type PayrollRecurringEntry = {
   id: string;
   kind: "rate" | "dauer";
@@ -60,6 +67,7 @@ export function PayrollTab({
   onAddRecurring,
   onCancelRecurring,
   renderStaffName,
+  hoursByStaffAndDept,
 }: {
   mode: BuchhaltungMode;
   onModeChange: (m: BuchhaltungMode) => void;
@@ -93,6 +101,8 @@ export function PayrollTab({
   onAddRecurring?: (vars: CreateRecurringVars) => void;
   onCancelRecurring?: (id: string) => void;
   renderStaffName?: (staffId: string, displayName: string) => ReactNode;
+  /** LG2 — Stundenaufteilung nach Schichtart je Mitarbeiter. */
+  hoursByStaffAndDept?: Map<string, Map<Department, number>>;
 }) {
   const is3b = mode === "section3b";
   // Spaltenanzahl für colSpan: Name + Gesamt + Schichten + (3 SFN | 5 §3b) + U + K + Vorschuss + Besonderheiten
@@ -288,6 +298,7 @@ export function PayrollTab({
                             : undefined
                         }
                         onCancelRecurring={onCancelRecurring}
+                        deptParts={hoursByStaffAndDept?.get(staffId)}
                       />
                     );
                   })}
@@ -372,6 +383,7 @@ function PayrollRow({
   onAddRecurring,
   onCancelRecurring,
   zebra,
+  deptParts,
 }: {
   row: BuchhaltungExportRow;
   is3b: boolean;
@@ -388,6 +400,7 @@ function PayrollRow({
   }) => void;
   onCancelRecurring?: (id: string) => void;
   zebra?: boolean;
+  deptParts?: Map<Department, number>;
 }) {
   const [besonderheiten, setBesonderheiten] = useState<string>(row.besonderheiten ?? "");
   const [addOpen, setAddOpen] = useState(false);
@@ -426,6 +439,16 @@ function PayrollRow({
       </TableCell>
       <TableCell className="py-1.5 text-right tabular-nums font-medium">
         {fmtHm(floorToQuarterHours(row.totalHours))}
+        {deptParts && deptParts.size >= 2 && (
+          <div className="text-[10px] font-normal text-muted-foreground leading-tight">
+            {DEPT_ORDER.filter((d) => (deptParts.get(d) ?? 0) > 0)
+              .map(
+                (d) =>
+                  `${DEPT_SHORT[d]} ${fmtDec(floorToQuarterHours(deptParts.get(d) ?? 0))}`,
+              )
+              .join(" · ")}
+          </div>
+        )}
       </TableCell>
       <TableCell className="py-1.5 text-right">{numCell(row.evening)}</TableCell>
       <TableCell className="py-1.5 text-right">{numCell(row.night)}</TableCell>

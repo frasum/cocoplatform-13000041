@@ -2339,6 +2339,7 @@ export type Database = {
           order_reply_forward_unassigned: boolean
           order_reply_telegram_enabled: boolean
           organization_id: string
+          pausen_bezahlt: boolean
           telegram_bot_username: string | null
           telegram_report_enabled: boolean
           telegram_report_flags: Json
@@ -2368,6 +2369,7 @@ export type Database = {
           order_reply_forward_unassigned?: boolean
           order_reply_telegram_enabled?: boolean
           organization_id: string
+          pausen_bezahlt?: boolean
           telegram_bot_username?: string | null
           telegram_report_enabled?: boolean
           telegram_report_flags?: Json
@@ -2397,6 +2399,7 @@ export type Database = {
           order_reply_forward_unassigned?: boolean
           order_reply_telegram_enabled?: boolean
           organization_id?: string
+          pausen_bezahlt?: boolean
           telegram_bot_username?: string | null
           telegram_report_enabled?: boolean
           telegram_report_flags?: Json

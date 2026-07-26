@@ -55,6 +55,142 @@ export type OpenChangeRequest = {
   }[];
 };
 
+export type ChangeRequestHistoryItem = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  note: string | null;
+  reviewNote: string | null;
+  fields: {
+    field: string;
+    requested: JsonPrimitive;
+    before: JsonPrimitive | null;
+    applied: JsonPrimitive | null;
+    manualOnly: boolean;
+  }[];
+};
+
+const listStaffChangeRequestsSchema = z.object({ staffId: z.string().uuid() });
+
+export const listStaffChangeRequests = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => listStaffChangeRequestsSchema.parse(input))
+  .handler(async ({ data, context }): Promise<ChangeRequestHistoryItem[]> => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Staff org-scope prüfen.
+    const { data: staff, error: staffErr } = await supabaseAdmin
+      .from("staff")
+      .select("id, organization_id")
+      .eq("id", data.staffId)
+      .maybeSingle();
+    if (staffErr) throw new Error(staffErr.message);
+    if (!staff || staff.organization_id !== caller.organizationId) throw new ForbiddenError();
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("staff_data_change_requests")
+      .select(
+        "id, status, payload, note, review_note, created_at, reviewed_at, reviewed_by",
+      )
+      .eq("organization_id", caller.organizationId)
+      .eq("staff_id", data.staffId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const list = rows ?? [];
+    if (list.length === 0) return [];
+
+    // Reviewer-Namen batchen.
+    const reviewerIds = Array.from(
+      new Set(list.map((r) => r.reviewed_by as string | null).filter(Boolean) as string[]),
+    );
+    const reviewerMap = new Map<string, string>();
+    if (reviewerIds.length > 0) {
+      const { data: reviewers, error: revErr } = await supabaseAdmin
+        .from("staff")
+        .select("id, display_name, first_name, last_name")
+        .in("id", reviewerIds);
+      if (revErr) throw new Error(revErr.message);
+      for (const r of reviewers ?? []) {
+        const name =
+          (r.display_name as string | null) ||
+          [r.first_name, r.last_name].filter(Boolean).join(" ") ||
+          "—";
+        reviewerMap.set(r.id as string, name);
+      }
+    }
+
+    // Audit-Einträge für Approve/Reject batchen.
+    const decidedIds = list
+      .filter((r) => r.status !== "pending")
+      .map((r) => r.id as string);
+    type AuditMeta = {
+      diff?: Record<string, { before?: unknown; after?: unknown }>;
+      manualOnly?: string[];
+    };
+    const auditMap = new Map<string, AuditMeta>();
+    if (decidedIds.length > 0) {
+      const { data: audits, error: auErr } = await supabaseAdmin
+        .from("audit_log")
+        .select("entity_id, action, meta, created_at")
+        .eq("organization_id", caller.organizationId)
+        .eq("entity", "staff_data_change_requests")
+        .in("entity_id", decidedIds)
+        .in("action", ["profile.request_approved", "profile.request_rejected"])
+        .order("created_at", { ascending: false });
+      if (auErr) throw new Error(auErr.message);
+      // Neuester Eintrag pro entity_id gewinnt (append-only, aber defensiv).
+      for (const a of audits ?? []) {
+        const key = a.entity_id as string;
+        if (!auditMap.has(key)) {
+          auditMap.set(key, (a.meta ?? {}) as AuditMeta);
+        }
+      }
+    }
+
+    return list.map((r) => {
+      const payload = (r.payload ?? {}) as Record<string, unknown>;
+      const audit = auditMap.get(r.id as string);
+      const diff = audit?.diff ?? {};
+      const auditManual = new Set(audit?.manualOnly ?? []);
+      // Fallback: aus payload-Struktur ableiten, falls Audit fehlt (Legacy).
+      const { manualOnly } = splitApplicableFields(
+        payload as Partial<Record<RequestField, unknown>>,
+      );
+      const manualKeys = new Set([...Object.keys(manualOnly), ...auditManual]);
+
+      const fields = Object.keys(payload).map((field) => {
+        const isManual = manualKeys.has(field);
+        const d = diff[field];
+        return {
+          field,
+          requested: toPrimitive(payload[field]),
+          before:
+            d && d.before !== undefined ? toPrimitive(d.before) : null,
+          applied:
+            r.status === "approved" && !isManual && d && d.after !== undefined
+              ? toPrimitive(d.after)
+              : null,
+          manualOnly: isManual,
+        };
+      });
+
+      const reviewerId = r.reviewed_by as string | null;
+      return {
+        id: r.id as string,
+        status: r.status as ChangeRequestHistoryItem["status"],
+        createdAt: r.created_at as string,
+        reviewedAt: (r.reviewed_at as string | null) ?? null,
+        reviewerName: reviewerId ? (reviewerMap.get(reviewerId) ?? null) : null,
+        note: (r.note as string | null) ?? null,
+        reviewNote: (r.review_note as string | null) ?? null,
+        fields,
+      };
+    });
+  });
+
 export const listOpenChangeRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<OpenChangeRequest[]> => {

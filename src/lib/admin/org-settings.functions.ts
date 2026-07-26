@@ -30,6 +30,9 @@ export type OrgSettings = {
   telegramBotUsername: string | null;
   orderReplyTelegramEnabled: boolean;
   orderReplyForwardUnassigned: boolean;
+  // PB1 — Runde 1: Wert wird angezeigt und bedienbar, aber NICHT von
+  // Stunden-/Lohnberechnung gelesen. Default true = Alt-Verhalten.
+  pausenBezahlt: boolean;
 };
 
 const updateSchema = z
@@ -80,7 +83,7 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       await supabaseAdmin
         .from("organization_settings")
         .select(
-          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, test_mode_enabled, test_mode_email, betriebsnummer, arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter, telegram_bot_username, order_reply_telegram_enabled, order_reply_forward_unassigned",
+          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, test_mode_enabled, test_mode_email, betriebsnummer, arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter, telegram_bot_username, order_reply_telegram_enabled, order_reply_forward_unassigned, pausen_bezahlt",
         )
         .eq("organization_id", caller.organizationId)
         .maybeSingle(),
@@ -99,6 +102,11 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       telegramBotUsername: data?.telegram_bot_username ?? null,
       orderReplyTelegramEnabled: Boolean(data?.order_reply_telegram_enabled ?? false),
       orderReplyForwardUnassigned: Boolean(data?.order_reply_forward_unassigned ?? false),
+      // Default true bewahrt das Alt-Verhalten, falls die Zeile noch nichts
+      // enthält (Migration setzt DB-Default ebenfalls auf true).
+      pausenBezahlt: Boolean(
+        (data as { pausen_bezahlt?: boolean | null } | null)?.pausen_bezahlt ?? true,
+      ),
     };
   });
 

@@ -510,29 +510,63 @@ function ZeitUebersichtPage() {
     return { staffDeptsByStaff, rosterAreaByStaffDate, rosterGlByStaffDate };
   }, [isAllLocations, overviewBatchQ.data, overviewQ.data, allLocationIds]);
 
-  // LG2 — Stundenaufteilung nach Schichtart je Mitarbeiter über die
-  // Abrechnungsperiode (Wochenplan-Attribution, Union über alle Standorte).
-  const hoursByStaffAndDept = useMemo(
-    () =>
-      aggregateHoursByStaffAndDept({
-        entries: overviewEntries,
-        staffDeptsByStaff: periodRoster.staffDeptsByStaff,
-        rosterAreaByStaffDate: periodRoster.rosterAreaByStaffDate,
-        rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
-      }),
-    [overviewEntries, periodRoster],
-  );
+  // LG3 (27.07.2026) — Split-Aggregation: eine Zeile pro (Mitarbeiter, Abteilung).
+  // Multi-Bereich-Personen (z. B. GL + Service) erscheinen mit einer Zeile je
+  // belegter Abteilung; Zuschläge werden anteilig auf die Zeilen aufgeteilt.
+  const staffDeptRows = useMemo<StaffDeptRow[]>(() => {
+    const seedStaff = (staffAllQ.data ?? [])
+      .filter((s) => s.isActive)
+      .map((s) => {
+        const deps = isAllLocations
+          ? Array.from(new Set(s.locationDepartments.map((ld) => ld.department)))
+          : Array.from(
+              new Set(
+                s.locationDepartments
+                  .filter((ld) => ld.locationId === effectiveLocationId)
+                  .map((ld) => ld.department),
+              ),
+            );
+        return { id: s.id, displayName: s.displayName, deps: deps as Department[] };
+      })
+      .filter((s) => s.deps.length > 0);
+    return aggregateStaffDeptRows({
+      entries: overviewEntries.map((e) => ({
+        staffId: e.staffId,
+        displayName: e.displayName,
+        businessDate: e.businessDate,
+        hoursWorked: e.hoursWorked,
+        rawDepartment: e.rawDepartment ?? null,
+        startedAt: e.startedAt,
+        endedAt: e.endedAt,
+      })),
+      seedStaff,
+      staffDeptsByStaff: periodRoster.staffDeptsByStaff,
+      rosterAreaByStaffDate: periodRoster.rosterAreaByStaffDate,
+      rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
+    });
+  }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId, periodRoster]);
 
   const byDept = useMemo(() => {
-    const m = new Map<Department, StaffAgg[]>();
+    const m = new Map<Department, StaffDeptRow[]>();
     for (const dept of DEPT_ORDER) m.set(dept, []);
-    for (const s of staffAggs) {
+    for (const s of staffDeptRows) {
       const arr = m.get(s.department) ?? [];
       arr.push(s);
       m.set(s.department, arr);
     }
     return m;
-  }, [staffAggs]);
+  }, [staffDeptRows]);
+
+  // Gruppierung je Mitarbeiter (für SFN-Split-Berechnung + Primärzeilen-Flags).
+  const rowsByStaffId = useMemo(() => {
+    const m = new Map<string, StaffDeptRow[]>();
+    for (const r of staffDeptRows) {
+      const arr = m.get(r.staffId) ?? [];
+      arr.push(r);
+      m.set(r.staffId, arr);
+    }
+    return m;
+  }, [staffDeptRows]);
 
   const notesByStaff = useMemo(() => {
     const m = new Map<string, { vorschuss: number; besonderheiten: string }>();

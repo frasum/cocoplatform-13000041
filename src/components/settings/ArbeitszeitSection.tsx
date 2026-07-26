@@ -151,11 +151,11 @@ export function ArbeitszeitSection({
                 </table>
               </div>
               <p>
-                Zusätzlich sinken die{" "}
-                <span className="font-medium text-foreground">SFN-Töpfe</span> (Abend, Nacht,
-                Sonntag) proportional um denselben Faktor (11,00 h ÷ 167,30 h ≈ 6,58 %), weil die
-                fiktive Pause anteilig auf alle Zeitfenster verteilt wird. Der Netto-Effekt für den
-                Mitarbeiter ist entsprechend kleiner als die 396 € brutto suggerieren.
+                Zusätzlich sinken die <span className="font-medium text-foreground">SFN-Töpfe</span>{" "}
+                (Abend, Nacht, Sonntag) proportional um denselben Faktor (11,00 h ÷ 167,30 h ≈ 6,58
+                %), weil die fiktive Pause anteilig auf alle Zeitfenster verteilt wird. Der
+                Netto-Effekt für den Mitarbeiter ist entsprechend kleiner als die 396 € brutto
+                suggerieren.
               </p>
               <p>
                 <span className="font-medium text-foreground">Für PB2 vorgesehene Regel:</span> Bei{" "}

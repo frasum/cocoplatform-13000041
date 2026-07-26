@@ -150,6 +150,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
+  const [baseline, setBaseline] = useState<FormState | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<string | null>(null);
   const [vacEditing, setVacEditing] = useState(false);
@@ -170,14 +171,19 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
   const mutation = useMutation({
     mutationFn: () => {
       if (!form) throw new Error("Formular nicht geladen");
-      const patch = toPatch(form);
+      const patch = baseline ? toSparsePatch(form, baseline) : toPatch(form);
+      if (Object.keys(patch).length === 0) {
+        return Promise.resolve({ ok: true as const, noop: true as const });
+      }
       // Client-Validierung (gleiches Schema wie Server)
       personalDetailsSchema.parse(patch);
       return saveFn({ data: { staffId, fields: patch } });
     },
-    onSuccess: async () => {
-      setMsg("Gespeichert.");
+    onSuccess: async (res) => {
+      const noop = typeof res === "object" && res !== null && "noop" in res && res.noop === true;
+      setMsg(noop ? "Keine Änderungen." : "Gespeichert.");
       setEditing(false);
+      setBaseline(null);
       await queryClient.invalidateQueries({
         queryKey: ["admin", "staff", staffId, "personal-details"],
       });

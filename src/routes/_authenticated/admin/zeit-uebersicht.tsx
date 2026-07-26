@@ -1676,7 +1676,17 @@ function ZeitUebersichtPage() {
                   <TableHead>Mitarbeiter</TableHead>
                   {weekCols.map((w) => (
                     <TableHead key={w.key} className="text-right whitespace-nowrap">
-                      {w.label}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWeekStart(w.start);
+                          setActiveTab("weekly");
+                        }}
+                        className="hover:underline focus:underline focus:outline-none"
+                        title="Zum Wochenplan dieser Kalenderwoche"
+                      >
+                        {w.label}
+                      </button>
                     </TableHead>
                   ))}
                   <TableHead className="text-right">Gesamt</TableHead>

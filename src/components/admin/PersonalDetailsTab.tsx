@@ -78,10 +78,7 @@ function toPatch(state: FormState): Record<string, unknown> {
  * haben. Verhindert, dass ein Save der Maske andere (nicht angefasste) Felder
  * versehentlich auf NULL setzt.
  */
-function toSparsePatch(
-  state: FormState,
-  baseline: FormState,
-): Record<string, unknown> {
+function toSparsePatch(state: FormState, baseline: FormState): Record<string, unknown> {
   const full = toPatch(state);
   const base = toPatch(baseline);
   const out: Record<string, unknown> = {};

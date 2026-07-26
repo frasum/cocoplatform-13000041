@@ -136,15 +136,15 @@ export function ArbeitszeitSection({
                       <td className="px-2 py-1.5 text-right">156,30 h</td>
                     </tr>
                     <tr>
-                      <td className="px-2 py-1.5">Grundlohn (× 36,00 €/h)</td>
-                      <td className="px-2 py-1.5 text-right">6.022,80 €</td>
-                      <td className="px-2 py-1.5 text-right">5.626,80 €</td>
+                      <td className="px-2 py-1.5">Grundlohn (× 14,00 €/h)</td>
+                      <td className="px-2 py-1.5 text-right">2.342,20 €</td>
+                      <td className="px-2 py-1.5 text-right">2.188,20 €</td>
                     </tr>
                     <tr className="bg-muted/40">
                       <td className="px-2 py-1.5 font-medium text-foreground">Differenz</td>
                       <td className="px-2 py-1.5 text-right" />
                       <td className="px-2 py-1.5 text-right font-medium text-foreground">
-                        −396,00 €
+                        −154,00 €
                       </td>
                     </tr>
                   </tbody>
@@ -154,7 +154,7 @@ export function ArbeitszeitSection({
                 Zusätzlich sinken die <span className="font-medium text-foreground">SFN-Töpfe</span>{" "}
                 (Abend, Nacht, Sonntag) proportional um denselben Faktor (11,00 h ÷ 167,30 h ≈ 6,58
                 %), weil die fiktive Pause anteilig auf alle Zeitfenster verteilt wird. Der
-                Netto-Effekt für den Mitarbeiter ist entsprechend kleiner als die 396 € brutto
+                Netto-Effekt für den Mitarbeiter ist entsprechend kleiner als die 154 € brutto
                 suggerieren.
               </p>
               <p>

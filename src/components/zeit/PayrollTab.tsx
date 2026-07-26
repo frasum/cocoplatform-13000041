@@ -607,6 +607,8 @@ function PayrollRow({
             )}
           </div>
         )}
+          </>
+        )}
       </TableCell>
     </TableRow>
   );

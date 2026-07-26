@@ -17,10 +17,6 @@ export type BuchhaltungExportRow = {
   /** Personalnummer (int) — nur im Export sichtbar. */
   persoNr?: number | null;
   totalHours: number;
-  /** LG2 — Stundenaufteilung nach Schichtart (Attribution wie Wochenplan). */
-  stundenGl?: number;
-  stundenKueche?: number;
-  stundenService?: number;
   shifts: number;
   evening: number; // 20–24
   night: number; // 24–X
@@ -59,9 +55,6 @@ export function columns(
     { key: "fullName", label: "Vollname" },
     { key: "persoNr", label: "Pers.-Nr." },
     { key: "totalHours", label: "Gesamt" },
-    { key: "stundenGl", label: "Std GL" },
-    { key: "stundenKueche", label: "Std Küche" },
-    { key: "stundenService", label: "Std Service" },
     { key: "shifts", label: "Schichten" },
     { key: "evening", label: "20–24" },
     { key: "night", label: "24–X" },
@@ -94,16 +87,6 @@ function cellValue(row: BuchhaltungExportRow, key: string): string | number {
       return row.persoNr != null ? row.persoNr : "";
     case "totalHours":
       return fmtDec(floorToQuarterHours(row.totalHours));
-    case "stundenGl":
-      return (row.stundenGl ?? 0) > 0 ? fmtDec(floorToQuarterHours(row.stundenGl ?? 0)) : "";
-    case "stundenKueche":
-      return (row.stundenKueche ?? 0) > 0
-        ? fmtDec(floorToQuarterHours(row.stundenKueche ?? 0))
-        : "";
-    case "stundenService":
-      return (row.stundenService ?? 0) > 0
-        ? fmtDec(floorToQuarterHours(row.stundenService ?? 0))
-        : "";
     case "shifts":
       return row.shifts;
     case "evening":
@@ -144,9 +127,6 @@ function totals(rows: BuchhaltungExportRow[]): BuchhaltungExportRow {
   return {
     displayName: "",
     totalHours: sumQ((r) => r.totalHours),
-    stundenGl: sumQ((r) => r.stundenGl ?? 0),
-    stundenKueche: sumQ((r) => r.stundenKueche ?? 0),
-    stundenService: sumQ((r) => r.stundenService ?? 0),
     shifts: sum((r) => r.shifts),
     evening: sumQ((r) => r.evening),
     night: sumQ((r) => r.night),

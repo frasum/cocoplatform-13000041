@@ -143,6 +143,8 @@ export function buildWeekColumns(fromIso: string, toIso: string): WeekCol[] {
 
 import { berlinLocalToIso } from "@/lib/time/shift-hours";
 import { entryRowDepartment } from "@/lib/time/primary-department";
+import { computeShiftHours } from "@/lib/time/shift-hours";
+// (computeShiftHours wird in aggregateStaffDeptRows weiter unten benutzt.)
 
 export const DEPT_LABEL: Record<Department, string> = {
   kitchen: "Küche",
@@ -314,5 +316,198 @@ export function aggregateHoursByStaffAndDept(input: {
     }
     byDept.set(department, (byDept.get(department) ?? 0) + e.hoursWorked);
   }
+  return out;
+}
+
+// „LG3 (27.07.2026) — Physische Zeilen-Aufteilung nach Schichtart pro
+// Mitarbeiter+Abteilung (statt einer Zeile mit Untzeile). Jede Schicht wird
+// via `entryRowDepartment` genau EINER Ziel-Abteilung zugerechnet — Stunden,
+// Anzahl Schichten UND die Basiswerte für die SFN-Zuschläge (Abend/Nacht/
+// SO+Fei) laufen 1:1 in die Zeile dieser Abteilung.
+//
+// Ein-Bereichs-Personen bekommen exakt eine Zeile (Verhalten wie zuvor).
+// Mehrbereichs-Personen (z. B. Lam: GL + Service) erscheinen mit einer eigenen
+// Zeile pro belegter Abteilung. `isPrimary` markiert die „Hauptzeile" (=
+// meiste Stunden; bei Gleichstand GL > Kitchen > Service). Notizen, Vorschuss,
+// Urlaub/Krank bleiben personengebunden und werden vom Konsumenten NUR auf
+// der Primärzeile gerendert.
+//
+// `basisEvening/basisNight/basisSunHol` sind die clientseitig aus den
+// Schichten dieser Abteilung berechneten Rohwerte — der Konsument nutzt sie,
+// um die serverseitigen SFN-Summen (evening/night/sunHol/sonntag/feiertag/
+// feiertag150) proportional auf die Abteilungszeilen zu splitten und dabei
+// die Personen-Summe invariant zu halten.
+export type StaffDeptRow = {
+  staffId: string;
+  displayName: string;
+  department: Department;
+  isPrimary: boolean;
+  perWeek: Map<string, number>;
+  totalHours: number;
+  shiftDates: Set<string>;
+  basisEvening: number;
+  basisNight: number;
+  basisSunHol: number;
+};
+
+const DEPT_TIE_ORDER: Department[] = ["gl", "kitchen", "service"];
+
+export function aggregateStaffDeptRows(input: {
+  entries: ReadonlyArray<{
+    staffId: string;
+    displayName: string;
+    businessDate: string;
+    hoursWorked: number;
+    rawDepartment?: Department | null;
+    startedAt?: string;
+    endedAt?: string;
+  }>;
+  seedStaff: ReadonlyArray<{ id: string; displayName: string; deps: readonly Department[] }>;
+  staffDeptsByStaff: Map<string, Department[]>;
+  rosterAreaByStaffDate: Record<string, Record<string, Department>>;
+  rosterGlByStaffDate: Record<string, Record<string, boolean>>;
+}): StaffDeptRow[] {
+  type Bucket = {
+    staffId: string;
+    displayName: string;
+    department: Department;
+    perWeek: Map<string, number>;
+    totalHours: number;
+    shiftDates: Set<string>;
+    basisEvening: number;
+    basisNight: number;
+    basisSunHol: number;
+  };
+  const buckets = new Map<string, Bucket>();
+  const keyOf = (sid: string, dept: Department) => `${sid}|${dept}`;
+  const ensure = (sid: string, name: string, dept: Department): Bucket => {
+    const k = keyOf(sid, dept);
+    let b = buckets.get(k);
+    if (!b) {
+      b = {
+        staffId: sid,
+        displayName: name,
+        department: dept,
+        perWeek: new Map(),
+        totalHours: 0,
+        shiftDates: new Set(),
+        basisEvening: 0,
+        basisNight: 0,
+        basisSunHol: 0,
+      };
+      buckets.set(k, b);
+    }
+    return b;
+  };
+
+  // Seed: alle aktiven Mitarbeiter (aus dem Standort-Filter) mit exakt einer
+  // Zeile bei ihrer Startabteilung. Kommen Einträge dazu, entstehen zusätzliche
+  // Zeilen — die Seed-Zeile bleibt bestehen (0-h-Fall). Personen mit Einträgen
+  // in mehreren Abteilungen werden entsprechend gesplittet.
+  const seededPrimary = new Map<string, Department>();
+  for (const s of input.seedStaff) {
+    if (s.deps.length === 0) continue;
+    const dep = s.deps[0] as Department;
+    ensure(s.id, s.displayName, dep);
+    seededPrimary.set(s.id, dep);
+  }
+
+  for (const e of input.entries) {
+    const staffDepts = input.staffDeptsByStaff.get(e.staffId) ?? [];
+    const rosterArea = input.rosterAreaByStaffDate[e.staffId]?.[e.businessDate] ?? null;
+    const rosterHasGlSkill = Boolean(input.rosterGlByStaffDate[e.staffId]?.[e.businessDate]);
+    const { department } = entryRowDepartment(e.rawDepartment ?? null, staffDepts, {
+      rosterArea,
+      rosterHasGlSkill,
+    });
+    const b = ensure(e.staffId, e.displayName, department);
+    const wk = isoWeek(parseIsoDate(e.businessDate));
+    const wkKey = `${wk.year}-W${String(wk.week).padStart(2, "0")}`;
+    b.perWeek.set(wkKey, (b.perWeek.get(wkKey) ?? 0) + e.hoursWorked);
+    b.totalHours += e.hoursWorked;
+    b.shiftDates.add(e.businessDate);
+    if (e.startedAt && e.endedAt) {
+      const h = computeShiftHours(e.startedAt, e.endedAt, e.businessDate);
+      b.basisEvening += h.eveningHours;
+      b.basisNight += h.nightHours;
+      b.basisSunHol += h.sundayHolidayHours;
+    }
+  }
+
+  // Primär-Zeile je Mitarbeiter bestimmen: meiste Stunden gewinnt; bei
+  // Gleichstand DEPT_TIE_ORDER (GL > Kitchen > Service). Personen ohne
+  // Einträge (0h) behalten die Seed-Abteilung als Primär.
+  const rowsByStaff = new Map<string, Bucket[]>();
+  for (const b of buckets.values()) {
+    const arr = rowsByStaff.get(b.staffId) ?? [];
+    arr.push(b);
+    rowsByStaff.set(b.staffId, arr);
+  }
+  const primaryByStaff = new Map<string, Department>();
+  for (const [sid, arr] of rowsByStaff) {
+    if (arr.length === 1) {
+      primaryByStaff.set(sid, arr[0].department);
+      continue;
+    }
+    const allZero = arr.every((r) => r.totalHours === 0);
+    if (allZero) {
+      primaryByStaff.set(sid, seededPrimary.get(sid) ?? arr[0].department);
+      continue;
+    }
+    const sorted = [...arr].sort((a, b) => {
+      if (b.totalHours !== a.totalHours) return b.totalHours - a.totalHours;
+      return DEPT_TIE_ORDER.indexOf(a.department) - DEPT_TIE_ORDER.indexOf(b.department);
+    });
+    primaryByStaff.set(sid, sorted[0].department);
+  }
+
+  const out: StaffDeptRow[] = [];
+  for (const b of buckets.values()) {
+    out.push({
+      staffId: b.staffId,
+      displayName: b.displayName,
+      department: b.department,
+      isPrimary: primaryByStaff.get(b.staffId) === b.department,
+      perWeek: b.perWeek,
+      totalHours: b.totalHours,
+      shiftDates: b.shiftDates,
+      basisEvening: b.basisEvening,
+      basisNight: b.basisNight,
+      basisSunHol: b.basisSunHol,
+    });
+  }
+  // Sortierung: Name (de) — Konsument gruppiert selbst per Abteilung.
+  return out.sort((a, b) => a.displayName.localeCompare(b.displayName, "de"));
+}
+
+// LG3 — Proportionaler Split einer personen-aggregierten SFN-Metrik auf die
+// Abteilungszeilen einer Person, gemessen an einer clientseitig berechneten
+// Basis (z. B. `basisEvening`). Summe über alle Zeilen bleibt EXAKT gleich
+// dem Personen-Wert (letzte Zeile erhält den Restbetrag). Ist die Basis-Summe
+// 0 (metrik trifft niemanden dieser Person), bekommt die Primärzeile den
+// gesamten Wert — so gehen Beträge nie verloren.
+export function splitSfnMetricByDept(
+  rows: readonly StaffDeptRow[],
+  personTotal: number,
+  basis: (r: StaffDeptRow) => number,
+): Map<Department, number> {
+  const out = new Map<Department, number>();
+  for (const r of rows) out.set(r.department, 0);
+  if (personTotal <= 0 || rows.length === 0) return out;
+  const basisSum = rows.reduce((a, r) => a + basis(r), 0);
+  if (basisSum <= 0) {
+    const primary = rows.find((r) => r.isPrimary) ?? rows[0];
+    out.set(primary.department, personTotal);
+    return out;
+  }
+  let assigned = 0;
+  for (let i = 0; i < rows.length - 1; i++) {
+    const r = rows[i];
+    const share = (basis(r) / basisSum) * personTotal;
+    out.set(r.department, share);
+    assigned += share;
+  }
+  const last = rows[rows.length - 1];
+  out.set(last.department, personTotal - assigned);
   return out;
 }

@@ -98,7 +98,9 @@ import {
   fmtIso,
   floorToQuarterHours,
   isoWeek,
-  aggregateHoursByStaffAndDept,
+  aggregateStaffDeptRows,
+  splitSfnMetricByDept,
+  type StaffDeptRow,
   mondayOf,
   parseIsoDate,
 } from "@/lib/time/zeit-uebersicht-core";
@@ -437,70 +439,6 @@ function ZeitUebersichtPage() {
   const weekCols = useMemo(() => buildWeekColumns(fromDate, toDate), [fromDate, toDate]);
 
   // Aggregations
-  type StaffAgg = {
-    staffId: string;
-    displayName: string;
-    department: Department;
-    perWeek: Map<string, number>;
-    totalHours: number;
-    shiftDates: Set<string>;
-  };
-  const staffAggs = useMemo(() => {
-    const entries: Entry[] = overviewEntries;
-    const map = new Map<string, StaffAgg>();
-    // WZ3 — Seed: alle aktiven Mitarbeiter aus dem Standort-Filter anlegen,
-    // damit Personen ohne time_entries in der Periode trotzdem erscheinen
-    // (0:00, keine Notizen). Der Aggregations-Key bleibt `staffId` — kommen
-    // Einträge dazu, gewinnt (wie bisher) die Abteilung des ersten Entry.
-    for (const s of staffAllQ.data ?? []) {
-      if (!s.isActive) continue;
-      const deps = isAllLocations
-        ? Array.from(new Set(s.locationDepartments.map((ld) => ld.department)))
-        : Array.from(
-            new Set(
-              s.locationDepartments
-                .filter((ld) => ld.locationId === effectiveLocationId)
-                .map((ld) => ld.department),
-            ),
-          );
-      if (deps.length === 0) continue;
-      // Genau eine Zeile pro Mitarbeiter (Key = staffId); als Startabteilung
-      // die erste zugeordnete — konsistent mit dem Verhalten heute (Einträge
-      // überschreiben nicht, sie erweitern).
-      if (!map.has(s.id)) {
-        map.set(s.id, {
-          staffId: s.id,
-          displayName: s.displayName,
-          department: deps[0] as Department,
-          perWeek: new Map(),
-          totalHours: 0,
-          shiftDates: new Set(),
-        });
-      }
-    }
-    for (const e of entries) {
-      let agg = map.get(e.staffId);
-      if (!agg) {
-        agg = {
-          staffId: e.staffId,
-          displayName: e.displayName,
-          department: e.department,
-          perWeek: new Map(),
-          totalHours: 0,
-          shiftDates: new Set(),
-        };
-        map.set(e.staffId, agg);
-      }
-      const wk = isoWeek(parseIsoDate(e.businessDate));
-      const wkKey = `${wk.year}-W${String(wk.week).padStart(2, "0")}`;
-      agg.perWeek.set(wkKey, (agg.perWeek.get(wkKey) ?? 0) + e.hoursWorked);
-      agg.totalHours += e.hoursWorked;
-      agg.shiftDates.add(e.businessDate);
-    }
-    return Array.from(map.values()).sort((a, b) =>
-      a.displayName.localeCompare(b.displayName, "de"),
-    );
-  }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId]);
 
   // LG2 — Perioden-Roster (Union über Standorte) für die Payroll-Stunden-
   // aufteilung nach Schichtart. Quelle: getTimeOverview (single) /
@@ -572,29 +510,63 @@ function ZeitUebersichtPage() {
     return { staffDeptsByStaff, rosterAreaByStaffDate, rosterGlByStaffDate };
   }, [isAllLocations, overviewBatchQ.data, overviewQ.data, allLocationIds]);
 
-  // LG2 — Stundenaufteilung nach Schichtart je Mitarbeiter über die
-  // Abrechnungsperiode (Wochenplan-Attribution, Union über alle Standorte).
-  const hoursByStaffAndDept = useMemo(
-    () =>
-      aggregateHoursByStaffAndDept({
-        entries: overviewEntries,
-        staffDeptsByStaff: periodRoster.staffDeptsByStaff,
-        rosterAreaByStaffDate: periodRoster.rosterAreaByStaffDate,
-        rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
-      }),
-    [overviewEntries, periodRoster],
-  );
+  // LG3 (27.07.2026) — Split-Aggregation: eine Zeile pro (Mitarbeiter, Abteilung).
+  // Multi-Bereich-Personen (z. B. GL + Service) erscheinen mit einer Zeile je
+  // belegter Abteilung; Zuschläge werden anteilig auf die Zeilen aufgeteilt.
+  const staffDeptRows = useMemo<StaffDeptRow[]>(() => {
+    const seedStaff = (staffAllQ.data ?? [])
+      .filter((s) => s.isActive)
+      .map((s) => {
+        const deps = isAllLocations
+          ? Array.from(new Set(s.locationDepartments.map((ld) => ld.department)))
+          : Array.from(
+              new Set(
+                s.locationDepartments
+                  .filter((ld) => ld.locationId === effectiveLocationId)
+                  .map((ld) => ld.department),
+              ),
+            );
+        return { id: s.id, displayName: s.displayName, deps: deps as Department[] };
+      })
+      .filter((s) => s.deps.length > 0);
+    return aggregateStaffDeptRows({
+      entries: overviewEntries.map((e) => ({
+        staffId: e.staffId,
+        displayName: e.displayName,
+        businessDate: e.businessDate,
+        hoursWorked: e.hoursWorked,
+        rawDepartment: e.rawDepartment ?? null,
+        startedAt: e.startedAt,
+        endedAt: e.endedAt,
+      })),
+      seedStaff,
+      staffDeptsByStaff: periodRoster.staffDeptsByStaff,
+      rosterAreaByStaffDate: periodRoster.rosterAreaByStaffDate,
+      rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
+    });
+  }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId, periodRoster]);
 
   const byDept = useMemo(() => {
-    const m = new Map<Department, StaffAgg[]>();
+    const m = new Map<Department, StaffDeptRow[]>();
     for (const dept of DEPT_ORDER) m.set(dept, []);
-    for (const s of staffAggs) {
+    for (const s of staffDeptRows) {
       const arr = m.get(s.department) ?? [];
       arr.push(s);
       m.set(s.department, arr);
     }
     return m;
-  }, [staffAggs]);
+  }, [staffDeptRows]);
+
+  // Gruppierung je Mitarbeiter (für SFN-Split-Berechnung + Primärzeilen-Flags).
+  const rowsByStaffId = useMemo(() => {
+    const m = new Map<string, StaffDeptRow[]>();
+    for (const r of staffDeptRows) {
+      const arr = m.get(r.staffId) ?? [];
+      arr.push(r);
+      m.set(r.staffId, arr);
+    }
+    return m;
+  }, [staffDeptRows]);
 
   const notesByStaff = useMemo(() => {
     const m = new Map<string, { vorschuss: number; besonderheiten: string }>();
@@ -1143,68 +1115,102 @@ function ZeitUebersichtPage() {
   }, [weeklyExportInput, deptFilter, skillFilter, rosterByStaffMap]);
 
   // ============ Buchhaltung-Aggregation (Render + Export) ============
-  const payrollRowsByStaff = useMemo(() => {
+  //
+  // LG3 — Eine Payroll-Zeile pro (Mitarbeiter, Abteilung). Personen-Metriken
+  // (Vorschuss, Urlaub/Krank, Notizen) landen ausschließlich auf der Primär-
+  // zeile. SFN-Zuschläge werden anteilig aus den Basiswerten
+  // (basisEvening/Night/SunHol) auf die Abteilungszeilen gesplittet — die
+  // Personen-Summe bleibt invariant.
+  type PayrollSplitRow = BuchhaltungExportRow & {
+    staffId: string;
+    department: Department;
+    isPrimary: boolean;
+    rowKey: string;
+  };
+  const payrollRowsSplit = useMemo<PayrollSplitRow[]>(() => {
     const is3b = payrollMode === "section3b";
-    const m = new Map<string, BuchhaltungExportRow & { staffId: string; department: Department }>();
-    for (const s of staffAggs) {
-      const sfn = sfnByStaff.get(s.staffId);
+    const out: PayrollSplitRow[] = [];
+    for (const [sid, group] of rowsByStaffId) {
+      const sfn = sfnByStaff.get(sid);
       const b = is3b ? sfn?.extended : sfn?.simple;
-      const note = notesByStaff.get(s.staffId);
-      const advCents = advanceCentsByStaff.get(s.staffId) ?? 0;
-      const abs = absencesByStaff.get(s.staffId);
-      const recur = activeRecurringByStaff.get(s.staffId) ?? [];
-      void recur; // rendered separately in PayrollTab; export mergt weiter unten.
-      m.set(s.staffId, {
-        staffId: s.staffId,
-        department: s.department,
-        displayName: s.displayName,
-        fullName: fullNameByStaffId.get(s.staffId) ?? "",
-        persoNr: persoNrByStaffId.get(s.staffId) ?? null,
-        totalHours: s.totalHours,
-        stundenGl: hoursByStaffAndDept.get(s.staffId)?.get("gl") ?? 0,
-        stundenKueche: hoursByStaffAndDept.get(s.staffId)?.get("kitchen") ?? 0,
-        stundenService: hoursByStaffAndDept.get(s.staffId)?.get("service") ?? 0,
-        shifts: s.shiftDates.size,
-        evening: b?.night25Hours ?? 0,
-        night: b?.night40Hours ?? 0,
-        sunHol: sfn?.simple.sundayHours ?? 0,
-        sonntag: sfn?.extended.sundayHours ?? 0,
-        feiertag: sfn?.extended.holidayHours ?? 0,
-        feiertag150: sfn?.extended.holiday150Hours ?? 0,
-        urlaubDays: abs?.urlaubDays ?? 0,
-        krankDays: abs?.krankDays ?? 0,
-        vorschussEUR: advCents / 100,
-        besonderheiten: note?.besonderheiten ?? "",
-        absenceNote: abs?.absenceNote ?? "",
-      });
+      const note = notesByStaff.get(sid);
+      const advCents = advanceCentsByStaff.get(sid) ?? 0;
+      const abs = absencesByStaff.get(sid);
+      const splitEvening = splitSfnMetricByDept(group, b?.night25Hours ?? 0, (r) => r.basisEvening);
+      const splitNight = splitSfnMetricByDept(group, b?.night40Hours ?? 0, (r) => r.basisNight);
+      const splitSunHolSimple = splitSfnMetricByDept(
+        group,
+        sfn?.simple.sundayHours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      const splitSonntag = splitSfnMetricByDept(
+        group,
+        sfn?.extended.sundayHours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      const splitFeiertag = splitSfnMetricByDept(
+        group,
+        sfn?.extended.holidayHours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      const splitFeiertag150 = splitSfnMetricByDept(
+        group,
+        sfn?.extended.holiday150Hours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      for (const r of group) {
+        const primary = r.isPrimary;
+        out.push({
+          staffId: r.staffId,
+          department: r.department,
+          isPrimary: primary,
+          rowKey: `${r.staffId}|${r.department}`,
+          displayName: r.displayName,
+          fullName: fullNameByStaffId.get(sid) ?? "",
+          persoNr: persoNrByStaffId.get(sid) ?? null,
+          totalHours: r.totalHours,
+          shifts: r.shiftDates.size,
+          evening: splitEvening.get(r.department) ?? 0,
+          night: splitNight.get(r.department) ?? 0,
+          sunHol: splitSunHolSimple.get(r.department) ?? 0,
+          sonntag: splitSonntag.get(r.department) ?? 0,
+          feiertag: splitFeiertag.get(r.department) ?? 0,
+          feiertag150: splitFeiertag150.get(r.department) ?? 0,
+          // Personen-Metriken NUR auf der Primärzeile — Summen bleiben invariant.
+          urlaubDays: primary ? (abs?.urlaubDays ?? 0) : 0,
+          krankDays: primary ? (abs?.krankDays ?? 0) : 0,
+          vorschussEUR: primary ? advCents / 100 : 0,
+          besonderheiten: primary ? (note?.besonderheiten ?? "") : "",
+          absenceNote: primary ? (abs?.absenceNote ?? "") : "",
+        });
+      }
     }
-    return m;
+    return out;
   }, [
-    staffAggs,
+    rowsByStaffId,
     sfnByStaff,
     notesByStaff,
     advanceCentsByStaff,
     absencesByStaff,
     payrollMode,
-    activeRecurringByStaff,
     fullNameByStaffId,
     persoNrByStaffId,
-    hoursByStaffAndDept,
   ]);
+
 
   const payrollSearchActive = payrollSearch.trim().length > 0;
   const payrollFilteredByDept = useMemo(() => {
     const q = payrollSearch.trim().toLowerCase();
     const m = new Map<Department, BuchhaltungExportRow[]>();
     for (const dept of DEPT_ORDER) m.set(dept, []);
-    for (const row of payrollRowsByStaff.values()) {
+    for (const row of payrollRowsSplit) {
       if (q !== "" && !row.displayName.toLowerCase().includes(q)) continue;
       const arr = m.get(row.department) ?? [];
       arr.push(row);
       m.set(row.department, arr);
     }
     return m;
-  }, [payrollRowsByStaff, payrollSearch]);
+  }, [payrollRowsSplit, payrollSearch]);
 
   const payrollAllVisible = useMemo(() => {
     const out: BuchhaltungExportRow[] = [];
@@ -1241,8 +1247,11 @@ function ZeitUebersichtPage() {
     const perLabel = selectedPeriod?.label ?? `${fromDate}_${toDate}`;
     const mergeRecurring = (rows: BuchhaltungExportRow[]): BuchhaltungExportRow[] =>
       rows.map((r) => {
-        const staffId = (r as BuchhaltungExportRow & { staffId?: string }).staffId;
-        const recur = staffId ? activeRecurringByStaff.get(staffId) : undefined;
+        const ext = r as BuchhaltungExportRow & { staffId?: string; isPrimary?: boolean };
+        // LG3 — Recurring-Notizen NUR auf der Primärzeile mergen, sonst
+        // erscheinen sie doppelt in den Exporten.
+        if (ext.isPrimary === false) return r;
+        const recur = ext.staffId ? activeRecurringByStaff.get(ext.staffId) : undefined;
         if (!recur || recur.length === 0) return r;
         const recurText = recur.map((x) => x.display).join(" · ");
         const combined = [r.besonderheiten ?? "", recurText].filter(Boolean).join(" · ");
@@ -1711,7 +1720,7 @@ function ZeitUebersichtPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!overviewLoading && staffAggs.length === 0 && (
+                {!overviewLoading && staffDeptRows.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={5 + weekCols.length}
@@ -1736,9 +1745,14 @@ function ZeitUebersichtPage() {
                     // BH1 — Bereichs-Summe = Σ der GERUNDETEN Personenwerte.
                     deptTotal += floorToQuarterHours(s.totalHours);
                     deptShifts += s.shiftDates.size;
-                    const abs = absencesByStaff.get(s.staffId);
-                    deptUrlaub += abs?.urlaubDays ?? 0;
-                    deptKrank += abs?.krankDays ?? 0;
+                    // LG3 — U/K sind personenweit; NUR auf der Primärzeile zählen,
+                    // damit Multi-Bereich-Personen die Bereichs-/Gesamtsumme nicht
+                    // doppelt hochtreiben.
+                    if (s.isPrimary) {
+                      const abs = absencesByStaff.get(s.staffId);
+                      deptUrlaub += abs?.urlaubDays ?? 0;
+                      deptKrank += abs?.krankDays ?? 0;
+                    }
                   }
                   return (
                     <Fragment key={`grp-${dept}`}>
@@ -1751,11 +1765,17 @@ function ZeitUebersichtPage() {
                         </TableCell>
                       </TableRow>
                       {list.map((s, idx) => {
-                        const abs = absencesByStaff.get(s.staffId);
+                        // LG3 — Absenzen erscheinen nur auf der Primärzeile
+                        // (Multi-Bereich-Personen haben zwei Zeilen — U/K würde
+                        // sonst doppelt gerendert).
+                        const abs = s.isPrimary ? absencesByStaff.get(s.staffId) : undefined;
                         const u = abs?.urlaubDays ?? 0;
                         const k = abs?.krankDays ?? 0;
                         return (
-                          <TableRow key={s.staffId} className={idx % 2 === 1 ? "bg-muted/60" : ""}>
+                          <TableRow
+                            key={`${s.staffId}|${s.department}`}
+                            className={idx % 2 === 1 ? "bg-muted/60" : ""}
+                          >
                             <TableCell>
                               <div>
                                 {canOpenStaff ? (
@@ -1837,23 +1857,25 @@ function ZeitUebersichtPage() {
                     </Fragment>
                   );
                 })}
-                {staffAggs.length > 0 &&
+                {staffDeptRows.length > 0 &&
                   (() => {
                     const totWeek = new Map<string, number>();
                     let tot = 0;
                     let totShifts = 0;
                     let totUrlaub = 0;
                     let totKrank = 0;
-                    for (const s of staffAggs) {
+                    for (const s of staffDeptRows) {
                       for (const [k, v] of s.perWeek) {
                         totWeek.set(k, (totWeek.get(k) ?? 0) + v);
                       }
                       // BH1 — Gesamt-Fußzeile = Σ der GERUNDETEN Personenwerte.
                       tot += floorToQuarterHours(s.totalHours);
                       totShifts += s.shiftDates.size;
-                      const abs = absencesByStaff.get(s.staffId);
-                      totUrlaub += abs?.urlaubDays ?? 0;
-                      totKrank += abs?.krankDays ?? 0;
+                      if (s.isPrimary) {
+                        const abs = absencesByStaff.get(s.staffId);
+                        totUrlaub += abs?.urlaubDays ?? 0;
+                        totKrank += abs?.krankDays ?? 0;
+                      }
                     }
                     return (
                       <TableRow className="bg-muted font-semibold">
@@ -1898,9 +1920,7 @@ function ZeitUebersichtPage() {
             onSearchChange={setPayrollSearch}
             searchActive={payrollSearchActive}
             rowsByDept={payrollFilteredByDept}
-            staffRows={payrollRowsByStaff}
             totals={payrollTotals}
-            hoursByStaffAndDept={hoursByStaffAndDept}
             readOnly={isPayroll}
             fullNameByStaffId={fullNameByStaffId}
             persoNrByStaffId={persoNrByStaffId}

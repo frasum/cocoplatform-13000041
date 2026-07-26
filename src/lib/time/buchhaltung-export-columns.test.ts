@@ -24,15 +24,14 @@ describe("buchhaltung-export columns(mode)", () => {
       const keys = columns(mode).map((c) => c.key);
       expect(keys[0]).toBe("name");
       expect(keys.slice(1, 3)).toEqual(["fullName", "persoNr"]);
-      expect(keys.slice(3, 10)).toEqual([
-        "totalHours",
-        "stundenGl",
-        "stundenKueche",
-        "stundenService",
-        "shifts",
-        "evening",
-        "night",
-      ]);
+      // LG3 (27.07.2026) — die separaten Stundenspalten je Abteilung entfallen,
+      // weil die Zeilen jetzt PHYSISCH pro (Mitarbeiter, Abteilung) gesplittet
+      // werden. Die Gesamtstunden-Zelle einer Zeile trägt nur noch die Stunden
+      // dieser Abteilung.
+      expect(keys.slice(3, 7)).toEqual(["totalHours", "shifts", "evening", "night"]);
+      expect(keys).not.toContain("stundenGl");
+      expect(keys).not.toContain("stundenKueche");
+      expect(keys).not.toContain("stundenService");
       expect(keys.slice(-4)).toEqual(["urlaubDays", "krankDays", "vorschussEUR", "besonderheiten"]);
     }
   });

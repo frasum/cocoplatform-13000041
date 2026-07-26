@@ -26,11 +26,15 @@ import {
   type Department,
 } from "@/lib/time/zeit-uebersicht-core";
 
-// LG2 — Kompakte Codes für die Departmental-Splitline in der Payroll-Zeile.
-const DEPT_SHORT: Record<Department, string> = {
-  gl: "GL",
-  kitchen: "KÜ",
-  service: "SV",
+// LG3 (27.07.2026) — Multi-Bereich-Personen werden physisch aufgeteilt: eine
+// Zeile pro (Mitarbeiter, Abteilung). `isPrimary` markiert die Zeile, auf der
+// personenbezogene Felder (Vorschuss, Urlaub/Krank, Notizen, Rate/Dauer) leben.
+// Non-Primary-Zeilen zeigen diese Felder ausgegraut/leer — die Personen-Summe
+// bleibt invariant.
+type PayrollRowExt = BuchhaltungExportRow & {
+  staffId?: string;
+  department?: Department;
+  isPrimary?: boolean;
 };
 
 export type PayrollRecurringEntry = {
@@ -53,7 +57,6 @@ export function PayrollTab({
   onSearchChange,
   searchActive,
   rowsByDept,
-  staffRows,
   totals,
   readOnly,
   onSaveNote,
@@ -67,7 +70,6 @@ export function PayrollTab({
   onAddRecurring,
   onCancelRecurring,
   renderStaffName,
-  hoursByStaffAndDept,
 }: {
   mode: BuchhaltungMode;
   onModeChange: (m: BuchhaltungMode) => void;
@@ -75,7 +77,6 @@ export function PayrollTab({
   onSearchChange: (s: string) => void;
   searchActive: boolean;
   rowsByDept: Map<Department, BuchhaltungExportRow[]>;
-  staffRows: Map<string, BuchhaltungExportRow & { staffId: string; department: Department }>;
   totals: {
     totalHours: number;
     shifts: number;
@@ -101,8 +102,6 @@ export function PayrollTab({
   onAddRecurring?: (vars: CreateRecurringVars) => void;
   onCancelRecurring?: (id: string) => void;
   renderStaffName?: (staffId: string, displayName: string) => ReactNode;
-  /** LG2 — Stundenaufteilung nach Schichtart je Mitarbeiter. */
-  hoursByStaffAndDept?: Map<string, Map<Department, number>>;
 }) {
   const is3b = mode === "section3b";
   // Spaltenanzahl für colSpan: Name + Gesamt + Schichten + (3 SFN | 5 §3b) + U + K + Vorschuss + Besonderheiten
@@ -276,29 +275,29 @@ export function PayrollTab({
                     </TableRow>
                   )}
                   {list.map((r, idx) => {
-                    const full = staffRows.get(
-                      (r as BuchhaltungExportRow & { staffId: string }).staffId,
-                    );
-                    const staffId = full?.staffId ?? "";
+                    const ext = r as PayrollRowExt;
+                    const staffId = ext.staffId ?? "";
+                    const isPrimary = ext.isPrimary !== false;
+                    const rowKey = `${staffId}|${ext.department ?? dept}`;
                     return (
                       <PayrollRow
-                        key={staffId}
+                        key={rowKey}
                         row={r}
                         is3b={is3b}
                         readOnly={readOnly}
-                        fullName={fullNameByStaffId?.get(staffId)}
-                        persoNr={persoNrByStaffId?.get(staffId) ?? null}
+                        fullName={isPrimary ? fullNameByStaffId?.get(staffId) : undefined}
+                        persoNr={isPrimary ? (persoNrByStaffId?.get(staffId) ?? null) : null}
                         onSave={(b) => onSaveNote(staffId, b)}
                         nameSlot={renderStaffName?.(staffId, r.displayName)}
                         zebra={idx % 2 === 1}
-                        recurring={recurringByStaff?.get(staffId) ?? []}
+                        recurring={isPrimary ? (recurringByStaff?.get(staffId) ?? []) : []}
                         onAddRecurring={
-                          onAddRecurring
+                          onAddRecurring && isPrimary
                             ? (vars) => onAddRecurring({ ...vars, staffId })
                             : undefined
                         }
-                        onCancelRecurring={onCancelRecurring}
-                        deptParts={hoursByStaffAndDept?.get(staffId)}
+                        onCancelRecurring={isPrimary ? onCancelRecurring : undefined}
+                        isPrimary={isPrimary}
                       />
                     );
                   })}
@@ -383,7 +382,7 @@ function PayrollRow({
   onAddRecurring,
   onCancelRecurring,
   zebra,
-  deptParts,
+  isPrimary,
 }: {
   row: BuchhaltungExportRow;
   is3b: boolean;
@@ -400,7 +399,8 @@ function PayrollRow({
   }) => void;
   onCancelRecurring?: (id: string) => void;
   zebra?: boolean;
-  deptParts?: Map<Department, number>;
+  /** LG3 — Primärzeile trägt Personen-Felder (Notiz, Vorschuss, U/K). */
+  isPrimary?: boolean;
 }) {
   const [besonderheiten, setBesonderheiten] = useState<string>(row.besonderheiten ?? "");
   const [addOpen, setAddOpen] = useState(false);
@@ -439,13 +439,6 @@ function PayrollRow({
       </TableCell>
       <TableCell className="py-1.5 text-right tabular-nums font-medium">
         {fmtHm(floorToQuarterHours(row.totalHours))}
-        {deptParts && deptParts.size >= 2 && (
-          <div className="text-[10px] font-normal text-muted-foreground leading-tight">
-            {DEPT_ORDER.filter((d) => (deptParts.get(d) ?? 0) > 0)
-              .map((d) => `${DEPT_SHORT[d]} ${fmtDec(floorToQuarterHours(deptParts.get(d) ?? 0))}`)
-              .join(" · ")}
-          </div>
-        )}
       </TableCell>
       <TableCell className="py-1.5 text-right">{numCell(row.evening)}</TableCell>
       <TableCell className="py-1.5 text-right">{numCell(row.night)}</TableCell>
@@ -484,6 +477,8 @@ function PayrollRow({
         {vorschussLabel ?? "–"}
       </TableCell>
       <TableCell className="py-1.5">
+        {isPrimary === false ? null : (
+          <>
         {(recurring?.length ?? 0) > 0 && (
           <div className="mb-1 flex flex-wrap gap-1">
             {recurring!.map((r) => (
@@ -611,6 +606,8 @@ function PayrollRow({
               </div>
             )}
           </div>
+        )}
+          </>
         )}
       </TableCell>
     </TableRow>

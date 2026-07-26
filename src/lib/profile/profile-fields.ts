@@ -67,6 +67,8 @@ export function normalizeIban(raw: string): string {
   return raw.replace(/\s+/g, "").toUpperCase();
 }
 
+const TAX_CLASS_ROMAN = ["I", "II", "III", "IV", "V", "VI"] as const;
+
 /** ISO-7064 Mod-97-Prüfung für IBAN. Erwartet bereits normalisierten String. */
 function ibanMod97(iban: string): boolean {
   const rearranged = iban.slice(4) + iban.slice(0, 4);
@@ -108,6 +110,13 @@ export function validateTaxId(v: unknown): string | null {
 }
 
 export function validateTaxClass(v: unknown): string | null {
+  // Römische Persistenzform (Ergebnis der eigenen Normalisierung) direkt akzeptieren.
+  if (
+    typeof v === "string" &&
+    (TAX_CLASS_ROMAN as readonly string[]).includes(v.trim().toUpperCase())
+  ) {
+    return null;
+  }
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
   if (!Number.isInteger(n) || n < 1 || n > 6) return "Steuerklasse muss zwischen 1 und 6 liegen.";
   return null;
@@ -280,9 +289,13 @@ export function normalizeRequestValue(field: RequestField, value: unknown): unkn
   }
   if (field === "tax_id" && typeof value === "string") return value.replace(/\s+/g, "");
   if (field === "tax_class") {
+    if (typeof value === "string") {
+      const s = value.trim().toUpperCase();
+      const idx = (TAX_CLASS_ROMAN as readonly string[]).indexOf(s);
+      if (idx >= 0) return TAX_CLASS_ROMAN[idx];
+    }
     const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
-    const roman = ["I", "II", "III", "IV", "V", "VI"];
-    return Number.isInteger(n) && n >= 1 && n <= 6 ? roman[n - 1] : null;
+    return Number.isInteger(n) && n >= 1 && n <= 6 ? TAX_CLASS_ROMAN[n - 1] : null;
   }
   return value;
 }

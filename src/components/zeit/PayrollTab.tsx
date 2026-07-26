@@ -71,7 +71,6 @@ export function PayrollTab({
   onAddRecurring,
   onCancelRecurring,
   renderStaffName,
-  hoursByStaffAndDept,
 }: {
   mode: BuchhaltungMode;
   onModeChange: (m: BuchhaltungMode) => void;

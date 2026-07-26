@@ -50,6 +50,6 @@ describe("buchhaltung-export — Viertelstunden-Abrundung", () => {
     // Person B: 30.24 → 30.00; 0.24 → 0.00; 0.50 → 0.50
     expect(csv).toMatch(/B;;;30,00;;;;0;0,00;0,00;0,50/);
     // Summenzeile = 178.25 + 30.00 = 208.25 (nicht 208.61 aus Rohsummen)
-    expect(csv).toMatch(/Summe;;;208,25;0;0;0;0;12,25;0,00;8,25/);
+    expect(csv).toMatch(/Summe;;;208,25;;;;0;12,25;0,00;8,25/);
   });
 });

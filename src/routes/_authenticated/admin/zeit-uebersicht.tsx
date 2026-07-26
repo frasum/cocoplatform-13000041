@@ -1197,27 +1197,20 @@ function ZeitUebersichtPage() {
     persoNrByStaffId,
   ]);
 
-  // Rückwärtskompatible Map (Key = rowKey) für die Recurring-Merge-Logik
-  // und PayrollTab-Konsumenten.
-  const payrollRowsByStaff = useMemo(() => {
-    const m = new Map<string, PayrollSplitRow>();
-    for (const r of payrollRowsSplit) m.set(r.rowKey, r);
-    return m;
-  }, [payrollRowsSplit]);
 
   const payrollSearchActive = payrollSearch.trim().length > 0;
   const payrollFilteredByDept = useMemo(() => {
     const q = payrollSearch.trim().toLowerCase();
     const m = new Map<Department, BuchhaltungExportRow[]>();
     for (const dept of DEPT_ORDER) m.set(dept, []);
-    for (const row of payrollRowsByStaff.values()) {
+    for (const row of payrollRowsSplit) {
       if (q !== "" && !row.displayName.toLowerCase().includes(q)) continue;
       const arr = m.get(row.department) ?? [];
       arr.push(row);
       m.set(row.department, arr);
     }
     return m;
-  }, [payrollRowsByStaff, payrollSearch]);
+  }, [payrollRowsSplit, payrollSearch]);
 
   const payrollAllVisible = useMemo(() => {
     const out: BuchhaltungExportRow[] = [];
@@ -1254,8 +1247,11 @@ function ZeitUebersichtPage() {
     const perLabel = selectedPeriod?.label ?? `${fromDate}_${toDate}`;
     const mergeRecurring = (rows: BuchhaltungExportRow[]): BuchhaltungExportRow[] =>
       rows.map((r) => {
-        const staffId = (r as BuchhaltungExportRow & { staffId?: string }).staffId;
-        const recur = staffId ? activeRecurringByStaff.get(staffId) : undefined;
+        const ext = r as BuchhaltungExportRow & { staffId?: string; isPrimary?: boolean };
+        // LG3 — Recurring-Notizen NUR auf der Primärzeile mergen, sonst
+        // erscheinen sie doppelt in den Exporten.
+        if (ext.isPrimary === false) return r;
+        const recur = ext.staffId ? activeRecurringByStaff.get(ext.staffId) : undefined;
         if (!recur || recur.length === 0) return r;
         const recurText = recur.map((x) => x.display).join(" · ");
         const combined = [r.besonderheiten ?? "", recurText].filter(Boolean).join(" · ");

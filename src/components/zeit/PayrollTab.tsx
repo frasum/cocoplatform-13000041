@@ -387,7 +387,7 @@ function PayrollRow({
   onAddRecurring,
   onCancelRecurring,
   zebra,
-  deptParts,
+  isPrimary,
 }: {
   row: BuchhaltungExportRow;
   is3b: boolean;
@@ -404,7 +404,8 @@ function PayrollRow({
   }) => void;
   onCancelRecurring?: (id: string) => void;
   zebra?: boolean;
-  deptParts?: Map<Department, number>;
+  /** LG3 — Primärzeile trägt Personen-Felder (Notiz, Vorschuss, U/K). */
+  isPrimary?: boolean;
 }) {
   const [besonderheiten, setBesonderheiten] = useState<string>(row.besonderheiten ?? "");
   const [addOpen, setAddOpen] = useState(false);
@@ -443,13 +444,6 @@ function PayrollRow({
       </TableCell>
       <TableCell className="py-1.5 text-right tabular-nums font-medium">
         {fmtHm(floorToQuarterHours(row.totalHours))}
-        {deptParts && deptParts.size >= 2 && (
-          <div className="text-[10px] font-normal text-muted-foreground leading-tight">
-            {DEPT_ORDER.filter((d) => (deptParts.get(d) ?? 0) > 0)
-              .map((d) => `${DEPT_SHORT[d]} ${fmtDec(floorToQuarterHours(deptParts.get(d) ?? 0))}`)
-              .join(" · ")}
-          </div>
-        )}
       </TableCell>
       <TableCell className="py-1.5 text-right">{numCell(row.evening)}</TableCell>
       <TableCell className="py-1.5 text-right">{numCell(row.night)}</TableCell>

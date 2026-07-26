@@ -91,6 +91,80 @@ export function ArbeitszeitSection({
             bezahlte Pausenminuten entfallende Zuschlagsanteile wären streng genommen nicht §
             3b-fähig. Details/Umsetzung folgen in PB2.
           </p>
+          <details className="rounded-md border border-border bg-background/60 p-3">
+            <summary className="cursor-pointer text-xs font-medium text-foreground">
+              Beispiel Ann Juni 2026 (ohne erfasste Pausen → gesetzliche Mindestpause)
+            </summary>
+            <div className="mt-3 space-y-3 text-xs leading-relaxed text-muted-foreground">
+              <p>
+                Ann (Patchari Chaisiri) hat im Juni 2026{" "}
+                <span className="font-medium text-foreground">23 Schichten</span> mit insgesamt{" "}
+                <span className="font-medium text-foreground">167,30 h</span> Anwesenheit
+                gearbeitet. In allen 23 Schichten ist{" "}
+                <span className="font-medium text-foreground">
+                  keine Pause erfasst (break_minutes = 0)
+                </span>
+                . Für dieses Beispiel wird pro Schicht die{" "}
+                <span className="font-medium text-foreground">ArbZG-Mindestpause</span> fiktiv
+                angesetzt: 0 min bei ≤ 6 h, 30 min bei &gt; 6 bis 9 h, 45 min bei &gt; 9 h. 22 der
+                23 Schichten liegen zwischen 6 und 9 h (die 23. Schicht am 14.06. dauert nur 1,5 h
+                und bekommt keine fiktive Pause). Keine Schicht ist länger als 9 h.
+              </p>
+              <div className="overflow-hidden rounded-md border border-border">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/60 text-foreground">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left font-medium">Kennzahl</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Ja (heute)</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Nein (PB2)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="[&_tr:not(:last-child)]:border-b [&_tr]:border-border">
+                    <tr>
+                      <td className="px-2 py-1.5">Bruttostunden (Anwesenheit)</td>
+                      <td className="px-2 py-1.5 text-right">167,30 h</td>
+                      <td className="px-2 py-1.5 text-right">167,30 h</td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-1.5">Fiktive ArbZG-Pause (22 × 30 min)</td>
+                      <td className="px-2 py-1.5 text-right">—</td>
+                      <td className="px-2 py-1.5 text-right">11,00 h</td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-1.5">Vergütungsstunden</td>
+                      <td className="px-2 py-1.5 text-right">167,30 h</td>
+                      <td className="px-2 py-1.5 text-right">156,30 h</td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-1.5">Grundlohn (× 36,00 €/h)</td>
+                      <td className="px-2 py-1.5 text-right">6.022,80 €</td>
+                      <td className="px-2 py-1.5 text-right">5.626,80 €</td>
+                    </tr>
+                    <tr className="bg-muted/40">
+                      <td className="px-2 py-1.5 font-medium text-foreground">Differenz</td>
+                      <td className="px-2 py-1.5 text-right" />
+                      <td className="px-2 py-1.5 text-right font-medium text-foreground">
+                        −396,00 €
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p>
+                Zusätzlich sinken die{" "}
+                <span className="font-medium text-foreground">SFN-Töpfe</span> (Abend, Nacht,
+                Sonntag) proportional um denselben Faktor (11,00 h ÷ 167,30 h ≈ 6,58 %), weil die
+                fiktive Pause anteilig auf alle Zeitfenster verteilt wird. Der Netto-Effekt für den
+                Mitarbeiter ist entsprechend kleiner als die 396 € brutto suggerieren.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Für PB2 vorgesehene Regel:</span> Bei{" "}
+                „Pausen bezahlt = Nein" wird eine fehlende Pausenerfassung durch die
+                ArbZG-Mindestpause je Schicht ersetzt (0 / 30 / 45 min gestaffelt nach
+                Schichtlänge). Wo eine Pause erfasst ist, gilt der erfasste Wert.
+              </p>
+            </div>
+          </details>
         </div>
       </details>
 

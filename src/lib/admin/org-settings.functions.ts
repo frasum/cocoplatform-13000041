@@ -79,6 +79,7 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       telegram_bot_username: string | null;
       order_reply_telegram_enabled: boolean | null;
       order_reply_forward_unassigned: boolean | null;
+      pausen_bezahlt: boolean | null;
     }>(
       await supabaseAdmin
         .from("organization_settings")
@@ -104,9 +105,7 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       orderReplyForwardUnassigned: Boolean(data?.order_reply_forward_unassigned ?? false),
       // Default true bewahrt das Alt-Verhalten, falls die Zeile noch nichts
       // enthält (Migration setzt DB-Default ebenfalls auf true).
-      pausenBezahlt: Boolean(
-        (data as { pausen_bezahlt?: boolean | null } | null)?.pausen_bezahlt ?? true,
-      ),
+      pausenBezahlt: Boolean(data?.pausen_bezahlt ?? true),
     };
   });
 

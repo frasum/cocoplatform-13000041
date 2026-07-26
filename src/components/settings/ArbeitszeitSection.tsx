@@ -121,8 +121,8 @@ export function ArbeitszeitSection({
                     : "Pausenzeit wird abgezogen (netto)."}
                 </p>
                 <p>
-                  Die Änderung gilt organisationsweit und wirkt rückwirkend auf alle Perioden,
-                  auch auf bereits abgeschlossene.
+                  Die Änderung gilt organisationsweit und wirkt rückwirkend auf alle Perioden, auch
+                  auf bereits abgeschlossene.
                 </p>
               </div>
             </AlertDialogDescription>

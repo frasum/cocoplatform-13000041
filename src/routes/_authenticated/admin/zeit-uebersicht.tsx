@@ -739,6 +739,12 @@ function ZeitUebersichtPage() {
     // Deckt Single- (["weekly-entries", locId, weekStart]) und Batch-Key
     // (["weekly-entries", "batch", …]) ab.
     void qc.invalidateQueries({ queryKey: ["weekly-entries"] });
+    // CI1 (26.07.): Zusammenfassung/Buchhaltung und SFN-abhängige Tabs hängen
+    // an denselben time_entries — sonst zeigt die Zusammenfassung nach einer
+    // Wochenplan-Korrektur den alten Cache-Wert bis zum harten Reload.
+    void qc.invalidateQueries({ queryKey: ["time-overview"] });
+    void qc.invalidateQueries({ queryKey: ["payroll-sfn"] });
+    void qc.invalidateQueries({ queryKey: ["payroll-absences"] });
   }
 
   const setShiftMut = useMutation({

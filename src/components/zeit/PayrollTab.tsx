@@ -280,29 +280,29 @@ export function PayrollTab({
                     </TableRow>
                   )}
                   {list.map((r, idx) => {
-                    const full = staffRows.get(
-                      (r as BuchhaltungExportRow & { staffId: string }).staffId,
-                    );
-                    const staffId = full?.staffId ?? "";
+                    const ext = r as PayrollRowExt;
+                    const staffId = ext.staffId ?? "";
+                    const isPrimary = ext.isPrimary !== false;
+                    const rowKey = `${staffId}|${ext.department ?? dept}`;
                     return (
                       <PayrollRow
-                        key={staffId}
+                        key={rowKey}
                         row={r}
                         is3b={is3b}
                         readOnly={readOnly}
-                        fullName={fullNameByStaffId?.get(staffId)}
-                        persoNr={persoNrByStaffId?.get(staffId) ?? null}
+                        fullName={isPrimary ? fullNameByStaffId?.get(staffId) : undefined}
+                        persoNr={isPrimary ? (persoNrByStaffId?.get(staffId) ?? null) : null}
                         onSave={(b) => onSaveNote(staffId, b)}
                         nameSlot={renderStaffName?.(staffId, r.displayName)}
                         zebra={idx % 2 === 1}
-                        recurring={recurringByStaff?.get(staffId) ?? []}
+                        recurring={isPrimary ? (recurringByStaff?.get(staffId) ?? []) : []}
                         onAddRecurring={
-                          onAddRecurring
+                          onAddRecurring && isPrimary
                             ? (vars) => onAddRecurring({ ...vars, staffId })
                             : undefined
                         }
-                        onCancelRecurring={onCancelRecurring}
-                        deptParts={hoursByStaffAndDept?.get(staffId)}
+                        onCancelRecurring={isPrimary ? onCancelRecurring : undefined}
+                        isPrimary={isPrimary}
                       />
                     );
                   })}

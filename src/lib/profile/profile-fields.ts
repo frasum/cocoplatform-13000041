@@ -109,7 +109,6 @@ export function validateTaxId(v: unknown): string | null {
 
 export function validateTaxClass(v: unknown): string | null {
   // Römische Persistenzform (Ergebnis der eigenen Normalisierung) direkt akzeptieren.
-  // Römische Persistenzform (Ergebnis der eigenen Normalisierung) direkt akzeptieren.
   if (
     typeof v === "string" &&
     (TAX_CLASS_ROMAN as readonly string[]).includes(v.trim().toUpperCase())

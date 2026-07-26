@@ -1197,7 +1197,6 @@ function ZeitUebersichtPage() {
     persoNrByStaffId,
   ]);
 
-
   const payrollSearchActive = payrollSearch.trim().length > 0;
   const payrollFilteredByDept = useMemo(() => {
     const q = payrollSearch.trim().toLowerCase();

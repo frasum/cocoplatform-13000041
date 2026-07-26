@@ -479,134 +479,135 @@ function PayrollRow({
       <TableCell className="py-1.5">
         {isPrimary === false ? null : (
           <>
-        {(recurring?.length ?? 0) > 0 && (
-          <div className="mb-1 flex flex-wrap gap-1">
-            {recurring!.map((r) => (
-              <span
-                key={r.id}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
-                  r.kind === "dauer"
-                    ? "border-amber-300 bg-amber-50 text-amber-900"
-                    : "border-sky-300 bg-sky-50 text-sky-900"
-                }`}
-                title={r.kind === "dauer" ? "Dauer-Notiz (permanent)" : "Ratennotiz"}
-              >
-                {r.display}
-                {!readOnly && onCancelRecurring && (
-                  <button
-                    type="button"
-                    aria-label="Notiz beenden"
-                    className="ml-0.5 rounded-full text-muted-foreground hover:text-foreground"
-                    onClick={() => {
-                      if (window.confirm("Notiz beenden?")) onCancelRecurring(r.id);
-                    }}
+            {(recurring?.length ?? 0) > 0 && (
+              <div className="mb-1 flex flex-wrap gap-1">
+                {recurring!.map((r) => (
+                  <span
+                    key={r.id}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+                      r.kind === "dauer"
+                        ? "border-amber-300 bg-amber-50 text-amber-900"
+                        : "border-sky-300 bg-sky-50 text-sky-900"
+                    }`}
+                    title={r.kind === "dauer" ? "Dauer-Notiz (permanent)" : "Ratennotiz"}
                   >
-                    ✕
-                  </button>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-        {row.absenceNote ? (
-          <div
-            className="mb-1 flex items-start gap-1 text-xs text-muted-foreground"
-            title="Automatisch aus Urlaub/Krank — Korrekturen dort vornehmen."
-          >
-            <CalendarDays className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
-            <span className="leading-tight">{row.absenceNote}</span>
-          </div>
-        ) : null}
-        <Textarea
-          rows={1}
-          placeholder="–"
-          className="min-h-7 h-7 py-1 resize-none text-sm border-transparent bg-transparent hover:border-input focus:border-input focus:bg-background focus:min-h-16 transition-all placeholder:text-muted-foreground/40"
-          readOnly={readOnly}
-          disabled={readOnly}
-          value={besonderheiten}
-          onChange={(e) => setBesonderheiten(e.target.value)}
-          onBlur={() => {
-            if (readOnly) return;
-            const prev = row.besonderheiten ?? "";
-            if (besonderheiten !== prev) onSave(besonderheiten);
-          }}
-        />
-        {!readOnly && onAddRecurring && (
-          <div className="mt-1">
-            {!addOpen ? (
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <Plus className="h-3 w-3" /> Rate / Dauer-Notiz
-              </button>
-            ) : (
-              <div className="mt-1 space-y-1 rounded border border-input bg-muted/30 p-2">
-                <div className="flex items-center gap-2 text-xs">
-                  <label className="inline-flex items-center gap-1">
-                    <input
-                      type="radio"
-                      name={`k-${row.displayName}`}
-                      checked={addKind === "rate"}
-                      onChange={() => setAddKind("rate")}
-                    />
-                    Rate
-                  </label>
-                  <label className="inline-flex items-center gap-1">
-                    <input
-                      type="radio"
-                      name={`k-${row.displayName}`}
-                      checked={addKind === "dauer"}
-                      onChange={() => setAddKind("dauer")}
-                    />
-                    Dauer
-                  </label>
-                  {addKind === "rate" && (
-                    <label className="inline-flex items-center gap-1">
-                      Perioden:
-                      <Input
-                        className="h-6 w-14 px-1 py-0 text-xs"
-                        value={addPeriods}
-                        onChange={(e) => setAddPeriods(e.target.value)}
-                      />
-                    </label>
-                  )}
-                  <button
-                    type="button"
-                    aria-label="Abbrechen"
-                    className="ml-auto text-muted-foreground hover:text-foreground"
-                    onClick={resetAdd}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    className="h-7 flex-1 text-xs"
-                    placeholder={addKind === "rate" ? "z. B. Darlehen 500 €" : "z. B. Pfändung"}
-                    value={addText}
-                    onChange={(e) => setAddText(e.target.value)}
-                  />
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      const t = addText.trim();
-                      if (!t) return;
-                      const n = addKind === "rate" ? Number(addPeriods) : null;
-                      if (addKind === "rate" && (!Number.isFinite(n) || (n as number) < 1)) return;
-                      onAddRecurring({ kind: addKind, text: t, periodsTotal: n });
-                      resetAdd();
-                    }}
-                  >
-                    Anlegen
-                  </Button>
-                </div>
+                    {r.display}
+                    {!readOnly && onCancelRecurring && (
+                      <button
+                        type="button"
+                        aria-label="Notiz beenden"
+                        className="ml-0.5 rounded-full text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          if (window.confirm("Notiz beenden?")) onCancelRecurring(r.id);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </span>
+                ))}
               </div>
             )}
-          </div>
-        )}
+            {row.absenceNote ? (
+              <div
+                className="mb-1 flex items-start gap-1 text-xs text-muted-foreground"
+                title="Automatisch aus Urlaub/Krank — Korrekturen dort vornehmen."
+              >
+                <CalendarDays className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+                <span className="leading-tight">{row.absenceNote}</span>
+              </div>
+            ) : null}
+            <Textarea
+              rows={1}
+              placeholder="–"
+              className="min-h-7 h-7 py-1 resize-none text-sm border-transparent bg-transparent hover:border-input focus:border-input focus:bg-background focus:min-h-16 transition-all placeholder:text-muted-foreground/40"
+              readOnly={readOnly}
+              disabled={readOnly}
+              value={besonderheiten}
+              onChange={(e) => setBesonderheiten(e.target.value)}
+              onBlur={() => {
+                if (readOnly) return;
+                const prev = row.besonderheiten ?? "";
+                if (besonderheiten !== prev) onSave(besonderheiten);
+              }}
+            />
+            {!readOnly && onAddRecurring && (
+              <div className="mt-1">
+                {!addOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setAddOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <Plus className="h-3 w-3" /> Rate / Dauer-Notiz
+                  </button>
+                ) : (
+                  <div className="mt-1 space-y-1 rounded border border-input bg-muted/30 p-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name={`k-${row.displayName}`}
+                          checked={addKind === "rate"}
+                          onChange={() => setAddKind("rate")}
+                        />
+                        Rate
+                      </label>
+                      <label className="inline-flex items-center gap-1">
+                        <input
+                          type="radio"
+                          name={`k-${row.displayName}`}
+                          checked={addKind === "dauer"}
+                          onChange={() => setAddKind("dauer")}
+                        />
+                        Dauer
+                      </label>
+                      {addKind === "rate" && (
+                        <label className="inline-flex items-center gap-1">
+                          Perioden:
+                          <Input
+                            className="h-6 w-14 px-1 py-0 text-xs"
+                            value={addPeriods}
+                            onChange={(e) => setAddPeriods(e.target.value)}
+                          />
+                        </label>
+                      )}
+                      <button
+                        type="button"
+                        aria-label="Abbrechen"
+                        className="ml-auto text-muted-foreground hover:text-foreground"
+                        onClick={resetAdd}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        className="h-7 flex-1 text-xs"
+                        placeholder={addKind === "rate" ? "z. B. Darlehen 500 €" : "z. B. Pfändung"}
+                        value={addText}
+                        onChange={(e) => setAddText(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          const t = addText.trim();
+                          if (!t) return;
+                          const n = addKind === "rate" ? Number(addPeriods) : null;
+                          if (addKind === "rate" && (!Number.isFinite(n) || (n as number) < 1))
+                            return;
+                          onAddRecurring({ kind: addKind, text: t, periodsTotal: n });
+                          resetAdd();
+                        }}
+                      >
+                        Anlegen
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </TableCell>

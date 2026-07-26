@@ -1920,7 +1920,6 @@ function ZeitUebersichtPage() {
             onSearchChange={setPayrollSearch}
             searchActive={payrollSearchActive}
             rowsByDept={payrollFilteredByDept}
-            staffRows={payrollRowsByStaff}
             totals={payrollTotals}
             readOnly={isPayroll}
             fullNameByStaffId={fullNameByStaffId}

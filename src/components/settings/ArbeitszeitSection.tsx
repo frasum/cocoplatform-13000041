@@ -24,7 +24,7 @@ type Props = {
   onChange: (next: boolean) => void;
 };
 
-export function ArbeitzeitSection({
+export function ArbeitszeitSection({
   canEdit,
   pausenBezahlt,
   msg,

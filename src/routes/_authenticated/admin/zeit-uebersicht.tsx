@@ -1724,7 +1724,7 @@ function ZeitUebersichtPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {!overviewLoading && staffAggs.length === 0 && (
+                {!overviewLoading && staffDeptRows.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={5 + weekCols.length}
@@ -1749,9 +1749,14 @@ function ZeitUebersichtPage() {
                     // BH1 — Bereichs-Summe = Σ der GERUNDETEN Personenwerte.
                     deptTotal += floorToQuarterHours(s.totalHours);
                     deptShifts += s.shiftDates.size;
-                    const abs = absencesByStaff.get(s.staffId);
-                    deptUrlaub += abs?.urlaubDays ?? 0;
-                    deptKrank += abs?.krankDays ?? 0;
+                    // LG3 — U/K sind personenweit; NUR auf der Primärzeile zählen,
+                    // damit Multi-Bereich-Personen die Bereichs-/Gesamtsumme nicht
+                    // doppelt hochtreiben.
+                    if (s.isPrimary) {
+                      const abs = absencesByStaff.get(s.staffId);
+                      deptUrlaub += abs?.urlaubDays ?? 0;
+                      deptKrank += abs?.krankDays ?? 0;
+                    }
                   }
                   return (
                     <Fragment key={`grp-${dept}`}>
@@ -1764,11 +1769,17 @@ function ZeitUebersichtPage() {
                         </TableCell>
                       </TableRow>
                       {list.map((s, idx) => {
-                        const abs = absencesByStaff.get(s.staffId);
+                        // LG3 — Absenzen erscheinen nur auf der Primärzeile
+                        // (Multi-Bereich-Personen haben zwei Zeilen — U/K würde
+                        // sonst doppelt gerendert).
+                        const abs = s.isPrimary ? absencesByStaff.get(s.staffId) : undefined;
                         const u = abs?.urlaubDays ?? 0;
                         const k = abs?.krankDays ?? 0;
                         return (
-                          <TableRow key={s.staffId} className={idx % 2 === 1 ? "bg-muted/60" : ""}>
+                          <TableRow
+                            key={`${s.staffId}|${s.department}`}
+                            className={idx % 2 === 1 ? "bg-muted/60" : ""}
+                          >
                             <TableCell>
                               <div>
                                 {canOpenStaff ? (
@@ -1850,23 +1861,25 @@ function ZeitUebersichtPage() {
                     </Fragment>
                   );
                 })}
-                {staffAggs.length > 0 &&
+                {staffDeptRows.length > 0 &&
                   (() => {
                     const totWeek = new Map<string, number>();
                     let tot = 0;
                     let totShifts = 0;
                     let totUrlaub = 0;
                     let totKrank = 0;
-                    for (const s of staffAggs) {
+                    for (const s of staffDeptRows) {
                       for (const [k, v] of s.perWeek) {
                         totWeek.set(k, (totWeek.get(k) ?? 0) + v);
                       }
                       // BH1 — Gesamt-Fußzeile = Σ der GERUNDETEN Personenwerte.
                       tot += floorToQuarterHours(s.totalHours);
                       totShifts += s.shiftDates.size;
-                      const abs = absencesByStaff.get(s.staffId);
-                      totUrlaub += abs?.urlaubDays ?? 0;
-                      totKrank += abs?.krankDays ?? 0;
+                      if (s.isPrimary) {
+                        const abs = absencesByStaff.get(s.staffId);
+                        totUrlaub += abs?.urlaubDays ?? 0;
+                        totKrank += abs?.krankDays ?? 0;
+                      }
                     }
                     return (
                       <TableRow className="bg-muted font-semibold">

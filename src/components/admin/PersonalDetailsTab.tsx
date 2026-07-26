@@ -73,6 +73,26 @@ function toPatch(state: FormState): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Sparse-Patch: liefert nur Felder, die sich gegenüber der Baseline unterschieden
+ * haben. Verhindert, dass ein Save der Maske andere (nicht angefasste) Felder
+ * versehentlich auf NULL setzt.
+ */
+function toSparsePatch(
+  state: FormState,
+  baseline: FormState,
+): Record<string, unknown> {
+  const full = toPatch(state);
+  const base = toPatch(baseline);
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(full)) {
+    const a = full[key];
+    const b = base[key];
+    if (a !== b) out[key] = a;
+  }
+  return out;
+}
+
 function mask(val: string | null, key: keyof PersonalDetailsFields): string {
   if (!val) return "—";
   if (key === "iban") {
@@ -130,6 +150,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<FormState | null>(null);
+  const [baseline, setBaseline] = useState<FormState | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState<string | null>(null);
   const [vacEditing, setVacEditing] = useState(false);
@@ -150,14 +171,19 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
   const mutation = useMutation({
     mutationFn: () => {
       if (!form) throw new Error("Formular nicht geladen");
-      const patch = toPatch(form);
+      const patch = baseline ? toSparsePatch(form, baseline) : toPatch(form);
+      if (Object.keys(patch).length === 0) {
+        return Promise.resolve({ ok: true as const, noop: true as const });
+      }
       // Client-Validierung (gleiches Schema wie Server)
       personalDetailsSchema.parse(patch);
       return saveFn({ data: { staffId, fields: patch } });
     },
-    onSuccess: async () => {
-      setMsg("Gespeichert.");
+    onSuccess: async (res) => {
+      const noop = typeof res === "object" && res !== null && "noop" in res && res.noop === true;
+      setMsg(noop ? "Keine Änderungen." : "Gespeichert.");
       setEditing(false);
+      setBaseline(null);
       await queryClient.invalidateQueries({
         queryKey: ["admin", "staff", staffId, "personal-details"],
       });
@@ -306,6 +332,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
           type="button"
           onClick={() => {
             setMsg(null);
+            if (form) setBaseline({ ...form });
             setEditing(true);
           }}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -478,6 +505,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
               setEditing(false);
               setMsg(null);
               setForm(toFormState(data));
+              setBaseline(null);
             }}
             className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-accent"
           >

@@ -4,10 +4,7 @@
 // Area → geplanter Bereich.
 
 import { describe, expect, it } from "vitest";
-import {
-  aggregateHoursByStaffAndDept,
-  type Department,
-} from "@/lib/time/zeit-uebersicht-core";
+import { aggregateHoursByStaffAndDept, type Department } from "@/lib/time/zeit-uebersicht-core";
 
 describe("aggregateHoursByStaffAndDept", () => {
   it("routet abteilungslose Schicht mit Tages-GL-Skill auf die GL-Zeile", () => {

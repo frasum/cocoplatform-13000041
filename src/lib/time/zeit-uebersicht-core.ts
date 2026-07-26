@@ -302,9 +302,7 @@ export function aggregateHoursByStaffAndDept(input: {
     if (!(e.hoursWorked > 0)) continue;
     const staffDepts = input.staffDeptsByStaff.get(e.staffId) ?? [];
     const rosterArea = input.rosterAreaByStaffDate[e.staffId]?.[e.businessDate] ?? null;
-    const rosterHasGlSkill = Boolean(
-      input.rosterGlByStaffDate[e.staffId]?.[e.businessDate],
-    );
+    const rosterHasGlSkill = Boolean(input.rosterGlByStaffDate[e.staffId]?.[e.businessDate]);
     const { department } = entryRowDepartment(e.rawDepartment ?? null, staffDepts, {
       rosterArea,
       rosterHasGlSkill,

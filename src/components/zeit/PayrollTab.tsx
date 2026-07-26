@@ -442,10 +442,7 @@ function PayrollRow({
         {deptParts && deptParts.size >= 2 && (
           <div className="text-[10px] font-normal text-muted-foreground leading-tight">
             {DEPT_ORDER.filter((d) => (deptParts.get(d) ?? 0) > 0)
-              .map(
-                (d) =>
-                  `${DEPT_SHORT[d]} ${fmtDec(floorToQuarterHours(deptParts.get(d) ?? 0))}`,
-              )
+              .map((d) => `${DEPT_SHORT[d]} ${fmtDec(floorToQuarterHours(deptParts.get(d) ?? 0))}`)
               .join(" · ")}
           </div>
         )}

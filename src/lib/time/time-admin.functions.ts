@@ -366,9 +366,10 @@ export const getTimeOverview = createServerFn({ method: "GET" })
 
     // LG2 — assignedStaff mit staffDepts (für Client-Attribution). Bei "Alle
     // Standorte" ohne Filter, sonst nur der gewählte Standort.
-    const assignedStaff = Array.from(
-      staffDeptsByStaff.entries(),
-    ).map(([staffId, depts]) => ({ staffId, staffDepts: depts }));
+    const assignedStaff = Array.from(staffDeptsByStaff.entries()).map(([staffId, depts]) => ({
+      staffId,
+      staffDepts: depts,
+    }));
 
     const entries = (rows ?? []).map((r) => {
       const started = new Date(r.started_at).getTime();

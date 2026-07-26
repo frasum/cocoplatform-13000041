@@ -520,9 +520,7 @@ function ZeitUebersichtPage() {
         staffDeptsByStaff.set(a.staffId, cur);
       }
     };
-    const mergeAreas = (
-      src: Record<string, Record<string, Department>> | undefined,
-    ) => {
+    const mergeAreas = (src: Record<string, Record<string, Department>> | undefined) => {
       for (const [sid, perDay] of Object.entries(src ?? {})) {
         const cur = rosterAreaByStaffDate[sid] ?? {};
         for (const [iso, area] of Object.entries(perDay)) {

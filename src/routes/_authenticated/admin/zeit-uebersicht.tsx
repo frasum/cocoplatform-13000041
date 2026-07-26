@@ -1115,54 +1115,95 @@ function ZeitUebersichtPage() {
   }, [weeklyExportInput, deptFilter, skillFilter, rosterByStaffMap]);
 
   // ============ Buchhaltung-Aggregation (Render + Export) ============
-  const payrollRowsByStaff = useMemo(() => {
+  //
+  // LG3 — Eine Payroll-Zeile pro (Mitarbeiter, Abteilung). Personen-Metriken
+  // (Vorschuss, Urlaub/Krank, Notizen) landen ausschließlich auf der Primär-
+  // zeile. SFN-Zuschläge werden anteilig aus den Basiswerten
+  // (basisEvening/Night/SunHol) auf die Abteilungszeilen gesplittet — die
+  // Personen-Summe bleibt invariant.
+  type PayrollSplitRow = BuchhaltungExportRow & {
+    staffId: string;
+    department: Department;
+    isPrimary: boolean;
+    rowKey: string;
+  };
+  const payrollRowsSplit = useMemo<PayrollSplitRow[]>(() => {
     const is3b = payrollMode === "section3b";
-    const m = new Map<string, BuchhaltungExportRow & { staffId: string; department: Department }>();
-    for (const s of staffAggs) {
-      const sfn = sfnByStaff.get(s.staffId);
+    const out: PayrollSplitRow[] = [];
+    for (const [sid, group] of rowsByStaffId) {
+      const sfn = sfnByStaff.get(sid);
       const b = is3b ? sfn?.extended : sfn?.simple;
-      const note = notesByStaff.get(s.staffId);
-      const advCents = advanceCentsByStaff.get(s.staffId) ?? 0;
-      const abs = absencesByStaff.get(s.staffId);
-      const recur = activeRecurringByStaff.get(s.staffId) ?? [];
-      void recur; // rendered separately in PayrollTab; export mergt weiter unten.
-      m.set(s.staffId, {
-        staffId: s.staffId,
-        department: s.department,
-        displayName: s.displayName,
-        fullName: fullNameByStaffId.get(s.staffId) ?? "",
-        persoNr: persoNrByStaffId.get(s.staffId) ?? null,
-        totalHours: s.totalHours,
-        stundenGl: hoursByStaffAndDept.get(s.staffId)?.get("gl") ?? 0,
-        stundenKueche: hoursByStaffAndDept.get(s.staffId)?.get("kitchen") ?? 0,
-        stundenService: hoursByStaffAndDept.get(s.staffId)?.get("service") ?? 0,
-        shifts: s.shiftDates.size,
-        evening: b?.night25Hours ?? 0,
-        night: b?.night40Hours ?? 0,
-        sunHol: sfn?.simple.sundayHours ?? 0,
-        sonntag: sfn?.extended.sundayHours ?? 0,
-        feiertag: sfn?.extended.holidayHours ?? 0,
-        feiertag150: sfn?.extended.holiday150Hours ?? 0,
-        urlaubDays: abs?.urlaubDays ?? 0,
-        krankDays: abs?.krankDays ?? 0,
-        vorschussEUR: advCents / 100,
-        besonderheiten: note?.besonderheiten ?? "",
-        absenceNote: abs?.absenceNote ?? "",
-      });
+      const note = notesByStaff.get(sid);
+      const advCents = advanceCentsByStaff.get(sid) ?? 0;
+      const abs = absencesByStaff.get(sid);
+      const splitEvening = splitSfnMetricByDept(group, b?.night25Hours ?? 0, (r) => r.basisEvening);
+      const splitNight = splitSfnMetricByDept(group, b?.night40Hours ?? 0, (r) => r.basisNight);
+      const splitSunHolSimple = splitSfnMetricByDept(
+        group,
+        sfn?.simple.sundayHours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      const splitSonntag = splitSfnMetricByDept(
+        group,
+        sfn?.extended.sundayHours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      const splitFeiertag = splitSfnMetricByDept(
+        group,
+        sfn?.extended.holidayHours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      const splitFeiertag150 = splitSfnMetricByDept(
+        group,
+        sfn?.extended.holiday150Hours ?? 0,
+        (r) => r.basisSunHol,
+      );
+      for (const r of group) {
+        const primary = r.isPrimary;
+        out.push({
+          staffId: r.staffId,
+          department: r.department,
+          isPrimary: primary,
+          rowKey: `${r.staffId}|${r.department}`,
+          displayName: r.displayName,
+          fullName: fullNameByStaffId.get(sid) ?? "",
+          persoNr: persoNrByStaffId.get(sid) ?? null,
+          totalHours: r.totalHours,
+          shifts: r.shiftDates.size,
+          evening: splitEvening.get(r.department) ?? 0,
+          night: splitNight.get(r.department) ?? 0,
+          sunHol: splitSunHolSimple.get(r.department) ?? 0,
+          sonntag: splitSonntag.get(r.department) ?? 0,
+          feiertag: splitFeiertag.get(r.department) ?? 0,
+          feiertag150: splitFeiertag150.get(r.department) ?? 0,
+          // Personen-Metriken NUR auf der Primärzeile — Summen bleiben invariant.
+          urlaubDays: primary ? (abs?.urlaubDays ?? 0) : 0,
+          krankDays: primary ? (abs?.krankDays ?? 0) : 0,
+          vorschussEUR: primary ? advCents / 100 : 0,
+          besonderheiten: primary ? (note?.besonderheiten ?? "") : "",
+          absenceNote: primary ? (abs?.absenceNote ?? "") : "",
+        });
+      }
     }
-    return m;
+    return out;
   }, [
-    staffAggs,
+    rowsByStaffId,
     sfnByStaff,
     notesByStaff,
     advanceCentsByStaff,
     absencesByStaff,
     payrollMode,
-    activeRecurringByStaff,
     fullNameByStaffId,
     persoNrByStaffId,
-    hoursByStaffAndDept,
   ]);
+
+  // Rückwärtskompatible Map (Key = rowKey) für die Recurring-Merge-Logik
+  // und PayrollTab-Konsumenten.
+  const payrollRowsByStaff = useMemo(() => {
+    const m = new Map<string, PayrollSplitRow>();
+    for (const r of payrollRowsSplit) m.set(r.rowKey, r);
+    return m;
+  }, [payrollRowsSplit]);
 
   const payrollSearchActive = payrollSearch.trim().length > 0;
   const payrollFilteredByDept = useMemo(() => {

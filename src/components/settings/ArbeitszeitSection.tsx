@@ -56,6 +56,44 @@ export function ArbeitszeitSection({
         </p>
       </div>
 
+      <details className="rounded-md border border-border bg-muted/40 p-3 text-sm text-foreground">
+        <summary className="cursor-pointer text-sm font-medium text-foreground">
+          Wie werden Pausen gesetzlich berechnet?
+        </summary>
+        <div className="mt-3 space-y-3 text-xs leading-relaxed text-muted-foreground">
+          <p>
+            <span className="font-medium text-foreground">ArbZG § 4 — Mindestpausen:</span> bis{" "}
+            <span className="font-medium text-foreground">6 h</span> keine Pflichtpause; mehr als{" "}
+            <span className="font-medium text-foreground">6 bis 9 h</span> mindestens{" "}
+            <span className="font-medium text-foreground">30 min</span>; mehr als{" "}
+            <span className="font-medium text-foreground">9 h</span> mindestens{" "}
+            <span className="font-medium text-foreground">45 min</span>. Aufteilung in Abschnitte
+            von je mindestens 15 min zulässig. Nicht länger als 6 h am Stück ohne Pause.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Vergütung:</span> Das ArbZG regelt nur die
+            Dauer, nicht die Bezahlung. Ruhepausen sind gesetzlich grundsätzlich{" "}
+            <span className="font-medium text-foreground">unbezahlt</span> (§ 611a BGB). Bezahlung
+            nur, wenn Tarif-, Betriebs- oder Arbeitsvertrag es vorsieht — oder wenn es keine echte
+            Pause, sondern eine Arbeitsunterbrechung (Wartezeit, Bereitschaft am Arbeitsplatz) ist.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Gastronomie-Praxis:</span> Kein
+            einschlägiger Flächentarifvertrag mit Pausenvergütungspflicht. Üblich und rechtlich
+            sauber: „Pausen bezahlt = Nein". „Ja" ist zulässig, aber freiwillig günstiger als das
+            Gesetz verlangt.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">
+              Steuerlicher Hinweis (SFN, § 3b EStG):
+            </span>{" "}
+            SFN-Zuschläge sind nur auf tatsächlich geleistete Arbeitsstunden steuerfrei. Auf
+            bezahlte Pausenminuten entfallende Zuschlagsanteile wären streng genommen nicht §
+            3b-fähig. Details/Umsetzung folgen in PB2.
+          </p>
+        </div>
+      </details>
+
       <fieldset className="space-y-3" disabled={!canEdit || isPending}>
         <legend className="text-sm font-medium text-foreground">Pausen bezahlt</legend>
 

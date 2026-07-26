@@ -59,7 +59,7 @@ describe("entryRowDepartment", () => {
       mismatched: true,
     });
   });
-  it("Z3b: NULL entry uses rosterArea over static kitchen>service>gl", () => {
+  it("Z3b: NULL entry uses rosterArea over static PRIORITY (gl > kitchen > service)", () => {
     // Non-GL-Fall: kitchen + service zugeordnet, Dienstplan = service.
     // (Der GL-Fall wird durch die W2-Ausnahme abgedeckt — siehe unten.)
     expect(entryRowDepartment(null, ["kitchen", "service"], { rosterArea: "service" })).toEqual({

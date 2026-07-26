@@ -31,7 +31,7 @@ export function primaryDepartment(depts: readonly Department[]): Department {
 //   * entryDept != null UND ∈ staffDepts → dieser Eintrag gehört zur Zeile
 //     dieser Abteilung.
 //   * entryDept == null → NULL-Fall (Stempel/Batch/Pool/Bestandsdaten) →
-//     Anzeige auf der Primär-Zeile (kitchen > service > gl).
+//     Anzeige auf der Primär-Zeile (PRIORITY: gl > kitchen > service).
 //   * entryDept != null aber NICHT in staffDepts → Person ist der
 //     Abteilung am Standort (nicht mehr) zugeordnet: Anzeige auf der
 //     Primär-Zeile + `mismatched: true` für Tooltip/Warnung. Kein

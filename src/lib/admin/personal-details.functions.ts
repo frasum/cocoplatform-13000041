@@ -94,6 +94,10 @@ export const upsertStaffPersonalDetails = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]);
+    // Leerer Patch (Sparse-Save ohne Änderungen) → No-Op, kein Upsert, kein Audit.
+    if (Object.keys(data.fields).length === 0) {
+      return { ok: true as const };
+    }
     return runWithPermission(
       context.supabase,
       "payroll.personal.edit",

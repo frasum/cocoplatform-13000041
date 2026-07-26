@@ -17,8 +17,13 @@ import type { FormEvent } from "react";
 import { createFileRoute, useRouteContext } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getOrgSettings, updateOrgSettings } from "@/lib/admin/org-settings.functions";
+import {
+  getOrgSettings,
+  updateOrgSettings,
+  setPausenBezahlt,
+} from "@/lib/admin/org-settings.functions";
 import { TrinkgeldpoolSection } from "@/components/settings/TrinkgeldpoolSection";
+import { ArbeitszeitSection } from "@/components/settings/ArbeitszeitSection";
 import { BestellungenSection } from "@/components/settings/BestellungenSection";
 import { SofortmeldungSection } from "@/components/settings/SofortmeldungSection";
 import { ArbeitgeberSection } from "@/components/settings/ArbeitgeberSection";
@@ -33,6 +38,7 @@ import { TaxonomySection } from "@/components/settings/TaxonomySection";
 export type SubTab = { key: string; label: string; adminOnly?: boolean };
 export const SUB_TABS = [
   { key: "trinkgeldpool", label: "Trinkgeldpool" },
+  { key: "arbeitszeit", label: "Arbeitszeit" },
   { key: "bestellungen", label: "Bestellungen" },
   { key: "sofortmeldung", label: "Sofortmeldung & Arbeitgeber" },
   { key: "telegram", label: "Telegram" },
@@ -61,6 +67,7 @@ function OrgSettingsPage() {
   const canEdit = identity.role === "admin";
   const queryClient = useQueryClient();
   const callUpdate = useServerFn(updateOrgSettings);
+  const callSetPausenBezahlt = useServerFn(setPausenBezahlt);
   const { tab: rawTab } = Route.useSearch();
   // AP1-A — Content-Fallback: Nicht-Admin darf keinen adminOnly-Tab sehen,
   // auch nicht per Direkt-Link (?tab=artikel). validateSearch bleibt lax; das
@@ -86,6 +93,11 @@ function OrgSettingsPage() {
   const [orderReplyForwardUnassigned, setOrderReplyForwardUnassigned] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // PB1 — separater Zustand, weil eigene Server-Fn und eigener Fluss
+  // (Bestätigungsdialog vor Speichern).
+  const [pausenBezahlt, setPausenBezahlt_] = useState(true);
+  const [pausenMsg, setPausenMsg] = useState<string | null>(null);
+  const [pausenErr, setPausenErr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!settingsQ.data) return;
@@ -96,6 +108,7 @@ function OrgSettingsPage() {
     setTestModeEmail(settingsQ.data.testModeEmail ?? "");
     setOrderReplyTelegramEnabled(settingsQ.data.orderReplyTelegramEnabled);
     setOrderReplyForwardUnassigned(settingsQ.data.orderReplyForwardUnassigned);
+    setPausenBezahlt_(settingsQ.data.pausenBezahlt);
   }, [settingsQ.data]);
 
   const mutation = useMutation({
@@ -135,6 +148,22 @@ function OrgSettingsPage() {
     onError: (e: unknown) => {
       setErr(e instanceof Error ? e.message : "Fehler.");
       setMsg(null);
+    },
+  });
+
+  const pausenMutation = useMutation({
+    mutationFn: async (next: boolean) => {
+      return callSetPausenBezahlt({ data: { pausenBezahlt: next } });
+    },
+    onSuccess: async (_res, next) => {
+      setPausenBezahlt_(next);
+      setPausenMsg("Gespeichert.");
+      setPausenErr(null);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "org-settings"] });
+    },
+    onError: (e: unknown) => {
+      setPausenErr(e instanceof Error ? e.message : "Fehler.");
+      setPausenMsg(null);
     },
   });
 
@@ -179,6 +208,21 @@ function OrgSettingsPage() {
             err={err}
             isPending={mutation.isPending}
             onSubmit={handleTrinkgeldpoolSubmit}
+          />
+        )}
+
+        {tab === "arbeitszeit" && (
+          <ArbeitszeitSection
+            canEdit={canEdit}
+            pausenBezahlt={pausenBezahlt}
+            msg={pausenMsg}
+            err={pausenErr}
+            isPending={pausenMutation.isPending}
+            onChange={(next) => {
+              setPausenMsg(null);
+              setPausenErr(null);
+              pausenMutation.mutate(next);
+            }}
           />
         )}
 

@@ -30,6 +30,9 @@ export type OrgSettings = {
   telegramBotUsername: string | null;
   orderReplyTelegramEnabled: boolean;
   orderReplyForwardUnassigned: boolean;
+  // PB1 — Runde 1: Wert wird angezeigt und bedienbar, aber NICHT von
+  // Stunden-/Lohnberechnung gelesen. Default true = Alt-Verhalten.
+  pausenBezahlt: boolean;
 };
 
 const updateSchema = z
@@ -76,11 +79,12 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       telegram_bot_username: string | null;
       order_reply_telegram_enabled: boolean | null;
       order_reply_forward_unassigned: boolean | null;
+      pausen_bezahlt: boolean | null;
     }>(
       await supabaseAdmin
         .from("organization_settings")
         .select(
-          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, test_mode_enabled, test_mode_email, betriebsnummer, arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter, telegram_bot_username, order_reply_telegram_enabled, order_reply_forward_unassigned",
+          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, test_mode_enabled, test_mode_email, betriebsnummer, arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter, telegram_bot_username, order_reply_telegram_enabled, order_reply_forward_unassigned, pausen_bezahlt",
         )
         .eq("organization_id", caller.organizationId)
         .maybeSingle(),
@@ -99,6 +103,9 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       telegramBotUsername: data?.telegram_bot_username ?? null,
       orderReplyTelegramEnabled: Boolean(data?.order_reply_telegram_enabled ?? false),
       orderReplyForwardUnassigned: Boolean(data?.order_reply_forward_unassigned ?? false),
+      // Default true bewahrt das Alt-Verhalten, falls die Zeile noch nichts
+      // enthält (Migration setzt DB-Default ebenfalls auf true).
+      pausenBezahlt: Boolean(data?.pausen_bezahlt ?? true),
     };
   });
 
@@ -299,3 +306,62 @@ export const setTelegramBotUsername = createServerFn({ method: "POST" })
 // 5-Tage-Modell gegenstandslos (Feiertage = normale Mo–Fr-Tage). Die
 // DB-Spalte `count_holidays_as_leave` bleibt aus Kompatibilitätsgründen
 // bestehen und wird beim Cutover aufgeräumt.
+
+// PB1 — Runde 1 (Einstellung ohne Wirkung auf Berechnungen).
+// Setzt organization_settings.pausen_bezahlt. Kein Aufrufer liest den
+// Wert in dieser Runde; die Verdrahtung in Stunden-/Lohnpfad kommt in
+// PB2. Admin-only, runGuarded + Audit; Meta enthält `before` und `after`.
+
+const pausenBezahltSchema = z.object({
+  pausenBezahlt: z.boolean(),
+});
+
+export const setPausenBezahlt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => pausenBezahltSchema.parse(i))
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    return runGuarded(
+      caller.role,
+      "admin",
+      async (entry) => {
+        await writeAuditLog({
+          organizationId: caller.organizationId,
+          actorUserId: caller.userId,
+          actorStaffId: caller.staffId,
+          action: entry.action,
+          entity: entry.entity,
+          entityId: entry.entityId ?? null,
+          meta: entry.meta,
+        });
+      },
+      async () => {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const prev = expectMaybe<{ pausen_bezahlt: boolean | null }>(
+          await supabaseAdmin
+            .from("organization_settings")
+            .select("pausen_bezahlt")
+            .eq("organization_id", caller.organizationId)
+            .maybeSingle(),
+          "setPausenBezahlt.select",
+        );
+        const before = Boolean(prev?.pausen_bezahlt ?? true);
+        expectVoid(
+          await supabaseAdmin
+            .from("organization_settings")
+            .update({ pausen_bezahlt: data.pausenBezahlt })
+            .eq("organization_id", caller.organizationId),
+          "setPausenBezahlt.update",
+        );
+        return {
+          result: { ok: true as const },
+          audit: {
+            action: "settings.pausen_bezahlt_changed",
+            entity: "organization_settings",
+            entityId: caller.organizationId,
+            meta: { before, after: data.pausenBezahlt },
+          },
+        };
+      },
+    );
+  });

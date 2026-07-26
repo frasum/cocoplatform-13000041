@@ -1926,7 +1926,6 @@ function ZeitUebersichtPage() {
             rowsByDept={payrollFilteredByDept}
             staffRows={payrollRowsByStaff}
             totals={payrollTotals}
-            hoursByStaffAndDept={hoursByStaffAndDept}
             readOnly={isPayroll}
             fullNameByStaffId={fullNameByStaffId}
             persoNrByStaffId={persoNrByStaffId}

@@ -67,6 +67,8 @@ export function normalizeIban(raw: string): string {
   return raw.replace(/\s+/g, "").toUpperCase();
 }
 
+const TAX_CLASS_ROMAN = ["I", "II", "III", "IV", "V", "VI"] as const;
+
 /** ISO-7064 Mod-97-Prüfung für IBAN. Erwartet bereits normalisierten String. */
 function ibanMod97(iban: string): boolean {
   const rearranged = iban.slice(4) + iban.slice(0, 4);

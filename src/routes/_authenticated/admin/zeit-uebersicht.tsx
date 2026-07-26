@@ -98,7 +98,9 @@ import {
   fmtIso,
   floorToQuarterHours,
   isoWeek,
-  aggregateHoursByStaffAndDept,
+  aggregateStaffDeptRows,
+  splitSfnMetricByDept,
+  type StaffDeptRow,
   mondayOf,
   parseIsoDate,
 } from "@/lib/time/zeit-uebersicht-core";

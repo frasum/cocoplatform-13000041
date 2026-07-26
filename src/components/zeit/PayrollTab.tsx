@@ -57,7 +57,6 @@ export function PayrollTab({
   onSearchChange,
   searchActive,
   rowsByDept,
-  staffRows,
   totals,
   readOnly,
   onSaveNote,
@@ -78,10 +77,6 @@ export function PayrollTab({
   onSearchChange: (s: string) => void;
   searchActive: boolean;
   rowsByDept: Map<Department, BuchhaltungExportRow[]>;
-  staffRows: Map<
-    string,
-    BuchhaltungExportRow & { staffId: string; department: Department; isPrimary?: boolean }
-  >;
   totals: {
     totalHours: number;
     shifts: number;

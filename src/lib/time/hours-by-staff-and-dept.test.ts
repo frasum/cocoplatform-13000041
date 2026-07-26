@@ -73,9 +73,21 @@ describe("aggregateHoursByStaffAndDept", () => {
 
   it("Summenprobe: Σ Teilwerte === Σ computeShiftHours(entry).totalHours (exakt, kein toBeCloseTo)", () => {
     const shifts = [
-      { businessDate: "2026-07-01", startedAt: "2026-07-01T09:00:00+02:00", endedAt: "2026-07-01T15:30:00+02:00" },
-      { businessDate: "2026-07-02", startedAt: "2026-07-02T17:00:00+02:00", endedAt: "2026-07-02T23:15:00+02:00" },
-      { businessDate: "2026-07-03", startedAt: "2026-07-03T11:00:00+02:00", endedAt: "2026-07-03T14:45:00+02:00" },
+      {
+        businessDate: "2026-07-01",
+        startedAt: "2026-07-01T09:00:00+02:00",
+        endedAt: "2026-07-01T15:30:00+02:00",
+      },
+      {
+        businessDate: "2026-07-02",
+        startedAt: "2026-07-02T17:00:00+02:00",
+        endedAt: "2026-07-02T23:15:00+02:00",
+      },
+      {
+        businessDate: "2026-07-03",
+        startedAt: "2026-07-03T11:00:00+02:00",
+        endedAt: "2026-07-03T14:45:00+02:00",
+      },
     ];
     const entries = shifts.map((s) => ({
       staffId: "s5",
@@ -93,7 +105,8 @@ describe("aggregateHoursByStaffAndDept", () => {
       rosterGlByStaffDate: { s5: { "2026-07-02": true } },
     });
     const byDept = out.get("s5")!;
-    const sum = (byDept.get("kitchen") ?? 0) + (byDept.get("service") ?? 0) + (byDept.get("gl") ?? 0);
+    const sum =
+      (byDept.get("kitchen") ?? 0) + (byDept.get("service") ?? 0) + (byDept.get("gl") ?? 0);
     expect(sum).toBe(totalExpected);
   });
 });

@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 22.07.2026 (§108: Generalprobe bestanden + AV1a + Account-Einladungen — T0−4)
+Stand: 26.07.2026 (§109: T0-Cutover-Tag — Export-Saga, TRMNL-4-Tage, LG2-Split, PB1, Notfallblatt)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 

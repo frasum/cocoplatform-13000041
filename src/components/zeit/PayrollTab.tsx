@@ -26,11 +26,15 @@ import {
   type Department,
 } from "@/lib/time/zeit-uebersicht-core";
 
-// LG2 — Kompakte Codes für die Departmental-Splitline in der Payroll-Zeile.
-const DEPT_SHORT: Record<Department, string> = {
-  gl: "GL",
-  kitchen: "KÜ",
-  service: "SV",
+// LG3 (27.07.2026) — Multi-Bereich-Personen werden physisch aufgeteilt: eine
+// Zeile pro (Mitarbeiter, Abteilung). `isPrimary` markiert die Zeile, auf der
+// personenbezogene Felder (Vorschuss, Urlaub/Krank, Notizen, Rate/Dauer) leben.
+// Non-Primary-Zeilen zeigen diese Felder ausgegraut/leer — die Personen-Summe
+// bleibt invariant.
+type PayrollRowExt = BuchhaltungExportRow & {
+  staffId?: string;
+  department?: Department;
+  isPrimary?: boolean;
 };
 
 export type PayrollRecurringEntry = {
@@ -75,7 +79,10 @@ export function PayrollTab({
   onSearchChange: (s: string) => void;
   searchActive: boolean;
   rowsByDept: Map<Department, BuchhaltungExportRow[]>;
-  staffRows: Map<string, BuchhaltungExportRow & { staffId: string; department: Department }>;
+  staffRows: Map<
+    string,
+    BuchhaltungExportRow & { staffId: string; department: Department; isPrimary?: boolean }
+  >;
   totals: {
     totalHours: number;
     shifts: number;
@@ -101,8 +108,6 @@ export function PayrollTab({
   onAddRecurring?: (vars: CreateRecurringVars) => void;
   onCancelRecurring?: (id: string) => void;
   renderStaffName?: (staffId: string, displayName: string) => ReactNode;
-  /** LG2 — Stundenaufteilung nach Schichtart je Mitarbeiter. */
-  hoursByStaffAndDept?: Map<string, Map<Department, number>>;
 }) {
   const is3b = mode === "section3b";
   // Spaltenanzahl für colSpan: Name + Gesamt + Schichten + (3 SFN | 5 §3b) + U + K + Vorschuss + Besonderheiten

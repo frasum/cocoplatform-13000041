@@ -289,8 +289,8 @@ function ZeitUebersichtPage() {
           merged.rosterByStaff![sid] = cur;
         }
         // Z3b — Per-Tag-Roster-Area über Standorte mergen. Konflikt (zwei
-        // Standorte, unterschiedliche Area am selben Tag): kitchen>service>gl
-        // gewinnt — konsistent mit primaryDepartment.
+        // Standorte, unterschiedliche Area am selben Tag): primaryDepartment
+        // entscheidet (gl > kitchen > service).
         for (const [sid, perDay] of Object.entries(d.rosterAreaByStaffDate ?? {})) {
           const cur = merged.rosterAreaByStaffDate![sid] ?? {};
           for (const [iso, area] of Object.entries(perDay)) {

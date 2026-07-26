@@ -73,6 +73,26 @@ function toPatch(state: FormState): Record<string, unknown> {
   return out;
 }
 
+/**
+ * Sparse-Patch: liefert nur Felder, die sich gegenüber der Baseline unterschieden
+ * haben. Verhindert, dass ein Save der Maske andere (nicht angefasste) Felder
+ * versehentlich auf NULL setzt.
+ */
+function toSparsePatch(
+  state: FormState,
+  baseline: FormState,
+): Record<string, unknown> {
+  const full = toPatch(state);
+  const base = toPatch(baseline);
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(full)) {
+    const a = full[key];
+    const b = base[key];
+    if (a !== b) out[key] = a;
+  }
+  return out;
+}
+
 function mask(val: string | null, key: keyof PersonalDetailsFields): string {
   if (!val) return "—";
   if (key === "iban") {

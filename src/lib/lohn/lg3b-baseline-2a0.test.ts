@@ -148,7 +148,7 @@ function entry(businessDate: string, start: string, end: string, endDate?: strin
 
 const FIXTURE_A: StubTables = {
   staff: [{ id: "S", organization_id: ORG }],
-  staff_compensation: [{ hourly_rate: 14.0 }],
+  staff_compensation: [{ staff_id: "S", hourly_rate: 14.0 }],
   staff_personal_details: [{ staff_id: "S", ...personalDetails() }],
   organization_settings: [{ organization_id: ORG, pausen_bezahlt: true }],
   lohn_absence_days: [],
@@ -171,7 +171,7 @@ const FIXTURE_A: StubTables = {
 
 const FIXTURE_B: StubTables = {
   staff: [{ id: "S", organization_id: ORG }],
-  staff_compensation: [{ hourly_rate: 15.0 }],
+  staff_compensation: [{ staff_id: "S", hourly_rate: 15.0 }],
   staff_personal_details: [{ staff_id: "S", ...personalDetails() }],
   organization_settings: [{ organization_id: ORG, pausen_bezahlt: true }],
   lohn_absence_days: [],
@@ -197,7 +197,7 @@ const FIXTURE_B: StubTables = {
 
 const FIXTURE_C: StubTables = {
   staff: [{ id: "S", organization_id: ORG }],
-  staff_compensation: [{ hourly_rate: 16.0 }],
+  staff_compensation: [{ staff_id: "S", hourly_rate: 16.0 }],
   staff_personal_details: [{ staff_id: "S", ...personalDetails() }],
   organization_settings: [{ organization_id: ORG, pausen_bezahlt: true }],
   lohn_absence_days: [],

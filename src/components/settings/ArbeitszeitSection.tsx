@@ -254,10 +254,10 @@ export function ArbeitszeitSection({
                       Σ {breakSummary.totalBreakHours.toString().replace(".", ",")} h
                     </strong>{" "}
                     über <strong>{breakSummary.staffCount}</strong> Mitarbeiter
-                    {pausenBezahlt && !pending
-                      ? " würden bei „Nein" von den Vergütungsstunden abgezogen."
-                      : !pausenBezahlt && pending
-                        ? " würden bei „Ja" zusätzlich in die Vergütungsstunden fließen."
+                    {pausenBezahlt && pending === false
+                      ? ' würden bei "Nein" von den Vergütungsstunden abgezogen.'
+                      : !pausenBezahlt && pending === true
+                        ? ' würden bei "Ja" zusätzlich in die Vergütungsstunden fließen.'
                         : "."}
                   </p>
                 )}

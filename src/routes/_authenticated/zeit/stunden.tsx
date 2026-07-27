@@ -130,13 +130,7 @@ type Entry = EntryInput & {
   locationDayServiceEnabled: boolean;
 };
 
-function MyHoursBody({
-  entries,
-  pausenBezahlt,
-}: {
-  entries: Entry[];
-  pausenBezahlt: boolean;
-}) {
+function MyHoursBody({ entries, pausenBezahlt }: { entries: Entry[]; pausenBezahlt: boolean }) {
   const total = periodTotalMinutes(entries, pausenBezahlt);
   const days = groupEntriesByDay(entries, pausenBezahlt);
 
@@ -202,13 +196,13 @@ function MyHoursBody({
               })}
               {day.entries.some((e) => entryNetMinutes(e, pausenBezahlt) !== null) &&
                 day.entries.length > 1 && (
-                <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
-                  <span>Tag gesamt</span>
-                  <span className="font-medium text-foreground">
-                    {formatMinutes(day.netMinutes)}
-                  </span>
-                </div>
-              )}
+                  <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
+                    <span>Tag gesamt</span>
+                    <span className="font-medium text-foreground">
+                      {formatMinutes(day.netMinutes)}
+                    </span>
+                  </div>
+                )}
             </Card>
           </section>
         ))}

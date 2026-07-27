@@ -250,9 +250,7 @@ export function ArbeitszeitSection({
                   <p className="rounded-md bg-muted/50 p-2 text-xs text-foreground">
                     Δ laufende Periode
                     {breakSummary.periodLabel ? ` (${breakSummary.periodLabel})` : ""}:{" "}
-                    <strong>
-                      Σ {breakSummary.totalBreakHours.toString().replace(".", ",")} h
-                    </strong>{" "}
+                    <strong>Σ {breakSummary.totalBreakHours.toString().replace(".", ",")} h</strong>{" "}
                     über <strong>{breakSummary.staffCount}</strong> Mitarbeiter
                     {pausenBezahlt && pending === false
                       ? ' würden bei "Nein" von den Vergütungsstunden abgezogen.'

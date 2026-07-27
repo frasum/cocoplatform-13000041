@@ -369,10 +369,26 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     const sfnSv = sfnRows.find((z) => (z.bezeichnung ?? "").includes("SFN-Zuschläge Service"));
     expect(sfnGl).toBeDefined();
     expect(sfnSv).toBeDefined();
-    expect(sfnGl!.betragCent).toBeGreaterThan(0);
-    expect(sfnSv!.betragCent).toBeGreaterThan(0);
+    // Exakte Handrechnung — `berechneSfnGeld` rundet EINMAL am Ende
+    // (Math.round(Σ hours × rate × pct)); Math.round rundet .5 nach +∞.
+    //
+    // GL @ 2200 c:
+    //   Nacht25  18,75 × 2200 × 0,25 = 10.312,5
+    //   Nacht40   4,50 × 2200 × 0,40 =  3.960,0
+    //   Sonntag  30,75 × 2200 × 0,50 = 33.825,0
+    //   Σ = 48.097,5 → Math.round = 48.098 c
+    //
+    // Service @ 1600 c:
+    //   Nacht25  15,00 × 1600 × 0,25 =  6.000,0
+    //   Nacht40   3,75 × 1600 × 0,40 =  2.400,0
+    //   Σ =  8.400,0 → 8.400 c
+    //
+    // Weicht der Motorwert ab: §104 melden, Literale NICHT anpassen.
+    expect(sfnGl!.betragCent).toBe(48_098);
+    expect(sfnSv!.betragCent).toBe(8_400);
     // Gesamt-Zuschlag = Summe der Bereichs-SFN.
     expect(sfnGl!.betragCent + sfnSv!.betragCent).toBe(r.zuschlagCents);
+    expect(r.zuschlagCents).toBe(48_098 + 8_400);
   });
 
   it("MO-Muster (drei Bereiche, alle 23 €): drei Zeitlohn-Zeilen, Skalar null, keine Rundungsdrift", async () => {
@@ -409,5 +425,13 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     // (gleicher Satz ⇒ keine Rundungsdrift).
     const sumBetrag = glZeit!.betragCent + kiZeit!.betragCent + svZeit!.betragCent;
     expect(sumBetrag).toBe(24 * 2300);
+
+    // Exakte SFN-Summen-Assertion (alle Töpfe × 2300):
+    // Alle Schichten liegen Mo–Fr zwischen 10:00 und 16:00 — keine
+    // Nacht/Sonntag/Feiertags-Anteile. Erwartete SFN-Summe = 0 c.
+    // Weicht der Motorwert ab: §104 melden, Literal NICHT anpassen.
+    expect(r.zuschlagCents).toBe(0);
+    const sfnRows = r.zeilen.filter((z) => z.kategorie === "zuschlag_frei");
+    expect(sfnRows.reduce((s, z) => s + z.betragCent, 0)).toBe(0);
   });
 });

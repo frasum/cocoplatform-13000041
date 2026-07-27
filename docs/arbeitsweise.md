@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 26.07.2026 (§109: T0-Cutover-Tag — Export-Saga, TRMNL-4-Tage, LG2-Split, PB1, Notfallblatt)
+Stand: 27.07.2026 (§110: AT1-Sentry-Fix, PB2, LG3a/b, Juli-Lohnabgleich, Security-Runde)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 

@@ -463,6 +463,7 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
       error: string | null;
     };
     const rows: Row[] = [];
+    const blockerPayloads: StaffExportPayload[] = [];
     for (const s of visibleStaffRows) {
       const displayName =
         (s.display_name as string | null)?.trim() ||
@@ -477,6 +478,13 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           toDate: data.toDate,
           mode: data.mode,
           zusatzZeilen: [],
+        });
+        blockerPayloads.push({
+          staffId: s.id as string,
+          staffLabel: displayName,
+          persoNr: persoNr == null ? null : String(persoNr),
+          buckets: r.deptBuckets,
+          unresolvedHoursUnrounded: r.unresolvedHoursUnrounded,
         });
         const sumCat = (cat: string) =>
           r.zeilen.filter((z) => z.kategorie === cat).reduce((sum, z) => sum + z.betragCent, 0);
@@ -547,5 +555,6 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
         });
       }
     }
-    return { mode: data.mode, fromDate: data.fromDate, toDate: data.toDate, rows };
+    const blockers: StaffBlocker[] = computeExportBlockers(blockerPayloads);
+    return { mode: data.mode, fromDate: data.fromDate, toDate: data.toDate, rows, blockers };
   });

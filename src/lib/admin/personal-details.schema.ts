@@ -116,12 +116,33 @@ export type PersonalDetailsInput = z.input<typeof personalDetailsSchema>;
 export type PersonalDetailsFields = z.output<typeof personalDetailsSchema>;
 
 /**
- * Sparse-Patch-Variante: validiert nur die tatsächlich mitgeschickten Felder.
- * Ausgelassene Felder bleiben ausgelassen (kein Auto-Fill mit null), damit
- * `upsert` bestehende DB-Werte NICHT auf null überschreibt.
+ * Sparse-Patch-Variante: validiert nur die tatsächlich mitgeschickten Felder
+ * und lässt ausgelassene Felder AUS dem Ergebnis raus.
+ *
+ * Hintergrund: die Einzelfeld-Schemata oben mappen `undefined → null` per
+ * `.transform`. In einem normalen `z.object` würden sie deshalb bei einem
+ * Sparse-Input alle Felder mit `null` in die Ausgabe schreiben — und ein
+ * anschließendes `upsert` würde die DB-Zeile leerräumen. `parsePatch`
+ * schneidet das Parse-Ergebnis daher auf die tatsächlich im Input
+ * vorhandenen Keys zurück.
  */
-export const personalDetailsPatchSchema = personalDetailsSchema.partial().strict();
-export type PersonalDetailsPatch = z.output<typeof personalDetailsPatchSchema>;
+export function parsePersonalDetailsPatch(
+  input: unknown,
+): Partial<PersonalDetailsFields> {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    throw new Error("Patch muss ein Objekt sein");
+  }
+  const suppliedKeys = new Set(Object.keys(input as Record<string, unknown>));
+  const parsed = personalDetailsSchema.parse(input) as Record<
+    string,
+    unknown
+  >;
+  const out: Record<string, unknown> = {};
+  for (const key of suppliedKeys) {
+    if (key in parsed) out[key] = parsed[key];
+  }
+  return out as Partial<PersonalDetailsFields>;
+}
 
 const SENSITIVE_KEYS = new Set<string>(SENSITIVE_FIELDS);
 

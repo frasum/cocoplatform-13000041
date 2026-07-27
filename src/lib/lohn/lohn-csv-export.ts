@@ -2,6 +2,21 @@
 // Reine Serialisierung — keine Rechnung, keine Seiteneffekte.
 // Format: UTF-8 BOM, Trenner `;`, Zeilenende `\r\n`. Geld in Cent (Ganzzahl),
 // Stunden als Dezimal mit Punkt. Excel-kompatibel und maschinenlesbar.
+//
+// LG3b 2b — Export-Spalten je Lohnart (Bereich) und Export-Gate.
+//   * Neue Spalten `zeitlohn_<bereich>_std/_cent` und `sfn_<bereich>_cent`
+//     bilden die Lohnart-Aufteilung (Service→Zeitlohn, GL→Zeitlohn 2,
+//     Küche→Zeitlohn 3) direkt in den Export ab, ohne die Anzeige zu
+//     verändern (A4 — Gate/Spalten sitzen in den Build-Funktionen).
+//   * `unresolved_std` weist A5-Stunden (Bereich nicht zuordenbar) aus.
+//   * Wird die Funktion mit einer nicht-leeren `blockers`-Liste gerufen,
+//     wirft sie `LohnExportBlockedError` — keine Teil-Exporte
+//     (docs/LG3b-bereichs-saetze.md).
+
+import {
+  LohnExportBlockedError,
+  type StaffBlocker,
+} from "./export-blockers";
 
 export type UebersichtCsvRow = {
   persoNr: number | null;
@@ -32,6 +47,18 @@ export type UebersichtCsvRow = {
   krankTageEst: number | null;
   avgStdTag: number | null;
   avgSfnTagCent: number | null;
+  // LG3b 2b — Lohnart-Split (A7). Alle Werte in Cent bzw. Dezimal-Stunden.
+  // `null` nur bei Fehlerzeilen; sonst 0 wenn Bereich in der Periode ungenutzt.
+  zeitlohnServiceHours: number | null;
+  zeitlohnServiceCent: number | null;
+  zeitlohnGlHours: number | null;
+  zeitlohnGlCent: number | null;
+  zeitlohnKitchenHours: number | null;
+  zeitlohnKitchenCent: number | null;
+  sfnServiceCent: number | null;
+  sfnGlCent: number | null;
+  sfnKitchenCent: number | null;
+  unresolvedHours: number | null;
   error: string | null;
 };
 
@@ -68,6 +95,17 @@ const HEADERS = [
   "krank_tage_est",
   "avg_std_tag",
   "avg_sfn_tag_cent",
+  // LG3b 2b — A7-Labels (Lohnart-Split je Bereich).
+  "zeitlohn_service_std",
+  "zeitlohn_service_cent",
+  "zeitlohn_gl_std",
+  "zeitlohn_gl_cent",
+  "zeitlohn_kitchen_std",
+  "zeitlohn_kitchen_cent",
+  "sfn_service_cent",
+  "sfn_gl_cent",
+  "sfn_kitchen_cent",
+  "unresolved_std",
   "fehler",
 ] as const;
 
@@ -93,7 +131,14 @@ function fmtHoursZero(n: number | null): string {
 export function buildUebersichtCsv(
   rows: UebersichtCsvRow[],
   meta: { periodLabel: string; mode: string },
+  blockers: readonly StaffBlocker[] = [],
 ): string {
+  // LG3b A4 — Gate in der Build-Funktion. Keine Teil-Exporte, wenn eine
+  // Person unvollständig gepflegt ist (fehlender Satz, `perso_nr`
+  // oder unresolved WZ2). Der Aufrufer zeigt die Liste an; wir werfen.
+  if (blockers.length > 0) {
+    throw new LohnExportBlockedError(blockers);
+  }
   const comment = `# COCO Lohn-Übersicht${SEP} Periode=${meta.periodLabel}${SEP} Modus=${meta.mode}`;
   const headerLine = HEADERS.join(SEP);
 
@@ -127,6 +172,16 @@ export function buildUebersichtCsv(
       fmtIntZero(r.krankTageEst),
       fmtHoursZero(r.avgStdTag),
       fmtIntZero(r.avgSfnTagCent),
+      fmtHoursZero(r.zeitlohnServiceHours),
+      fmtIntZero(r.zeitlohnServiceCent),
+      fmtHoursZero(r.zeitlohnGlHours),
+      fmtIntZero(r.zeitlohnGlCent),
+      fmtHoursZero(r.zeitlohnKitchenHours),
+      fmtIntZero(r.zeitlohnKitchenCent),
+      fmtIntZero(r.sfnServiceCent),
+      fmtIntZero(r.sfnGlCent),
+      fmtIntZero(r.sfnKitchenCent),
+      fmtHoursZero(r.unresolvedHours),
       escapeField(r.error ?? ""),
     ];
     return cells.join(SEP);

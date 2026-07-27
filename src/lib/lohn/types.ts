@@ -20,6 +20,14 @@
  */
 export type Kategorie =
   | "zeitlohn"
+  /**
+   * Zeitlohn eines zweiten Arbeitsbereichs (LG3b). Steuer-/SV-Verhalten
+   * identisch zu `zeitlohn`; nur die Herkunft (Bereichs-Satz) unterscheidet
+   * sich. Ab Etappe 2 gefüllt; in Etappe 1 nur Typ, kein Erzeuger.
+   */
+  | "zeitlohn_2"
+  /** Zeitlohn eines dritten Arbeitsbereichs (LG3b). Verhalten wie `zeitlohn`. */
+  | "zeitlohn_3"
   | "zuschlag_frei"
   | "sachbezug_frei"
   | "mahlzeiten_paust"

@@ -126,17 +126,12 @@ export type PersonalDetailsFields = z.output<typeof personalDetailsSchema>;
  * schneidet das Parse-Ergebnis daher auf die tatsächlich im Input
  * vorhandenen Keys zurück.
  */
-export function parsePersonalDetailsPatch(
-  input: unknown,
-): Partial<PersonalDetailsFields> {
+export function parsePersonalDetailsPatch(input: unknown): Partial<PersonalDetailsFields> {
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new Error("Patch muss ein Objekt sein");
   }
   const suppliedKeys = new Set(Object.keys(input as Record<string, unknown>));
-  const parsed = personalDetailsSchema.parse(input) as Record<
-    string,
-    unknown
-  >;
+  const parsed = personalDetailsSchema.parse(input) as Record<string, unknown>;
   const out: Record<string, unknown> = {};
   for (const key of suppliedKeys) {
     if (key in parsed) out[key] = parsed[key];

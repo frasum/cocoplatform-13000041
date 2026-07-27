@@ -10,6 +10,7 @@ export type Entry = {
   department: Department;
   businessDate: string;
   hoursWorked: number;
+  breakMinutes: number;
   startedAt?: string;
   endedAt?: string;
   rawDepartment?: Department | null;
@@ -144,6 +145,7 @@ export function buildWeekColumns(fromIso: string, toIso: string): WeekCol[] {
 import { berlinLocalToIso } from "@/lib/time/shift-hours";
 import { entryRowDepartment } from "@/lib/time/primary-department";
 import { computeShiftHours } from "@/lib/time/shift-hours";
+import { paidHours } from "@/lib/time/paid-hours";
 // (computeShiftHours wird in aggregateStaffDeptRows weiter unten benutzt.)
 
 export const DEPT_LABEL: Record<Department, string> = {
@@ -358,6 +360,7 @@ export function aggregateStaffDeptRows(input: {
     displayName: string;
     businessDate: string;
     hoursWorked: number;
+    breakMinutes: number;
     rawDepartment?: Department | null;
     startedAt?: string;
     endedAt?: string;
@@ -366,6 +369,9 @@ export function aggregateStaffDeptRows(input: {
   staffDeptsByStaff: Map<string, Department[]>;
   rosterAreaByStaffDate: Record<string, Record<string, Department>>;
   rosterGlByStaffDate: Record<string, Record<string, boolean>>;
+  // PB2 — Vergütungsstunden-Regel; steuert paidHours() für totalHours und
+  // computeShiftHours() für die SFN-Zerlegung (SFN-Töpfe bleiben netto).
+  pausenBezahlt: boolean;
 }): StaffDeptRow[] {
   type Bucket = {
     staffId: string;
@@ -423,11 +429,18 @@ export function aggregateStaffDeptRows(input: {
     const b = ensure(e.staffId, e.displayName, department);
     const wk = isoWeek(parseIsoDate(e.businessDate));
     const wkKey = `${wk.year}-W${String(wk.week).padStart(2, "0")}`;
-    b.perWeek.set(wkKey, (b.perWeek.get(wkKey) ?? 0) + e.hoursWorked);
-    b.totalHours += e.hoursWorked;
+    const paid = paidHours(e.hoursWorked, e.breakMinutes, input.pausenBezahlt);
+    b.perWeek.set(wkKey, (b.perWeek.get(wkKey) ?? 0) + paid);
+    b.totalHours += paid;
     b.shiftDates.add(e.businessDate);
     if (e.startedAt && e.endedAt) {
-      const h = computeShiftHours(e.startedAt, e.endedAt, e.businessDate);
+      const h = computeShiftHours(
+        e.startedAt,
+        e.endedAt,
+        e.businessDate,
+        e.breakMinutes,
+        input.pausenBezahlt,
+      );
       b.basisEvening += h.eveningHours;
       b.basisNight += h.nightHours;
       b.basisSunHol += h.sundayHolidayHours;

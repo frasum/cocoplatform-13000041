@@ -66,6 +66,7 @@ export type TimeEntryOverviewRow = {
   ended_at: string;
   source: string;
   department: Department | null;
+  break_minutes: number | null;
   staff: { display_name: string } | null;
   id: string;
 };
@@ -81,7 +82,7 @@ export async function _loadTimeEntriesForOverviewBatch(
     supabaseAdmin
       .from("time_entries")
       .select(
-        "id, location_id, staff_id, business_date, started_at, ended_at, source, department, staff(display_name)",
+        "id, location_id, staff_id, business_date, started_at, ended_at, source, department, break_minutes, staff(display_name)",
       )
       .eq("organization_id", organizationId)
       .in("location_id", locationIds)
@@ -288,7 +289,7 @@ export const getTimeOverview = createServerFn({ method: "GET" })
     let entriesQuery = supabaseAdmin
       .from("time_entries")
       .select(
-        "staff_id, business_date, started_at, ended_at, source, department, staff(display_name)",
+        "staff_id, business_date, started_at, ended_at, source, department, break_minutes, staff(display_name)",
       )
       .eq("organization_id", caller.organizationId)
       .gte("business_date", data.fromDate)
@@ -388,6 +389,7 @@ export const getTimeOverview = createServerFn({ method: "GET" })
         startedAt: r.started_at as string,
         endedAt: r.ended_at as string,
         hoursWorked,
+        breakMinutes: Number(r.break_minutes ?? 0),
         source: r.source as string,
       };
     });
@@ -1130,6 +1132,7 @@ export const getTimeOverviewBatch = createServerFn({ method: "GET" })
           startedAt: string;
           endedAt: string;
           hoursWorked: number;
+          breakMinutes: number;
           source: string;
         }>;
         assignedStaff: Array<{ staffId: string; staffDepts: Department[] }>;
@@ -1187,6 +1190,7 @@ export const getTimeOverviewBatch = createServerFn({ method: "GET" })
         startedAt: r.started_at as string,
         endedAt: r.ended_at as string,
         hoursWorked,
+        breakMinutes: Number(r.break_minutes ?? 0),
         source: r.source as string,
       });
     }
@@ -1471,6 +1475,7 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
           businessDate: string;
           startedAt: string;
           endedAt: string;
+          breakMinutes: number;
         }>;
         crossLocationDates: Record<string, string[]>;
         assignedStaff: Array<{
@@ -1543,6 +1548,7 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
         businessDate: r.business_date as string,
         startedAt: r.started_at as string,
         endedAt: r.ended_at as string,
+        breakMinutes: Number((r as { break_minutes?: number | null }).break_minutes ?? 0),
       }));
 
       // crossLocationDates wird im „Alle Standorte"-Mode client-seitig nicht

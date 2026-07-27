@@ -16,6 +16,8 @@ describe("shift-hours", () => {
       "2026-06-15T15:00:00+02:00",
       "2026-06-15T23:30:00+02:00",
       "2026-06-15",
+      0,
+      true,
     );
     expect(r.totalHours).toBeCloseTo(8.5, 5);
     expect(r.eveningHours).toBeCloseTo(3.5, 5);
@@ -28,6 +30,8 @@ describe("shift-hours", () => {
       "2026-06-15T16:00:00+02:00",
       "2026-06-16T00:15:00+02:00",
       "2026-06-15",
+      0,
+      true,
     );
     expect(r.totalHours).toBeCloseTo(8.25, 5);
     expect(r.eveningHours).toBeCloseTo(4, 5);
@@ -40,6 +44,8 @@ describe("shift-hours", () => {
       "2026-06-14T15:00:00+02:00",
       "2026-06-14T23:00:00+02:00",
       "2026-06-14",
+      0,
+      true,
     );
     expect(r.totalHours).toBeCloseTo(8, 5);
     expect(r.sundayHolidayHours).toBeCloseTo(8, 5);
@@ -65,6 +71,8 @@ describe("shift-hours", () => {
       "2026-06-15T10:00:00+02:00",
       "2026-06-15T18:00:00+02:00",
       "2026-06-15",
+      0,
+      true,
     );
     expect(r.nightHours).toBe(0);
     expect(r.eveningHours).toBe(0);
@@ -96,7 +104,7 @@ describe("shift-hours", () => {
     const endedAt = berlinLocalToIso("2026-10-25", 1, 0);
     expect(startedAt).toBe("2026-10-24T15:00:00.000Z");
     expect(endedAt).toBe("2026-10-24T23:00:00.000Z");
-    const r = computeShiftHours(startedAt, endedAt, "2026-10-24");
+    const r = computeShiftHours(startedAt, endedAt, "2026-10-24", 0, true);
     expect(r.totalHours).toBeCloseTo(8, 5);
     expect(r.eveningHours).toBeCloseTo(4, 5);
     expect(r.nightHours).toBeCloseTo(1, 5);
@@ -110,7 +118,7 @@ describe("shift-hours", () => {
     const endedAt = berlinLocalToIso("2026-03-29", 1, 0);
     expect(startedAt).toBe("2026-03-28T16:00:00.000Z");
     expect(endedAt).toBe("2026-03-29T00:00:00.000Z");
-    const r = computeShiftHours(startedAt, endedAt, "2026-03-28");
+    const r = computeShiftHours(startedAt, endedAt, "2026-03-28", 0, true);
     expect(r.totalHours).toBeCloseTo(8, 5);
     expect(r.eveningHours).toBeCloseTo(4, 5);
     expect(r.nightHours).toBeCloseTo(1, 5);
@@ -122,5 +130,46 @@ describe("shift-hours", () => {
     expect(berlinOffsetMinutesAt(new Date("2026-10-25T00:30:00Z"))).toBe(120);
     // 2026-10-25T02:00:00Z = 03:00 CET (nach Umstellung).
     expect(berlinOffsetMinutesAt(new Date("2026-10-25T02:00:00Z"))).toBe(60);
+  });
+
+  // PB2 — Schalter-Invarianz der SFN-Töpfe: identische Topf-Werte für beide
+  // Schalterstellungen bei identischer Schicht mit Pause.
+  it("(l) PB2: Abend/Nacht/SO-Fei unabhängig vom Pausen-bezahlt-Schalter", () => {
+    const a = computeShiftHours(
+      "2026-06-15T16:00:00+02:00",
+      "2026-06-16T00:15:00+02:00",
+      "2026-06-15",
+      30,
+      true,
+    );
+    const b = computeShiftHours(
+      "2026-06-15T16:00:00+02:00",
+      "2026-06-16T00:15:00+02:00",
+      "2026-06-15",
+      30,
+      false,
+    );
+    expect(a.eveningHours).toBeCloseTo(b.eveningHours, 10);
+    expect(a.nightHours).toBeCloseTo(b.nightHours, 10);
+    expect(a.sundayHolidayHours).toBeCloseTo(b.sundayHolidayHours, 10);
+  });
+
+  it("(m) PB2: totalHours = paidHours(brutto, break, flag)", () => {
+    const brutto = computeShiftHours(
+      "2026-06-15T15:00:00+02:00",
+      "2026-06-15T23:30:00+02:00",
+      "2026-06-15",
+      30,
+      true,
+    );
+    const netto = computeShiftHours(
+      "2026-06-15T15:00:00+02:00",
+      "2026-06-15T23:30:00+02:00",
+      "2026-06-15",
+      30,
+      false,
+    );
+    expect(brutto.totalHours).toBeCloseTo(8.5, 5);
+    expect(netto.totalHours).toBeCloseTo(8.0, 5);
   });
 });

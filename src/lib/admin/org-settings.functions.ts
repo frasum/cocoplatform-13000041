@@ -316,6 +316,54 @@ const pausenBezahltSchema = z.object({
   pausenBezahlt: z.boolean(),
 });
 
+// PB2 — Vorschau: Σ break_minutes der geschlossenen time_entries in der
+// laufenden Abrechnungsperiode + Anzahl betroffener Mitarbeiter. Rein
+// lesend, admin-only, ohne Audit. Zeigt dem Umschalter, wie groß die
+// Auswirkung des Wechsels von „Ja" → „Nein" wäre.
+export const getCurrentPeriodBreakSummary = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(
+    async ({
+      context,
+    }): Promise<{ totalBreakHours: number; staffCount: number; periodLabel: string | null }> => {
+      const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { data: period, error: pErr } = await supabaseAdmin
+        .from("periods")
+        .select("label, start_date, end_date")
+        .eq("organization_id", caller.organizationId)
+        .lte("start_date", today)
+        .gte("end_date", today)
+        .maybeSingle();
+      if (pErr) throw pErr;
+      if (!period) return { totalBreakHours: 0, staffCount: 0, periodLabel: null };
+
+      const { data: rows, error: eErr } = await supabaseAdmin
+        .from("time_entries")
+        .select("staff_id, break_minutes")
+        .eq("organization_id", caller.organizationId)
+        .gte("business_date", period.start_date as string)
+        .lte("business_date", period.end_date as string)
+        .not("ended_at", "is", null)
+        .gt("break_minutes", 0);
+      if (eErr) throw eErr;
+
+      let sum = 0;
+      const staff = new Set<string>();
+      for (const r of rows ?? []) {
+        sum += Number(r.break_minutes ?? 0);
+        if (r.staff_id) staff.add(r.staff_id as string);
+      }
+      return {
+        totalBreakHours: Math.round((sum / 60) * 100) / 100,
+        staffCount: staff.size,
+        periodLabel: (period.label as string) ?? null,
+      };
+    },
+  );
+
 export const setPausenBezahlt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => pausenBezahltSchema.parse(i))

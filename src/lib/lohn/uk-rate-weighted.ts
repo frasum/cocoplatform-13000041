@@ -49,9 +49,7 @@ export interface WeightedUkRateResult {
   missingDepartments?: Department[];
 }
 
-export function computeWeightedUkRate(
-  slots: readonly UkRateSlot[],
-): WeightedUkRateResult {
+export function computeWeightedUkRate(slots: readonly UkRateSlot[]): WeightedUkRateResult {
   // Nur Bereiche mit tatsächlich bezahlten Stunden im Fenster fließen ein.
   // (Ungerundet — Blocker-Prüfmenge der Engine folgt derselben Regel.)
   const active = slots.filter((s) => s.paidHours > 0);

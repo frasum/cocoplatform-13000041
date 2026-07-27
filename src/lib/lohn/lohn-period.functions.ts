@@ -71,7 +71,12 @@ export interface SfnEntryAttribution {
 }
 
 export interface SfnPeriodAggregate {
-  hourlyRateCents: number;
+  /**
+   * LG3b A2 — Legacy-Skalar: Bereichssatz bei genau einem tatsächlich
+   * benutzten Bereich; `null` bei Mehrsatz (Anzeige „—", die Bereichszeilen
+   * tragen die Wahrheit). Bit-identisch zum Alt-Wert im Ein-Bereichs-Fall.
+   */
+  hourlyRateCents: number | null;
   totalHours: number;
   entryCount: number;
   workdayCount: number;
@@ -81,6 +86,12 @@ export interface SfnPeriodAggregate {
   deptSlices: SfnDeptSlice[];
   /** LG3b — Pro-Eintrag-Attribution, in Reihenfolge der Verarbeitung. */
   entryAttribution: SfnEntryAttribution[];
+  /**
+   * LG3b A5 — ungerundete bezahlte Stunden, deren Bereich WZ2 nicht klären
+   * konnte. Speist die A5-Zeile im Rechner und den `unresolved_department`-
+   * Export-Blocker.
+   */
+  unresolvedHoursUnrounded: number;
 }
 
 /**

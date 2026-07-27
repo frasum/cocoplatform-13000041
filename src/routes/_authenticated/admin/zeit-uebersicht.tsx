@@ -989,7 +989,13 @@ function ZeitUebersichtPage() {
       const arr = r.byDate.get(e.businessDate) ?? [];
       arr.push(e);
       r.byDate.set(e.businessDate, arr);
-      const s = computeShiftHours(e.startedAt, e.endedAt, e.businessDate);
+      const s = computeShiftHours(
+        e.startedAt,
+        e.endedAt,
+        e.businessDate,
+        (e as { breakMinutes?: number }).breakMinutes ?? 0,
+        pausenBezahlt,
+      );
       r.totals.total += s.totalHours;
       r.totals.evening += s.eveningHours;
       r.totals.night += s.nightHours;

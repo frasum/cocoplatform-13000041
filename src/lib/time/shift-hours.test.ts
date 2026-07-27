@@ -96,7 +96,7 @@ describe("shift-hours", () => {
     const endedAt = berlinLocalToIso("2026-10-25", 1, 0);
     expect(startedAt).toBe("2026-10-24T15:00:00.000Z");
     expect(endedAt).toBe("2026-10-24T23:00:00.000Z");
-    const r = computeShiftHours(startedAt, endedAt, "2026-10-24");
+    const r = computeShiftHours(startedAt, endedAt, "2026-10-24", 0, true);
     expect(r.totalHours).toBeCloseTo(8, 5);
     expect(r.eveningHours).toBeCloseTo(4, 5);
     expect(r.nightHours).toBeCloseTo(1, 5);
@@ -110,7 +110,7 @@ describe("shift-hours", () => {
     const endedAt = berlinLocalToIso("2026-03-29", 1, 0);
     expect(startedAt).toBe("2026-03-28T16:00:00.000Z");
     expect(endedAt).toBe("2026-03-29T00:00:00.000Z");
-    const r = computeShiftHours(startedAt, endedAt, "2026-03-28");
+    const r = computeShiftHours(startedAt, endedAt, "2026-03-28", 0, true);
     expect(r.totalHours).toBeCloseTo(8, 5);
     expect(r.eveningHours).toBeCloseTo(4, 5);
     expect(r.nightHours).toBeCloseTo(1, 5);

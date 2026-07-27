@@ -130,8 +130,10 @@ describe("buildUebersichtCsv", () => {
     // Messspalten jetzt "0" statt leer
     const row = line.split(";");
     // Achtung: name ist gequotet und enthält ein ";" → splittet in zwei Felder.
-    // Wir prüfen daher explizit auf die Zero-Sequenz nach dem Namen.
-    expect(row).not.toContain("");
+    // Wir prüfen daher explizit auf die Zero-Sequenz nach dem Namen. Die drei
+    // `zeitlohn_<dept>_satz_cent`-Felder sind bei Fehlerzeilen leer (satz aus
+    // `bucket.rateCents` ist null → CSV-Feld bleibt leer), daher kein
+    // `not.toContain("")` mehr.
     expect(line.endsWith(";Keine Personaldaten für diesen Mitarbeiter.")).toBe(true);
     // Spot-Check: viele "0"-Felder hintereinander
     expect(line).toContain(";0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;");

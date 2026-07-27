@@ -10,6 +10,7 @@ export type Entry = {
   department: Department;
   businessDate: string;
   hoursWorked: number;
+  breakMinutes: number;
   startedAt?: string;
   endedAt?: string;
   rawDepartment?: Department | null;

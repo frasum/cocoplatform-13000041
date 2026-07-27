@@ -138,11 +138,7 @@ function StaffDetailPage() {
       {tab === "basics" && (
         <div className="space-y-4">
           {isAdmin && <SofortmeldungBanner staffId={s.id} />}
-          <BasicsTab
-            staff={s}
-            showPool={!isPayroll}
-            canEditPersoNr={isAdmin || isPayroll}
-          />
+          <BasicsTab staff={s} showPool={!isPayroll} canEditPersoNr={isAdmin || isPayroll} />
         </div>
       )}
       {tab === "personal" && showPersonal && (
@@ -324,8 +320,8 @@ function BasicsTab({
             </div>
           </label>
           <p className="text-xs text-muted-foreground">
-            Wird in Wochenplan/Zusammenfassung/Buchhaltung klein hinter dem Rufnamen angezeigt und in
-            Exporten ausgewiesen. Leer lassen = keine Personalnummer.
+            Wird in Wochenplan/Zusammenfassung/Buchhaltung klein hinter dem Rufnamen angezeigt und
+            in Exporten ausgewiesen. Leer lassen = keine Personalnummer.
           </p>
           {persoNrMsg && <p className="text-xs text-muted-foreground">{persoNrMsg}</p>}
         </div>

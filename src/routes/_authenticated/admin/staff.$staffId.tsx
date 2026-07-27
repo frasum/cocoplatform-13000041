@@ -6,6 +6,7 @@ import {
   getStaff,
   setStaffActive,
   setStaffParticipatesInPool,
+  setStaffPersoNr,
   updateStaffBasics,
 } from "@/lib/admin/staff.functions";
 import { clearPin, setPin } from "@/lib/admin/pin.functions";
@@ -137,7 +138,11 @@ function StaffDetailPage() {
       {tab === "basics" && (
         <div className="space-y-4">
           {isAdmin && <SofortmeldungBanner staffId={s.id} />}
-          <BasicsTab staff={s} showPool={!isPayroll} />
+          <BasicsTab
+            staff={s}
+            showPool={!isPayroll}
+            canEditPersoNr={isAdmin || isPayroll}
+          />
         </div>
       )}
       {tab === "personal" && showPersonal && (
@@ -160,6 +165,7 @@ function StaffDetailPage() {
 function BasicsTab({
   staff,
   showPool,
+  canEditPersoNr,
 }: {
   staff: {
     id: string;
@@ -168,13 +174,16 @@ function BasicsTab({
     displayName: string;
     email: string | null;
     phone: string | null;
+    persoNr: number | null;
     participatesInPool: boolean;
   };
   showPool: boolean;
+  canEditPersoNr: boolean;
 }) {
   const queryClient = useQueryClient();
   const callUpdate = useServerFn(updateStaffBasics);
   const callSetPool = useServerFn(setStaffParticipatesInPool);
+  const callSetPersoNr = useServerFn(setStaffPersoNr);
   const [form, setForm] = useState({
     firstName: staff.firstName,
     lastName: staff.lastName,
@@ -182,6 +191,10 @@ function BasicsTab({
     email: staff.email ?? "",
     phone: staff.phone ?? "",
   });
+  const [persoNrInput, setPersoNrInput] = useState<string>(
+    staff.persoNr != null ? String(staff.persoNr) : "",
+  );
+  const [persoNrMsg, setPersoNrMsg] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [poolMsg, setPoolMsg] = useState<string | null>(null);
 
@@ -212,6 +225,16 @@ function BasicsTab({
       await queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
     },
     onError: (e: unknown) => setPoolMsg(e instanceof Error ? e.message : "Fehler."),
+  });
+
+  const persoNrMutation = useMutation({
+    mutationFn: (persoNr: number | null) =>
+      callSetPersoNr({ data: { staffId: staff.id, persoNr } }),
+    onSuccess: async () => {
+      setPersoNrMsg("Gespeichert.");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
+    },
+    onError: (e: unknown) => setPersoNrMsg(e instanceof Error ? e.message : "Fehler."),
   });
 
   return (
@@ -260,6 +283,53 @@ function BasicsTab({
       >
         {mutation.isPending ? "Speichern…" : "Speichern"}
       </button>
+      {canEditPersoNr && (
+        <div className="mt-4 space-y-2 border-t border-border pt-4">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium text-muted-foreground">Personalnummer</span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="\d*"
+                value={persoNrInput}
+                onChange={(e) => {
+                  setPersoNrMsg(null);
+                  setPersoNrInput(e.target.value.replace(/\D+/g, ""));
+                }}
+                className="w-40 rounded-md border border-input bg-background px-3 py-2 text-sm tabular-nums"
+                placeholder="z.B. 320"
+              />
+              <button
+                type="button"
+                disabled={persoNrMutation.isPending}
+                onClick={() => {
+                  setPersoNrMsg(null);
+                  const trimmed = persoNrInput.trim();
+                  if (trimmed === "") {
+                    persoNrMutation.mutate(null);
+                    return;
+                  }
+                  const n = Number(trimmed);
+                  if (!Number.isInteger(n) || n <= 0) {
+                    setPersoNrMsg("Bitte eine positive ganze Zahl eingeben.");
+                    return;
+                  }
+                  persoNrMutation.mutate(n);
+                }}
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              >
+                {persoNrMutation.isPending ? "Speichern…" : "Speichern"}
+              </button>
+            </div>
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Wird in Wochenplan/Zusammenfassung/Buchhaltung klein hinter dem Rufnamen angezeigt und in
+            Exporten ausgewiesen. Leer lassen = keine Personalnummer.
+          </p>
+          {persoNrMsg && <p className="text-xs text-muted-foreground">{persoNrMsg}</p>}
+        </div>
+      )}
       {showPool && (
         <div className="mt-4 space-y-2 border-t border-border pt-4">
           <label className="flex items-start gap-2 text-sm">

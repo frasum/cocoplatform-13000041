@@ -1475,6 +1475,7 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
           businessDate: string;
           startedAt: string;
           endedAt: string;
+          breakMinutes: number;
         }>;
         crossLocationDates: Record<string, string[]>;
         assignedStaff: Array<{
@@ -1547,6 +1548,7 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
         businessDate: r.business_date as string,
         startedAt: r.started_at as string,
         endedAt: r.ended_at as string,
+        breakMinutes: Number((r as { break_minutes?: number | null }).break_minutes ?? 0),
       }));
 
       // crossLocationDates wird im „Alle Standorte"-Mode client-seitig nicht

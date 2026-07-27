@@ -393,7 +393,13 @@ function ZeitUebersichtPage() {
     const m = new Map<string, { total: number; evening: number; night: number; sunHol: number }>();
     for (const e of overviewEntries) {
       if (!e.startedAt || !e.endedAt) continue;
-      const h = computeShiftHours(e.startedAt, e.endedAt, e.businessDate);
+      const h = computeShiftHours(
+        e.startedAt,
+        e.endedAt,
+        e.businessDate,
+        e.breakMinutes,
+        pausenBezahlt,
+      );
       const cur = m.get(e.staffId) ?? { total: 0, evening: 0, night: 0, sunHol: 0 };
       cur.total += h.totalHours;
       cur.evening += h.eveningHours;
@@ -402,7 +408,7 @@ function ZeitUebersichtPage() {
       m.set(e.staffId, cur);
     }
     return m;
-  }, [overviewEntries]);
+  }, [overviewEntries, pausenBezahlt]);
 
   const notesQ = useQuery({
     queryKey: ["payroll-notes", effectiveLocationId, fromDate, toDate],
@@ -543,6 +549,7 @@ function ZeitUebersichtPage() {
         displayName: e.displayName,
         businessDate: e.businessDate,
         hoursWorked: e.hoursWorked,
+        breakMinutes: e.breakMinutes,
         rawDepartment: e.rawDepartment ?? null,
         startedAt: e.startedAt,
         endedAt: e.endedAt,
@@ -551,8 +558,9 @@ function ZeitUebersichtPage() {
       staffDeptsByStaff: periodRoster.staffDeptsByStaff,
       rosterAreaByStaffDate: periodRoster.rosterAreaByStaffDate,
       rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
+      pausenBezahlt,
     });
-  }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId, periodRoster]);
+  }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId, periodRoster, pausenBezahlt]);
 
   const byDept = useMemo(() => {
     const m = new Map<Department, StaffDeptRow[]>();

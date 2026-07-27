@@ -407,7 +407,7 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
 
     // Summe der drei Zeilen-Beträge === paidHours-Gesamt × 2300
     // (gleicher Satz ⇒ keine Rundungsdrift).
-    const sumBetrag = (glZeit!.betragCent + kiZeit!.betragCent + svZeit!.betragCent);
+    const sumBetrag = glZeit!.betragCent + kiZeit!.betragCent + svZeit!.betragCent;
     expect(sumBetrag).toBe(24 * 2300);
   });
 });

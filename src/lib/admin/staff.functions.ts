@@ -321,6 +321,7 @@ export const getStaff = createServerFn({ method: "GET" })
       display_name: string;
       email: string | null;
       phone: string | null;
+      perso_nr: number | null;
       is_active: boolean;
       participates_in_pool: boolean;
       role_assignments: unknown;
@@ -330,7 +331,7 @@ export const getStaff = createServerFn({ method: "GET" })
       await supabaseAdmin
         .from("staff")
         .select(
-          "id, organization_id, first_name, last_name, display_name, email, phone, is_active, participates_in_pool, role_assignments(role), staff_locations(location_id), staff_pins(id)",
+          "id, organization_id, first_name, last_name, display_name, email, phone, perso_nr, is_active, participates_in_pool, role_assignments(role), staff_locations(location_id), staff_pins(id)",
         )
         .eq("id", data.staffId)
         .eq("organization_id", caller.organizationId)
@@ -346,6 +347,7 @@ export const getStaff = createServerFn({ method: "GET" })
       displayName: staff.display_name,
       email: staff.email,
       phone: staff.phone,
+      persoNr: staff.perso_nr,
       isActive: staff.is_active,
       participatesInPool: staff.participates_in_pool,
       role: (ra && ra.length > 0 ? ra[0].role : null) as AppRole | null,

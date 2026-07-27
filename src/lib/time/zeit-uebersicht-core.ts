@@ -360,6 +360,7 @@ export function aggregateStaffDeptRows(input: {
     displayName: string;
     businessDate: string;
     hoursWorked: number;
+    breakMinutes: number;
     rawDepartment?: Department | null;
     startedAt?: string;
     endedAt?: string;
@@ -368,6 +369,9 @@ export function aggregateStaffDeptRows(input: {
   staffDeptsByStaff: Map<string, Department[]>;
   rosterAreaByStaffDate: Record<string, Record<string, Department>>;
   rosterGlByStaffDate: Record<string, Record<string, boolean>>;
+  // PB2 — Vergütungsstunden-Regel; steuert paidHours() für totalHours und
+  // computeShiftHours() für die SFN-Zerlegung (SFN-Töpfe bleiben netto).
+  pausenBezahlt: boolean;
 }): StaffDeptRow[] {
   type Bucket = {
     staffId: string;
@@ -425,11 +429,18 @@ export function aggregateStaffDeptRows(input: {
     const b = ensure(e.staffId, e.displayName, department);
     const wk = isoWeek(parseIsoDate(e.businessDate));
     const wkKey = `${wk.year}-W${String(wk.week).padStart(2, "0")}`;
-    b.perWeek.set(wkKey, (b.perWeek.get(wkKey) ?? 0) + e.hoursWorked);
-    b.totalHours += e.hoursWorked;
+    const paid = paidHours(e.hoursWorked, e.breakMinutes, input.pausenBezahlt);
+    b.perWeek.set(wkKey, (b.perWeek.get(wkKey) ?? 0) + paid);
+    b.totalHours += paid;
     b.shiftDates.add(e.businessDate);
     if (e.startedAt && e.endedAt) {
-      const h = computeShiftHours(e.startedAt, e.endedAt, e.businessDate);
+      const h = computeShiftHours(
+        e.startedAt,
+        e.endedAt,
+        e.businessDate,
+        e.breakMinutes,
+        input.pausenBezahlt,
+      );
       b.basisEvening += h.eveningHours;
       b.basisNight += h.nightHours;
       b.basisSunHol += h.sundayHolidayHours;

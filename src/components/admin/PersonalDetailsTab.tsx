@@ -12,6 +12,15 @@ import {
   type PersonalDetailsFields,
 } from "@/lib/admin/personal-details.schema";
 import { getStaffCompensation, upsertStaffCompensation } from "@/lib/admin/compensation.functions";
+import {
+  listStaffCompensationRates,
+  upsertStaffCompensationRate,
+  deleteStaffCompensationRate,
+  type CompensationRatesDto,
+  type CompensationRateEntry,
+} from "@/lib/admin/compensation-rates.functions";
+import { isValidFromAllowed, periodStart } from "@/lib/time/valid-from-guard";
+import { todayIso } from "@/lib/format";
 
 type Props = { staffId: string; canEdit: boolean; canEditVacation?: boolean };
 
@@ -527,6 +536,8 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
       )}
 
       {canEdit && <CompensationSection staffId={staffId} />}
+
+      {canEdit && <CompensationRatesSection staffId={staffId} />}
     </div>
   );
 }

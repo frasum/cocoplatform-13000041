@@ -137,6 +137,40 @@ export async function aggregateSfnPeriod(
   if (locErr) throw locErr;
   const staffDepts = Array.from(new Set((locRows ?? []).map((r) => r.department as Department)));
 
+  // LG3b 2a-ii-b — Roster-Signale (rosterArea/rosterHasGlSkill) je business_date.
+  // Serverfähiger Signal-Pfad, deckungsgleich zu getTimeOverview (LG2). WZ2
+  // gehört in die Motor-Attribution, nicht in die Anzeige (§104-Befund).
+  const rosterAreaByDate = new Map<string, Department>();
+  const rosterGlByDate = new Set<string>();
+  if (orgId) {
+    const { data: rosterRows, error: rosterErr } = await supabaseAdmin
+      .from("roster_shifts")
+      .select("area, skill_id, shift_date")
+      .eq("organization_id", orgId)
+      .eq("staff_id", staffId)
+      .gte("shift_date", fromDate)
+      .lte("shift_date", toDate);
+    if (rosterErr) throw rosterErr;
+    const glSkillIds = new Set<string>();
+    const { data: glSkillRows, error: glSkillErr } = await supabaseAdmin
+      .from("skills")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("category", "gl");
+    if (glSkillErr) throw glSkillErr;
+    for (const s of glSkillRows ?? []) glSkillIds.add(s.id as string);
+    for (const r of rosterRows ?? []) {
+      const area = r.area as Department | null;
+      const skillId = r.skill_id as string | null;
+      const iso = r.shift_date as string;
+      if (area) {
+        const existing = rosterAreaByDate.get(iso);
+        rosterAreaByDate.set(iso, existing ? primaryDepartment([existing, area]) : area);
+      }
+      if (skillId && glSkillIds.has(skillId)) rosterGlByDate.add(iso);
+    }
+  }
+
   const { data: entries, error: entriesErr } = await supabaseAdmin
     .from("time_entries")
     .select("started_at, ended_at, business_date, break_minutes, source, department")
@@ -181,11 +215,11 @@ export async function aggregateSfnPeriod(
     const attr = attributeEntry({
       rawDepartment: (e.department as Department | null) ?? null,
       staffDepts,
-      // Etappe 2a-ii: Roster-Bezug (rosterArea/rosterHasGlSkill) wird in
-      // Etappe 2b nachgezogen, wenn UI/Export den Weg mitgeht. Ohne
-      // Plan-Signal fällt WZ2 auf statische Priorität (WZ1) zurück —
-      // deckungsgleich zum Verhalten des Alt-Pfads, der keine Attribution
-      // kannte und alles auf eine Zeile legte.
+      // LG3b 2a-ii-b — Roster-Signale je business_date aus derselben
+      // Quelle wie getTimeOverview (LG2). Ein-Bereich ist signal-invariant
+      // (die 2a-0-Baselines bleiben bit-identisch grün).
+      rosterArea: rosterAreaByDate.get(e.business_date) ?? null,
+      rosterHasGlSkill: rosterGlByDate.has(e.business_date),
     });
     const rateCents = resolveRateCents(rates, attr.department, e.business_date);
     const businessDay = new Date(`${e.business_date}T12:00:00Z`);

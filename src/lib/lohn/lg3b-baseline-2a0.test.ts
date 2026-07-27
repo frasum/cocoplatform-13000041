@@ -37,7 +37,9 @@ type Table =
   | "time_entries"
   | "lohn_absence_days"
   | "lohn_recurring_zeilen"
-  | "roster_absence";
+  | "roster_absence"
+  | "roster_shifts"
+  | "skills";
 
 interface StubTables {
   staff: Row[];
@@ -50,6 +52,8 @@ interface StubTables {
   lohn_absence_days: Row[];
   lohn_recurring_zeilen: Row[];
   roster_absence: Row[];
+  roster_shifts: Row[];
+  skills: Row[];
 }
 
 /**
@@ -165,6 +169,8 @@ const FIXTURE_A: StubTables = {
   lohn_absence_days: [],
   lohn_recurring_zeilen: [],
   roster_absence: [],
+  roster_shifts: [],
+  skills: [],
   time_entries: [
     entry("2026-07-03", "17:00", "23:15"),
     entry("2026-07-04", "17:00", "23:15"),
@@ -192,6 +198,8 @@ const FIXTURE_B: StubTables = {
   lohn_absence_days: [],
   lohn_recurring_zeilen: [],
   roster_absence: [],
+  roster_shifts: [],
+  skills: [],
   time_entries: [
     entry("2026-07-06", "10:00", "14:00"),
     entry("2026-07-07", "10:00", "14:00"),
@@ -222,6 +230,8 @@ const FIXTURE_C: StubTables = {
   lohn_absence_days: [],
   lohn_recurring_zeilen: [],
   roster_absence: [],
+  roster_shifts: [],
+  skills: [],
   time_entries: [
     entry("2026-07-03", "18:00", "24:00"),
     entry("2026-07-04", "20:00", "04:00", "2026-07-05"),

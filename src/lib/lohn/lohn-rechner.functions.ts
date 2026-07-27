@@ -248,13 +248,13 @@ export async function computeLohnForStaff(
   const zeitlohnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
     const rate = slice.rateCents ?? 0;
     const isMinijob = person.beschaeftigung === "minijob";
-    const label = isMinijob
-      ? AUSHILFE_LABEL[slice.department]
-      : ZEITLOHN_LABEL[slice.department];
+    const label = isMinijob ? AUSHILFE_LABEL[slice.department] : ZEITLOHN_LABEL[slice.department];
     // A3 — Kategorie je Bereich (Nicht-Minijob). Minijob bleibt bereichs-
     // unabhängig `aushilfe_paust`; die Bereichsunterscheidung tragen die
     // Labels. Etappe-1-Kategorien werden hierüber tatsächlich erzeugt.
-    const kategorie: Kategorie = isMinijob ? "aushilfe_paust" : ZEITLOHN_KATEGORIE[slice.department];
+    const kategorie: Kategorie = isMinijob
+      ? "aushilfe_paust"
+      : ZEITLOHN_KATEGORIE[slice.department];
     return {
       kategorie,
       bezeichnung: label,

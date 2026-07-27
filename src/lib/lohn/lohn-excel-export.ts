@@ -107,6 +107,20 @@ export async function buildLohnXlsx(d: LohnExportInput): Promise<Blob> {
   setKv(s, r++, "Feiertag 150 %", d.buckets.holiday150Hours, HRS);
   r++;
 
+  // LG3b 2b (A7) — Lohnart-Split je Bereich, direkt aus den A3-Entgeltzeilen.
+  // Zeigt für Mehr-Bereichs-Personen alle Zeitlohn-Zeilen einzeln;
+  // Ein-Bereichs-Personen erhalten wie bisher eine Zeile.
+  const zeitlohnZeilen = d.zeilen.filter((z) =>
+    isZeitlohnKategorie(z.kategorie, d.person.beschaeftigung),
+  );
+  if (zeitlohnZeilen.length > 0) {
+    sectionHeader(s, r++, "Lohnart-Split (Bereich)");
+    for (const z of zeitlohnZeilen) {
+      setKv(s, r++, z.bezeichnung ?? z.kategorie, z.betragCent / 100, EUR);
+    }
+    r++;
+  }
+
   sectionHeader(s, r++, "Personenparameter");
   setKv(s, r++, "Steuerklasse", d.person.steuerklasse);
   setKv(s, r++, "Kinderfreibeträge (ZKF)", d.person.zkf);

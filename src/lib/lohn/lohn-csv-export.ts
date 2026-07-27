@@ -13,10 +13,7 @@
 //     wirft sie `LohnExportBlockedError` — keine Teil-Exporte
 //     (docs/LG3b-bereichs-saetze.md).
 
-import {
-  LohnExportBlockedError,
-  type StaffBlocker,
-} from "./export-blockers";
+import { LohnExportBlockedError, type StaffBlocker } from "./export-blockers";
 
 export type UebersichtCsvRow = {
   persoNr: number | null;

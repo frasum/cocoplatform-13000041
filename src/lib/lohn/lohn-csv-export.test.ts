@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  buildUebersichtCsv,
-  type UebersichtCsvRow,
-} from "./lohn-csv-export";
+import { buildUebersichtCsv, type UebersichtCsvRow } from "./lohn-csv-export";
 import { LohnExportBlockedError, type StaffBlocker } from "./export-blockers";
 
 const FULL: UebersichtCsvRow = {
@@ -178,8 +175,8 @@ describe("buildUebersichtCsv", () => {
         reasons: [{ reason: "missing_perso_nr" }],
       },
     ];
-    expect(() => buildUebersichtCsv([FULL], { periodLabel: "P", mode: "simple" }, blockers)).toThrow(
-      LohnExportBlockedError,
-    );
+    expect(() =>
+      buildUebersichtCsv([FULL], { periodLabel: "P", mode: "simple" }, blockers),
+    ).toThrow(LohnExportBlockedError);
   });
 });

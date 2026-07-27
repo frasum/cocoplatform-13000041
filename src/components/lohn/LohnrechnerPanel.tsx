@@ -487,8 +487,8 @@ function BlockerBanner({ blockers }: { blockers: StaffBlocker[] }) {
         Export blockiert — {blockers.length} Person(en) unvollständig gepflegt
       </h2>
       <p className="mb-3 text-xs text-muted-foreground">
-        Keine Teil-Exporte. Bitte die genannten Punkte in den Stammdaten
-        korrigieren; anschließend wird der Export automatisch freigegeben.
+        Keine Teil-Exporte. Bitte die genannten Punkte in den Stammdaten korrigieren; anschließend
+        wird der Export automatisch freigegeben.
       </p>
       <ul className="space-y-1 text-sm">
         {blockers.map((b) => (

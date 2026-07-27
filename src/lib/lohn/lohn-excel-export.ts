@@ -6,10 +6,7 @@ import type { Entgeltzeile, LohnErgebnis, PersonenParameter } from "./types";
 import type { SfnGeldErgebnis } from "./sfn-geld/types";
 import { isZeitlohnKategorie } from "./kategorie";
 import { downloadBlob as downloadBrowserBlob } from "@/lib/time/weekly-export";
-import {
-  LohnExportBlockedError,
-  type StaffBlocker,
-} from "./export-blockers";
+import { LohnExportBlockedError, type StaffBlocker } from "./export-blockers";
 
 export interface LohnExportInput {
   staffLabel: string;

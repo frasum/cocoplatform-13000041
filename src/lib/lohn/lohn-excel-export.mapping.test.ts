@@ -55,12 +55,7 @@ const buckets: SfnGeldErgebnis = {
   sundayHours: 0,
   holidayHours: 0,
   holiday150Hours: 0,
-  night25Cents: 0,
-  night40Cents: 0,
-  sundayCents: 0,
-  holidayCents: 0,
-  holiday150Cents: 0,
-  totalCents: 0,
+  zuschlagCents: 0,
 };
 
 function baseInput(zeilen: Entgeltzeile[]): LohnExportInput {

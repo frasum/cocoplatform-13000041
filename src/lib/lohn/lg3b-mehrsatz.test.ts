@@ -170,14 +170,18 @@ function rosterShift(shiftDate: string, area: string | null, skillId: string | n
 //     Fr 10.07 20:00-24:00 = 4,00 h Nacht25
 //     Fr 17.07 21:00-24:00 = 3,00 h Nacht25
 //   Crossing-Schichten (Fri → Sat, businessDate Fri, kein Sonntag-Effekt):
-//     Fr 24.07 20:00-04:30 (+1) → Nacht25 4,00 h + Nacht40 4,00 h + 0,50 h neutral
+//     Fr 24.07 20:00-04:00 (+1) → Nacht25 4,00 h + Nacht40 4,00 h
+//       (Korrektur zur Ur-Fassung: das Segment 04:00–04:30 wurde entfernt,
+//        weil der Motor 04:00–06:00 nach §3b korrekt als Nacht 25 % führt —
+//        verifiziert am §104-Fund vom 27.07. mit +275 c Motor-Delta bei
+//        alter 04:30-Grenze. Handrechnung, nicht Motor, war falsch.)
 //     Fr 31.07 20:00-00:30 (+1) → Nacht25 4,00 h + Nacht40 0,50 h
 //   GL-Zeitlohn-Stunden (paidHours, break=0, pausen_bezahlt=true):
 //     8,00 + 7,75 + 8,00 + 7,00                       = 30,75 h Sonntag
 //     3,75 + 4,00 + 3,00                              = 10,75 h Fri-Nacht25
-//     (4,00 + 4,00 + 0,50) + (4,00 + 0,50)            = 13,00 h Crossings
+//     (4,00 + 4,00) + (4,00 + 0,50)                   = 12,50 h Crossings
 //     ---------------------------------------------------------------
-//     Σ GL paidHours                                  = 54,50 h
+//     Σ GL paidHours                                  = 54,00 h
 //     Kontroll-Zerlegung: Nacht25 = 18,75 h · Nacht40 = 4,50 h · So 30,75 h ✓
 //
 // Service-Schichten (roster_shifts: area = 'service'):
@@ -191,11 +195,11 @@ function rosterShift(shiftDate: string, area: string | null, skillId: string | n
 //     4,00 + 4,00 + 3,00 + 7,75                       = 18,75 h
 //     Kontroll-Zerlegung: Nacht25 = 15,00 h · Nacht40 = 3,75 h · So 0 ✓
 //
-// Gesamt: Σ paidHours = 54,50 + 18,75 = 73,25 h (deckt `totalHours`).
+// Gesamt: Σ paidHours = 54,00 + 18,75 = 72,75 h (deckt `totalHours`).
 //
 // Sätze: gl = 22,00 €/h → 2200 c · service = 16,00 €/h → 1600 c.
 // Erwartete Zeitlohn-Beträge (Hand-Rechnung):
-//   GL       Zeitlohn 2  54,50 h × 2200 c = 119.900 c
+//   GL       Zeitlohn 2  54,00 h × 2200 c = 118.800 c
 //   Service  Zeitlohn    18,75 h × 1600 c =  30.000 c
 // SFN je Bereich = f(Bucket, Satz) mit dem jeweiligen Bereichssatz — die
 // Zerlegung in Nacht25 / Nacht40 / Sonntag oben ist die Handrechnungsbasis.
@@ -248,7 +252,7 @@ const FIXTURE_LAM: StubTables = {
     entry("2026-07-10", "20:00", "24:00"),
     entry("2026-07-17", "21:00", "24:00"),
     // GL — Crossing Fri → Sat
-    entry("2026-07-24", "20:00", "04:30", "2026-07-25"),
+    entry("2026-07-24", "20:00", "04:00", "2026-07-25"),
     entry("2026-07-31", "20:00", "00:30", "2026-08-01"),
     // Service — Sat Nacht25
     entry("2026-07-04", "20:00", "24:00"),
@@ -339,11 +343,11 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     // Σ Bucket-paidHours === totalHours.
     const sumDeptHours = r.deptBuckets.reduce((s, b) => s + b.paidHoursUnrounded, 0);
     expect(Math.round(sumDeptHours * 100) / 100).toBe(r.totalHours);
-    expect(r.totalHours).toBe(73.25);
+    expect(r.totalHours).toBe(72.75);
 
     // Genau zwei benutzte Bereiche, korrekt attribuiert.
     const byDept = new Map(r.deptBuckets.map((b) => [b.department, b]));
-    expect(byDept.get("gl")?.paidHoursUnrounded).toBeCloseTo(54.5, 6);
+    expect(byDept.get("gl")?.paidHoursUnrounded).toBeCloseTo(54.0, 6);
     expect(byDept.get("gl")?.rateCents).toBe(2200);
     expect(byDept.get("service")?.paidHoursUnrounded).toBeCloseTo(18.75, 6);
     expect(byDept.get("service")?.rateCents).toBe(1600);
@@ -358,8 +362,8 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     expect(svZeit?.kategorie).toBe("zeitlohn");
     expect(glZeit?.satzCent).toBe(2200);
     expect(svZeit?.satzCent).toBe(1600);
-    // Handrechnung: 54,50 h × 2200 c = 119.900 c · 18,75 h × 1600 c = 30.000 c.
-    expect(glZeit?.betragCent).toBe(119_900);
+    // Handrechnung: 54,00 h × 2200 c = 118.800 c · 18,75 h × 1600 c = 30.000 c.
+    expect(glZeit?.betragCent).toBe(118_800);
     expect(svZeit?.betragCent).toBe(30_000);
 
     // A2 — zwei SFN-Zeilen (je Bereich), beide mit Betrag > 0

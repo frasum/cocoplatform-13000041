@@ -1,42 +1,45 @@
+## Diagnose
+
+Die Sparse-Patch-Absicherung im Client ist intakt. Der Wipe passiert **serverseitig** in `src/lib/admin/personal-details.functions.ts` beim Input-Validieren:
+
+```
+inputValidator: personalDetailsSchema.parse(v.fields)
+```
+
+`personalDetailsSchema` ist ein `z.object({...})`, bei dem jedes Feld
+`.optional().transform(v => v === undefined ? null : v)` ist. Das heißt: übergibt der Client einen sparsen Patch (z. B. nur `{ tax_class: "III" }`), füllt Zod **alle 28 anderen Felder mit `null` auf**. Der anschließende `upsert(..., { onConflict: "staff_id" })` schreibt genau diese Nulls in die Zeile und leert Adresse, IBAN, Bank, Tax-ID, SV-Nr., Urlaubstage usw.
+
+Beweis im Audit-Log: alle 4 Speichervorgänge zwischen 07:54 und 07:57 melden **jedes** Feld als `changed:true` — obwohl der Client (nach BU-Fix) nur wenige Felder gesendet hat.
+
 ## Ziel
 
-Kontaktdaten von GIG SERVICE (Narisara Asa-sa-na, `93e44abe-d1d8-4763-b0a6-63cea7313687`) aus dem Audit-Log wiederherstellen und danach klären, warum die Admin-Speicherung sie überschrieben hat.
+Sparse-Save darf ausschließlich die tatsächlich mitgeschickten Felder anfassen. Alle anderen Werte bleiben in der DB unangetastet.
 
-## Diagnose (bestätigt)
+## Änderungen (nur Personaldaten-Pfad)
 
-- Change-Request vom 26.07.: enthielt nur 12 Felder (Bank, Steuer, Geburts- und Kassendaten, Namen). Diese sind sauber in `staff_personal_details` gelandet.
-- Direktbearbeitung am 03.07. via Self-Service (`profile.contact_update`): setzte `address`, `email`, `phone`.
-- Zwischen 26.07. 16:30 und 27.07. 07:27 vier `staff_personal_details.upsert`-Vorgänge aus der Admin-Maske. Aktuell stehen `address`, `email`, `phone` auf NULL — sie wurden dabei überschrieben.
-- Nie eingereicht (bleibt leer): Anrede, Straße/PLZ/Ort, Kirchensteuer, Minijob, SV-frei, Kinderfreibeträge, Eintritts-/Austrittsdatum, Personalgruppe, Berufsbezeichnung, Urlaubstage.
+1. **`src/lib/admin/personal-details.schema.ts`**
+   - Neues Export: `personalDetailsPatchSchema = personalDetailsSchema.partial().strict()` — validiert Sparse-Patches feldweise (Format, Länge, IBAN-Regex, PLZ-Regex, Datum), lässt aber ausgelassene Felder **weg** statt sie mit `null` zu belegen.
+   - Bestehendes `personalDetailsSchema` bleibt für Voll-Reads/Formstate erhalten.
 
-## Schritt 1 — Datenwiederherstellung (Migration)
+2. **`src/lib/admin/personal-details.functions.ts` → `upsertStaffPersonalDetails`**
+   - `inputValidator` nutzt `personalDetailsPatchSchema` statt `personalDetailsSchema`.
+   - Zusätzliche Sicherung: nach dem Parse `Object.keys(parsed)` gegen die Input-Keys schneiden, damit selbst bei Schema-Regressionen keine Fremd-Nulls durchrutschen (Defense in Depth).
+   - Der No-Op-Check (`length === 0 → early return`) bleibt.
 
-Update auf `staff_personal_details` für `staff_id = 93e44abe-d1d8-4763-b0a6-63cea7313687`, ausschließlich diese drei Felder aus dem Audit-Log setzen:
+3. **`src/components/admin/PersonalDetailsTab.tsx`**
+   - Client-Vorvalidierung (`personalDetailsSchema.parse(patch)` in `mutation`/`vacMutation`) auf `personalDetailsPatchSchema.parse(patch)` umstellen, damit dieselbe Sparse-Semantik gilt und keine irreführenden Zod-Errors kommen.
 
-- `address = 'Max-kraus-str. 46\n85435 Erding'`
-- `email = 'muguggig93@gmail.com'`
-- `phone = '17663784147'`
+4. **Datenrettung**
+   - Wiederherstellen der zuletzt bekannten Werte für Narisara Asa-sa-na (`93e44abe-…`) aus dem Audit-Log-Verlauf (Adresse, Mail, Telefon, Konto, SV, Steuer, Urlaub) — analog zum Restore vom 27.07. vormittags, nachdem der Fix live ist.
 
-Kein weiteres Feld anfassen. Danach Verifikation per Read-Query.
+## Bewusst NICHT im Scope
 
-## Schritt 2 — Ursachenanalyse Sparse-Patch
+- Kein Umbau der UI-Sektionen, keine weiteren Feld-Änderungen.
+- Kein Anfassen von `getStaffPersonalDetails` oder Compensation.
+- Keine Migration — Fix ist rein anwendungslogisch.
 
-Der Sparse-Patch aus dem letzten Runden-Fix (`PersonalDetailsTab.toSparsePatch`) sollte genau diesen Fall verhindern. Er hat offensichtlich bei GIG SERVICE nicht gegriffen. Zu klären:
+## Verifikation
 
-1. Konsole/Sentry: haben die 26.07./27.07.-Saves auf diesem Staff-Datensatz Fehler geworfen?
-2. Wurde die Maske geöffnet, bevor die `getStaffPersonalDetails`-Query vollständig geladen war? Dann wäre die Baseline leer und ALLE Felder würden als „changed" gelten (Audit zeigt genau dieses Muster).
-3. Reproduktion: PersonalDetailsTab öffnen, sofort „Bearbeiten" klicken, ohne zu tippen speichern. Ergebnis prüfen.
-
-Wenn (2) bestätigt: Fix ist, `setBaseline` erst nach vollständigem Laden zu setzen und den Bearbeiten-Button so lange zu deaktivieren, bis `detailsQ.isSuccess` true ist. Dieser Fix landet erst nach der Wiederherstellung — Schritt 1 ist unabhängig.
-
-## Nicht-Ziele
-
-- Keine Änderung an den Antrags-/Freigabepfaden.
-- Keine Übernahme von Vor-/Nachname auf `staff` (die Werte stimmen bereits: „Narisara" / „Asa-sa-na").
-- Keine Ergänzung von Feldern, die die Mitarbeiterin nie gemeldet hat.
-
-## Reihenfolge
-
-1. Migration mit dem drei-Felder-Update ausführen (Approval erforderlich).
-2. Read-Query zur Bestätigung: `address`, `email`, `phone` befüllt.
-3. Kurze Rückmeldung mit dem Ergebnis und dem Vorschlag zu Schritt 2 (Reproduktion + Bearbeiten-Guard) als separates Häppchen.
+- `bunx tsgo` gegen die geänderten Dateien.
+- Unit-Test (neu): `personalDetailsPatchSchema.parse({ tax_class: "III" })` liefert genau `{ tax_class: "III" }`, nicht 28 Felder.
+- Manuell im Preview: eine einzelne Zeile ändern, speichern, Seite neu laden → alle anderen Felder bleiben stehen; Audit-Log meldet nur das eine Feld als geändert.

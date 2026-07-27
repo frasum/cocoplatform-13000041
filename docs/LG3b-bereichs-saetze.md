@@ -20,15 +20,23 @@ Aufbauend auf **PB2** (Anker 708e4906, 1924 Tests). Keine Migration, keine SQL.
   ausschließlich Personen mit `paidHours > 0` in mindestens einem
   Bereich der Exportperiode. Payroll-Accounts ohne Stunden (z. B.
   Viktoria Schaffer) dürfen den Export nie blockieren.
-- **Export-Blocker — zwei Bedingungen** über derselben Prüfmenge:
+  Die Prüfmenge rechnet auf **ungerundeten** `paidHours` — 0,2 h
+  zählt, auch wenn die Anzeige (Viertelstunden-Abrundung) 0,00 zeigt.
+- **Export-Blocker — drei Bedingungen** über derselben Prüfmenge:
   1. `staff_compensation_rates`: kein Satz in einem Bereich, in dem die
      Person Stunden hat (LG-9-b).
   2. `staff.perso_nr`: `null` oder leer.
+  3. `unresolved_department: true`: mindestens ein Zeiteintrag der
+     Person in der Exportperiode, dessen WZ2-Attribution
+     (`entryRowDepartment`) fehlschlägt. Solche Einträge machen die
+     Person prüfpflichtig und blockieren mit eigenem Grund — auch
+     dann, wenn für alle *aufgelösten* Bereiche Sätze existieren.
      Fehler-Payload ist eine kombinierte Liste, pro Person mit Grund
-     (`missing_rate: [dept, …]` und/oder `missing_perso_nr: true`). Bricht
-     den gesamten Export ab — keine Teil-Exporte. Anzeige (LG-9-c) läuft
-     unabhängig weiter; fehlende `perso_nr` wird analog rot markiert, ohne
-     Rechenwirkung.
+     (`missing_rate: [dept, …]`, `missing_perso_nr: true` und/oder
+     `unresolved_department: true`). Bricht den gesamten Export ab —
+     keine Teil-Exporte. Anzeige (LG-9-c) läuft unabhängig weiter;
+     fehlende `perso_nr` und nicht-attribuierte Einträge werden analog
+     rot markiert, ohne Rechenwirkung.
 - **Rückwirkung**: `isValidFromAllowed` bleibt unverändert (LG-12).
 - **Stundenbasis je Lohnart** = `paidHours(...)` aus PB2 (respektiert
   `pausen_bezahlt`; SFN-Töpfe bleiben in beiden Stellungen netto).

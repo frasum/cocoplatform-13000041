@@ -4,15 +4,16 @@ Zwei präzisierende Auflagen zum bestehenden LG3b-Plan (Anker: `docs/LG3b-bereic
 
 ### 1. Export-Blocker: perso_nr zusätzlich zur fehlenden Satz-Prüfung
 
-**Prüfmenge (verbindlich):** ausschließlich Personen mit `paidHours > 0` in mindestens einem Bereich der Exportperiode. Payroll-Accounts ohne Stunden (z. B. Viktoria Schaffer) dürfen den Export **nie** blockieren.
+**Prüfmenge (verbindlich):** ausschließlich Personen mit `paidHours > 0` in mindestens einem Bereich der Exportperiode. Payroll-Accounts ohne Stunden (z. B. Viktoria Schaffer) dürfen den Export **nie** blockieren. Die Prüfmenge rechnet auf **ungerundeten** `paidHours` — 0,2 h zählt, auch wenn die Viertelstunden-Anzeige 0,00 zeigt.
 
-**Zwei Blocker-Bedingungen, gleiche Prüfmenge:**
+**Drei Blocker-Bedingungen, gleiche Prüfmenge:**
 - `staff_compensation_rates`: kein Satz in einem Bereich, in dem die Person Stunden hat (bestehende LG-9-b-Regel).
 - `staff.perso_nr`: `null` oder leer.
+- `unresolved_department: true`: mindestens ein Zeiteintrag mit fehlgeschlagener WZ2-Attribution (`entryRowDepartment`) — blockiert mit eigenem Grund, unabhängig davon, ob für die *aufgelösten* Bereiche Sätze existieren.
 
-**Fehler-Payload:** eine kombinierte Liste, pro Person mit Grund (`missing_rate: [dept, …]` und/oder `missing_perso_nr: true`). Bricht Export ab, zeigt vollständige Liste — keine Teil-Exporte.
+**Fehler-Payload:** eine kombinierte Liste, pro Person mit Grund (`missing_rate: [dept, …]`, `missing_perso_nr: true` und/oder `unresolved_department: true`). Bricht Export ab, zeigt vollständige Liste — keine Teil-Exporte.
 
-**Anzeige (LG-9-c bleibt):** unabhängig vom Export rechnet die Bildschirmanzeige weiter (0 bei fehlendem Satz, roter Marker je Person, Summenzeile „unvollständig"). Fehlende perso_nr wird analog markiert.
+**Anzeige (LG-9-c bleibt):** unabhängig vom Export rechnet die Bildschirmanzeige weiter (0 bei fehlendem Satz, roter Marker je Person, Summenzeile „unvollständig"). Fehlende `perso_nr` und nicht-attribuierte Einträge werden analog rot markiert, ohne Rechenwirkung.
 
 ### 2. MO-Fixture: 23,00 in allen drei Bereichen
 

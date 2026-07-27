@@ -158,7 +158,7 @@ export function LohnrechnerPanel() {
         toDate,
         mode: result.mode,
         totalHours: result.totalHours,
-        hourlyRateCents: result.hourlyRateCents,
+        hourlyRateCents: result.hourlyRateCents ?? 0,
         entryCount: result.entryCount,
         zuschlagCents: result.zuschlagCents,
         buckets: result.buckets,
@@ -336,7 +336,11 @@ export function LohnrechnerPanel() {
               <KV k="SFN-Modus" v={result.mode} />
               <KV
                 k="Zeitlohn (Stunden × Satz)"
-                v={eur(Math.round(result.totalHours * result.hourlyRateCents))}
+                v={eur(
+                  result.hourlyRateCents == null
+                    ? null
+                    : Math.round(result.totalHours * result.hourlyRateCents),
+                )}
               />
               <KV k="SFN-Zuschläge" v={eur(result.zuschlagCents)} />
             </div>

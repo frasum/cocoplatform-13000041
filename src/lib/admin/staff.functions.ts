@@ -321,6 +321,7 @@ export const getStaff = createServerFn({ method: "GET" })
       display_name: string;
       email: string | null;
       phone: string | null;
+      perso_nr: number | null;
       is_active: boolean;
       participates_in_pool: boolean;
       role_assignments: unknown;
@@ -330,7 +331,7 @@ export const getStaff = createServerFn({ method: "GET" })
       await supabaseAdmin
         .from("staff")
         .select(
-          "id, organization_id, first_name, last_name, display_name, email, phone, is_active, participates_in_pool, role_assignments(role), staff_locations(location_id), staff_pins(id)",
+          "id, organization_id, first_name, last_name, display_name, email, phone, perso_nr, is_active, participates_in_pool, role_assignments(role), staff_locations(location_id), staff_pins(id)",
         )
         .eq("id", data.staffId)
         .eq("organization_id", caller.organizationId)
@@ -346,6 +347,7 @@ export const getStaff = createServerFn({ method: "GET" })
       displayName: staff.display_name,
       email: staff.email,
       phone: staff.phone,
+      persoNr: staff.perso_nr,
       isActive: staff.is_active,
       participatesInPool: staff.participates_in_pool,
       role: (ra && ra.length > 0 ? ra[0].role : null) as AppRole | null,
@@ -533,6 +535,65 @@ export const setStaffParticipatesInPool = createServerFn({ method: "POST" })
           entity: "staff",
           entityId: data.staffId,
           meta: { participates: data.participates },
+        },
+      };
+    });
+  });
+
+// Personalnummer manuell setzen/entfernen. Admin- und payroll-only; PII-nah
+// über payroll bereits abgedeckt (Import läuft dort). Uniqueness wird
+// weich pro Organisation geprüft (kein DB-Unique — Historie kann Kollisionen
+// enthalten, die wir hier nicht stillschweigend erzwingen).
+export const setStaffPersoNr = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        staffId: z.string().uuid(),
+        persoNr: z.number().int().positive().max(2_147_483_647).nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]);
+    return runAllowed(caller.role, ["admin", "payroll"], makeAuditWriter(caller), async () => {
+      await assertStaffInOrg(data.staffId, caller.organizationId);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      if (data.persoNr !== null) {
+        // Weiche Eindeutigkeitsprüfung pro Organisation.
+        const conflict = expectOk<{ id: string; display_name: string }[]>(
+          await supabaseAdmin
+            .from("staff")
+            .select("id, display_name")
+            .eq("organization_id", caller.organizationId)
+            .eq("perso_nr", data.persoNr)
+            .neq("id", data.staffId)
+            .limit(1),
+          "setStaffPersoNr.conflict",
+        );
+        if (conflict && conflict.length > 0) {
+          throw new Error(
+            `Personalnummer ${data.persoNr} ist bereits vergeben (${conflict[0].display_name}).`,
+          );
+        }
+      }
+
+      expectVoid(
+        await supabaseAdmin
+          .from("staff")
+          .update({ perso_nr: data.persoNr })
+          .eq("id", data.staffId)
+          .eq("organization_id", caller.organizationId),
+        "setStaffPersoNr",
+      );
+      return {
+        result: { ok: true as const },
+        audit: {
+          action: "staff.set_perso_nr",
+          entity: "staff",
+          entityId: data.staffId,
+          meta: { persoNr: data.persoNr },
         },
       };
     });

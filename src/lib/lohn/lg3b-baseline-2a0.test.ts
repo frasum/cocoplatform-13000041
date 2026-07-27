@@ -254,9 +254,9 @@ describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () =>
     const out = await runBaseline(FIXTURE_A);
     expect(out).toMatchInlineSnapshot(`
       {
-        "auszahlungCents": 0,
-        "avCent": 0,
-        "bruttoCents": 0,
+        "auszahlungCents": 73045,
+        "avCent": 910,
+        "bruttoCents": 87850,
         "buckets": {
           "holidayHours": 0,
           "night25Hours": 26,
@@ -264,18 +264,18 @@ describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () =>
           "sundayHours": 12.5,
         },
         "entryCount": 8,
-        "hourlyRateCents": 0,
+        "hourlyRateCents": 1400,
         "kistCent": 0,
-        "kvCent": 0,
+        "kvCent": 5705,
         "lstCent": 0,
-        "nettoCents": 0,
-        "pvCent": 0,
-        "rvCent": 0,
+        "nettoCents": 73045,
+        "pvCent": 1680,
+        "rvCent": 6510,
         "soliCent": 0,
-        "stBruttoAusweisCent": 0,
+        "stBruttoAusweisCent": 70000,
         "totalHours": 50,
         "workdayCount": 8,
-        "zuschlagCents": 0,
+        "zuschlagCents": 17850,
       }
     `);
   });
@@ -284,9 +284,9 @@ describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () =>
     const out = await runBaseline(FIXTURE_B);
     expect(out).toMatchInlineSnapshot(`
       {
-        "auszahlungCents": 0,
-        "avCent": 0,
-        "bruttoCents": 0,
+        "auszahlungCents": 37848,
+        "avCent": 624,
+        "bruttoCents": 48000,
         "buckets": {
           "holidayHours": 0,
           "night25Hours": 0,
@@ -294,15 +294,15 @@ describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () =>
           "sundayHours": 0,
         },
         "entryCount": 8,
-        "hourlyRateCents": 0,
+        "hourlyRateCents": 1500,
         "kistCent": 0,
-        "kvCent": 0,
+        "kvCent": 3912,
         "lstCent": 0,
-        "nettoCents": 0,
-        "pvCent": 0,
-        "rvCent": 0,
+        "nettoCents": 37848,
+        "pvCent": 1152,
+        "rvCent": 4464,
         "soliCent": 0,
-        "stBruttoAusweisCent": 0,
+        "stBruttoAusweisCent": 48000,
         "totalHours": 32,
         "workdayCount": 8,
         "zuschlagCents": 0,
@@ -314,9 +314,9 @@ describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () =>
     const out = await runBaseline(FIXTURE_C);
     expect(out).toMatchInlineSnapshot(`
       {
-        "auszahlungCents": 0,
-        "avCent": 0,
-        "bruttoCents": 0,
+        "auszahlungCents": 46846,
+        "avCent": 582,
+        "bruttoCents": 56320,
         "buckets": {
           "holidayHours": 0,
           "night25Hours": 16,
@@ -324,18 +324,18 @@ describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () =>
           "sundayHours": 0,
         },
         "entryCount": 4,
-        "hourlyRateCents": 0,
+        "hourlyRateCents": 1600,
         "kistCent": 0,
-        "kvCent": 0,
+        "kvCent": 3651,
         "lstCent": 0,
-        "nettoCents": 0,
-        "pvCent": 0,
-        "rvCent": 0,
+        "nettoCents": 46846,
+        "pvCent": 1075,
+        "rvCent": 4166,
         "soliCent": 0,
-        "stBruttoAusweisCent": 0,
+        "stBruttoAusweisCent": 44800,
         "totalHours": 28,
         "workdayCount": 4,
-        "zuschlagCents": 0,
+        "zuschlagCents": 11520,
       }
     `);
   });

@@ -388,6 +388,7 @@ export const getTimeOverview = createServerFn({ method: "GET" })
         startedAt: r.started_at as string,
         endedAt: r.ended_at as string,
         hoursWorked,
+        breakMinutes: Number(r.break_minutes ?? 0),
         source: r.source as string,
       };
     });

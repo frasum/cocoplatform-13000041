@@ -10,7 +10,6 @@ import { loadAdminCaller } from "./admin-context";
 import { assertPermission, runWithPermission } from "./admin-call";
 import { writeAuditLog } from "./audit";
 import {
-  personalDetailsSchema,
   parsePersonalDetailsPatch,
   redactForAudit,
   type PersonalDetailsFields,

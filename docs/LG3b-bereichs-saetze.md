@@ -24,11 +24,11 @@ Aufbauend auf **PB2** (Anker 708e4906, 1924 Tests). Keine Migration, keine SQL.
   1. `staff_compensation_rates`: kein Satz in einem Bereich, in dem die
      Person Stunden hat (LG-9-b).
   2. `staff.perso_nr`: `null` oder leer.
-  Fehler-Payload ist eine kombinierte Liste, pro Person mit Grund
-  (`missing_rate: [dept, …]` und/oder `missing_perso_nr: true`). Bricht
-  den gesamten Export ab — keine Teil-Exporte. Anzeige (LG-9-c) läuft
-  unabhängig weiter; fehlende `perso_nr` wird analog rot markiert, ohne
-  Rechenwirkung.
+     Fehler-Payload ist eine kombinierte Liste, pro Person mit Grund
+     (`missing_rate: [dept, …]` und/oder `missing_perso_nr: true`). Bricht
+     den gesamten Export ab — keine Teil-Exporte. Anzeige (LG-9-c) läuft
+     unabhängig weiter; fehlende `perso_nr` wird analog rot markiert, ohne
+     Rechenwirkung.
 - **Rückwirkung**: `isValidFromAllowed` bleibt unverändert (LG-12).
 - **Stundenbasis je Lohnart** = `paidHours(...)` aus PB2 (respektiert
   `pausen_bezahlt`; SFN-Töpfe bleiben in beiden Stellungen netto).

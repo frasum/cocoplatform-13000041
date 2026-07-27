@@ -26,9 +26,7 @@ describe("LG3b · export-blockers", () => {
   it("alles gepflegt → keine Blocker", () => {
     const b = computeExportBlockers([
       payload({
-        buckets: [
-          { department: "service", paidHoursUnrounded: 40, rateCents: 1400 },
-        ],
+        buckets: [{ department: "service", paidHoursUnrounded: 40, rateCents: 1400 }],
       }),
     ]);
     expect(b).toEqual([]);
@@ -52,9 +50,7 @@ describe("LG3b · export-blockers", () => {
   it("winzige, aber echte Stunden (0.2 h) triggern missing_rate", () => {
     const b = computeExportBlockers([
       payload({
-        buckets: [
-          { department: "gl", paidHoursUnrounded: 0.2, rateCents: null },
-        ],
+        buckets: [{ department: "gl", paidHoursUnrounded: 0.2, rateCents: null }],
       }),
     ]);
     expect(b).toHaveLength(1);
@@ -64,9 +60,7 @@ describe("LG3b · export-blockers", () => {
   it("Fließkomma-Rauschen unter Epsilon triggert NICHT", () => {
     const b = computeExportBlockers([
       payload({
-        buckets: [
-          { department: "gl", paidHoursUnrounded: 1e-12, rateCents: null },
-        ],
+        buckets: [{ department: "gl", paidHoursUnrounded: 1e-12, rateCents: null }],
       }),
     ]);
     expect(b).toEqual([]);
@@ -76,9 +70,7 @@ describe("LG3b · export-blockers", () => {
     const b = computeExportBlockers([
       payload({
         persoNr: "",
-        buckets: [
-          { department: "service", paidHoursUnrounded: 40, rateCents: 1400 },
-        ],
+        buckets: [{ department: "service", paidHoursUnrounded: 40, rateCents: 1400 }],
       }),
     ]);
     expect(b).toHaveLength(1);
@@ -88,9 +80,7 @@ describe("LG3b · export-blockers", () => {
   it("unresolved_department bei Stunden im Unresolved-Topf", () => {
     const b = computeExportBlockers([
       payload({
-        buckets: [
-          { department: "service", paidHoursUnrounded: 20, rateCents: 1400 },
-        ],
+        buckets: [{ department: "service", paidHoursUnrounded: 20, rateCents: 1400 }],
         unresolvedHoursUnrounded: 2.5,
       }),
     ]);
@@ -105,19 +95,13 @@ describe("LG3b · export-blockers", () => {
     const b = computeExportBlockers([
       payload({
         persoNr: null,
-        buckets: [
-          { department: "service", paidHoursUnrounded: 10, rateCents: null },
-        ],
+        buckets: [{ department: "service", paidHoursUnrounded: 10, rateCents: null }],
         unresolvedHoursUnrounded: 1,
       }),
     ]);
     expect(b).toHaveLength(1);
     const kinds = b[0].reasons.map((r) => r.reason).sort();
-    expect(kinds).toEqual([
-      "missing_perso_nr",
-      "missing_rate",
-      "unresolved_department",
-    ]);
+    expect(kinds).toEqual(["missing_perso_nr", "missing_rate", "unresolved_department"]);
   });
 
   it("assertExportUnblocked wirft LohnExportBlockedError mit vollständiger Liste", () => {
@@ -125,15 +109,11 @@ describe("LG3b · export-blockers", () => {
       payload({
         staffId: "s1",
         persoNr: null,
-        buckets: [
-          { department: "service", paidHoursUnrounded: 10, rateCents: 1400 },
-        ],
+        buckets: [{ department: "service", paidHoursUnrounded: 10, rateCents: 1400 }],
       }),
       payload({
         staffId: "s2",
-        buckets: [
-          { department: "kitchen", paidHoursUnrounded: 5, rateCents: null },
-        ],
+        buckets: [{ department: "kitchen", paidHoursUnrounded: 5, rateCents: null }],
       }),
     ];
     let caught: unknown = null;
@@ -152,9 +132,7 @@ describe("LG3b · export-blockers", () => {
     expect(() =>
       assertExportUnblocked([
         payload({
-          buckets: [
-            { department: "service", paidHoursUnrounded: 40, rateCents: 1400 },
-          ],
+          buckets: [{ department: "service", paidHoursUnrounded: 40, rateCents: 1400 }],
         }),
       ]),
     ).not.toThrow();

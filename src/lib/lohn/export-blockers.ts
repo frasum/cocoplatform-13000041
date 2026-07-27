@@ -17,10 +17,7 @@ import type { Department } from "@/lib/time/primary-department";
 /** Grenze gegen Fließkomma-Rauschen — 1 Sekunde ≈ 0,000278 h. */
 const HOURS_EPS = 1e-9;
 
-export type BlockerReason =
-  | "missing_rate"
-  | "missing_perso_nr"
-  | "unresolved_department";
+export type BlockerReason = "missing_rate" | "missing_perso_nr" | "unresolved_department";
 
 export interface DeptBucket {
   department: Department;
@@ -81,14 +78,11 @@ function personoNrLeer(v: string | null | undefined): boolean {
  * Ermittelt Blocker je Person. Personen ganz ohne Stunden (Summe der
  * Buckets + unresolved = 0) tauchen nicht auf.
  */
-export function computeExportBlockers(
-  payloads: readonly StaffExportPayload[],
-): StaffBlocker[] {
+export function computeExportBlockers(payloads: readonly StaffExportPayload[]): StaffBlocker[] {
   const out: StaffBlocker[] = [];
   for (const p of payloads) {
     const totalHours =
-      p.buckets.reduce((s, b) => s + b.paidHoursUnrounded, 0) +
-      p.unresolvedHoursUnrounded;
+      p.buckets.reduce((s, b) => s + b.paidHoursUnrounded, 0) + p.unresolvedHoursUnrounded;
     if (!hasHours(totalHours)) continue; // keine Stunden → nie Blocker
 
     const reasons: BlockerDetail[] = [];
@@ -131,9 +125,7 @@ export function computeExportBlockers(
 }
 
 /** Wirft `LohnExportBlockedError`, wenn irgendein Blocker vorliegt. */
-export function assertExportUnblocked(
-  payloads: readonly StaffExportPayload[],
-): void {
+export function assertExportUnblocked(payloads: readonly StaffExportPayload[]): void {
   const blockers = computeExportBlockers(payloads);
   if (blockers.length > 0) {
     throw new LohnExportBlockedError(blockers);

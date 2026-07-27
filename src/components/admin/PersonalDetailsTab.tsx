@@ -664,8 +664,13 @@ function CompensationSection({ staffId }: { staffId: string }) {
   return (
     <fieldset className="space-y-3 rounded-md border border-border p-4">
       <legend className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Vergütung (nur Admin)
+        Vergütung — Alt-Satz (nur Admin)
       </legend>
+      <p className="text-xs text-muted-foreground">
+        Alt-Satz — von der Lohnrechnung nicht mehr gelesen. Die Payroll rechnet
+        seit LG3b mit den Bereichssätzen unten. Feld bleibt aus historischen
+        Gründen sichtbar; ein Abriss ist als späterer Schritt geplant.
+      </p>
 
       {compQ.isLoading ? (
         <p className="text-sm text-muted-foreground">Lade…</p>
@@ -846,10 +851,13 @@ function LegacyAddressPuffer({
   );
 }
 
-// LG3a — Stundensätze je Arbeitsbereich. Runde 1 von 2: pflegbar, aber ohne
-// Lohnwirkung (Berechnung liest weiterhin `staff_compensation.hourly_rate`).
-// Anzeige-Reihenfolge fix: gl → kitchen → service, damit sich die Anzeige mit
-// LG2 (Buchhaltung-Split) deckt.
+// LG3a/LG3b — Stundensätze je Arbeitsbereich. Seit LG3b (2a-iii) sind diese
+// Sätze lohnwirksam: `entryRowDepartment` löst je Zeiteintrag den Bereich
+// auf, `staff_compensation_rates` liefert den zeitpunktgenauen Satz. Der
+// Legacy-Skalar `staff_compensation.hourly_rate` wird von der Engine nicht
+// mehr gelesen (siehe docs/LG3b-bereichs-saetze.md). Anzeige-Reihenfolge
+// fix: gl → kitchen → service, damit sich die Anzeige mit LG2 (Buchhaltung-
+// Split) deckt.
 const DEPT_ORDER = ["gl", "kitchen", "service"] as const;
 const DEPT_LABEL: Record<(typeof DEPT_ORDER)[number], string> = {
   gl: "Geschäftsleitung",
@@ -902,12 +910,13 @@ function CompensationRatesSection({ staffId }: { staffId: string }) {
   return (
     <fieldset className="space-y-3 rounded-md border border-border p-4">
       <legend className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Sätze je Arbeitsbereich (nur Admin) — noch ohne Lohnwirkung
+        Sätze je Arbeitsbereich (nur Admin)
       </legend>
       <p className="text-xs text-muted-foreground">
         Rückwirkung nur bis Periodenbeginn (<span className="tabular-nums">{cutoff}</span>) erlaubt.
-        Ältere Zeilen sind gesperrt. Die Payroll rechnet in dieser Runde noch mit dem einheitlichen
-        Stundenlohn oben.
+        Ältere Zeilen sind gesperrt. Diese Sätze sind lohnwirksam: die Payroll
+        löst je Zeiteintrag den Bereich auf und rechnet mit dem hier gepflegten
+        Satz.
       </p>
       {q.isLoading ? (
         <p className="text-sm text-muted-foreground">Lade…</p>

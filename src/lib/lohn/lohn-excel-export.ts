@@ -4,7 +4,7 @@
 import type ExcelJS from "exceljs";
 import type { Entgeltzeile, LohnErgebnis, PersonenParameter } from "./types";
 import type { SfnGeldErgebnis } from "./sfn-geld/types";
-import { zeitlohnKategorie } from "./kategorie";
+import { isZeitlohnKategorie } from "./kategorie";
 import { downloadBlob as downloadBrowserBlob } from "@/lib/time/weekly-export";
 
 export interface LohnExportInput {
@@ -76,9 +76,11 @@ export async function buildLohnXlsx(d: LohnExportInput): Promise<Blob> {
   // Lohn-Kern erzeugten Betrag der Entgeltzeile ausgeben. Eine Lohnformel,
   // ein Ort (`lohn-rechner.functions.ts`); der Excel-Export ist reine
   // Ausgabe. Regressionstest: `lohn-excel-export.regression.test.ts`.
-  const zeitlohnKat = zeitlohnKategorie(d.person.beschaeftigung);
+  // LG3b 2b — alle vom Lohn-Kern erzeugten Zeitlohn-Zeilen (A3) aufsummieren.
+  // Bei Mehr-Bereichs-Personen sind das `zeitlohn` + `zeitlohn_2` + `zeitlohn_3`;
+  // der Alt-Filter auf genau eine Kategorie verlor die _2/_3-Beträge.
   const zeitlohnCent = d.zeilen
-    .filter((z) => z.kategorie === zeitlohnKat)
+    .filter((z) => isZeitlohnKategorie(z.kategorie, d.person.beschaeftigung))
     .reduce((sum, z) => sum + z.betragCent, 0);
   setKv(s, r++, "Zeitlohn (Stunden × Satz)", zeitlohnCent / 100, EUR);
   setKv(s, r++, "SFN-Zuschläge", d.zuschlagCents / 100, EUR);

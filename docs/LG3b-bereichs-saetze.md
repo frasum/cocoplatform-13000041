@@ -30,7 +30,7 @@ Aufbauend auf **PB2** (Anker 708e4906, 1924 Tests). Keine Migration, keine SQL.
      Person in der Exportperiode, dessen WZ2-Attribution
      (`entryRowDepartment`) fehlschlägt. Solche Einträge machen die
      Person prüfpflichtig und blockieren mit eigenem Grund — auch
-     dann, wenn für alle *aufgelösten* Bereiche Sätze existieren.
+     dann, wenn für alle _aufgelösten_ Bereiche Sätze existieren.
      Fehler-Payload ist eine kombinierte Liste, pro Person mit Grund
      (`missing_rate: [dept, …]`, `missing_perso_nr: true` und/oder
      `unresolved_department: true`). Bricht den gesamten Export ab —

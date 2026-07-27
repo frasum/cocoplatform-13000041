@@ -19,12 +19,91 @@ import { buildFixedZeilen } from "./fixed-zeilen";
 import { computeUrlaubKrankDiagnose } from "./urlaub-krank-diagnose";
 import { buildUrlaubKrankZeilen } from "./urlaub-krank-zeilen";
 import { zeitlohnKategorie } from "./kategorie";
+import { computeWeightedUkRate, type UkRateSlot } from "./uk-rate-weighted";
+import { resolveRateCents, type RateRow } from "./rate-resolution";
+import type { Department } from "@/lib/time/primary-department";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 // Re-Export für Bestandsimporte (z. B. zeitlohn-kategorie.test.ts) —
 // die Implementierung liegt jetzt in `./kategorie` (zirkelfrei).
 export { zeitlohnKategorie };
+
+// LG3b 2a-iii — Lohnart-Bezeichnungen je Bereich (Lohnbüro 27.07., siehe
+// docs/LG3b-bereichs-saetze.md). Der Zeitlohn-Split je Bereich ersetzt die
+// Ein-Zeilen-Ausgabe des Alt-Pfads. Ein-Bereichs-Personen erhalten weiterhin
+// genau eine Zeitlohn-Zeile mit identischem Betrag — Baseline-Nullmessung.
+const ZEITLOHN_LABEL: Record<Department, string> = {
+  service: "Zeitlohn (Service)",
+  gl: "Zeitlohn 2 (GL)",
+  kitchen: "Zeitlohn 3 (Küche)",
+};
+const AUSHILFE_LABEL: Record<Department, string> = {
+  service: "Aushilfe-Zeitlohn (Service, pauschal)",
+  gl: "Aushilfe-Zeitlohn 2 (GL, pauschal)",
+  kitchen: "Aushilfe-Zeitlohn 3 (Küche, pauschal)",
+};
+const SFN_LABEL: Record<Department, string> = {
+  service: "Service",
+  gl: "GL",
+  kitchen: "Küche",
+};
+
+/** YYYY-MM-DD - `days` Tage; UTC-anker, monatssicher. */
+function isoMinusDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * LG3b G1 — U/K-Grundsatz je Person:
+ *   * Ein-Bereich (genau ein Bereich mit paidHours in der Periode) → Satz
+ *     dieses Bereichs, auf den Periodenbeginn aufgelöst. Für Ein-Bereichs-
+ *     Personen ist das exakt der Alt-Wert (`sfn.hourlyRateCents`) — die
+ *     2a-0-Baselines bleiben bit-identisch.
+ *   * Mehr-Bereich → gewichteter 91-Tage-Durchschnitt via
+ *     `computeWeightedUkRate` (paidHours-gewichtet, Rate je Bereich auf
+ *     `fromDate` aufgelöst). Liefert `null` (keine Stunden im Fenster oder
+ *     ein Bereich ohne Satz) → LG-9-c: Anzeige rechnet 0, Export blockiert
+ *     an anderer Stelle.
+ */
+async function resolveUkHourlyRateCents(
+  supabaseAdmin: SupabaseClient<Database>,
+  args: {
+    staffId: string;
+    fromDate: string;
+    usedDepts: readonly Department[];
+    fallbackRateCents: number;
+  },
+): Promise<number> {
+  if (args.usedDepts.length <= 1) return args.fallbackRateCents;
+
+  // Rates zum Periodenbeginn (jüngstes valid_from ≤ fromDate).
+  const { data: rateRows, error: rateErr } = await supabaseAdmin
+    .from("staff_compensation_rates")
+    .select("department, valid_from, hourly_rate")
+    .eq("staff_id", args.staffId);
+  if (rateErr) throw rateErr;
+  const rates: RateRow[] = (rateRows ?? []).map((r) => ({
+    department: r.department as Department,
+    validFrom: r.valid_from as string,
+    hourlyRateCents: Math.round(Number(r.hourly_rate) * 100),
+  }));
+
+  // 91-Tage-Fenster vor Periodenbeginn: paidHours je Bereich aus dem
+  // Alt-Aggregator (deckt PB2/pausen_bezahlt und Attribution identisch ab).
+  const preTo = isoMinusDays(args.fromDate, 1);
+  const preFrom = isoMinusDays(args.fromDate, 91);
+  const pre = await aggregateSfnPeriod(supabaseAdmin, args.staffId, preFrom, preTo);
+  const slots: UkRateSlot[] = pre.deptSlices.map((s) => ({
+    department: s.department,
+    paidHours: s.paidHours,
+    rateCents: resolveRateCents(rates, s.department, args.fromDate),
+  }));
+  const weighted = computeWeightedUkRate(slots);
+  return weighted.rateCents ?? 0;
+}
 
 /**
  * Geteilter Rechen-Kern: Aggregat → Personenparameter → Entgeltzeilen → Lohn.
@@ -64,7 +143,6 @@ export async function computeLohnForStaff(
 
   const person = staffDetailsToPerson(details, args.toDate);
 
-  const zeitlohnCent = Math.round(sfn.totalHours * sfn.hourlyRateCents);
   const periodYear = Number(args.toDate.slice(0, 4));
   const fixedZeilen = buildFixedZeilen({
     sachbezugMonthlyCents: details.sachbezug_monthly_cents ?? 0,
@@ -92,11 +170,21 @@ export async function computeLohnForStaff(
   const usedUrlaubTage = override?.urlaub_tage ?? 0;
   const usedKrankTage = override?.krank_tage ?? 0;
 
+  // LG3b 2a-iii — U/K-Satz: Ein-Bereich → Bereichssatz (identisch zum
+  // Alt-Wert); Mehr-Bereich → gewichteter 91-Tage-Durchschnitt.
+  const usedDepts = sfn.deptSlices.map((s) => s.department);
+  const ukHourlyRateCents = await resolveUkHourlyRateCents(supabaseAdmin, {
+    staffId: args.staffId,
+    fromDate: args.fromDate,
+    usedDepts,
+    fallbackRateCents: sfn.hourlyRateCents,
+  });
+
   const ukZeilen = buildUrlaubKrankZeilen({
     urlaubTage: usedUrlaubTage,
     krankTage: usedKrankTage,
     sollHoursPerDay: Number(details.soll_hours_per_day ?? 8),
-    hourlyRateCents: sfn.hourlyRateCents,
+    hourlyRateCents: ukHourlyRateCents,
     sfnTagCent: diagnose.avgSfnTagCent,
     beschaeftigung: person.beschaeftigung,
   });
@@ -113,22 +201,58 @@ export async function computeLohnForStaff(
     betragCent: r.betrag_cent,
   }));
 
-  const zeilen: Entgeltzeile[] = [
-    {
-      kategorie: zeitlohnKategorie(person.beschaeftigung),
+  // LG3b 2a-iii — Zeitlohn und SFN je Bereich (Lohnart-Split). Bei
+  // Ein-Bereichs-Personen entsteht wie im Alt-Pfad genau eine Zeitlohn-Zeile
+  // und genau eine SFN-Zeile — die Baseline-Nullmessung bleibt bit-identisch.
+  const kat = zeitlohnKategorie(person.beschaeftigung);
+  const zeitlohnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
+    const rate = slice.rateCents ?? 0;
+    const label =
+      person.beschaeftigung === "minijob"
+        ? AUSHILFE_LABEL[slice.department]
+        : ZEITLOHN_LABEL[slice.department];
+    return {
+      kategorie: kat,
+      bezeichnung: label,
+      betragCent: Math.round(slice.paidHours * rate),
+      stunden: slice.paidHours,
+      satzCent: rate,
+    };
+  });
+
+  const sfnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
+    const bucket = args.mode === "extended" ? slice.extended : slice.simple;
+    return {
+      kategorie: "zuschlag_frei",
+      bezeichnung: `SFN-Zuschläge ${SFN_LABEL[slice.department]} (${args.mode})`,
+      betragCent: bucket.zuschlagCents,
+    };
+  });
+
+  // Fallback: völlig leere Periode → Alt-Verhalten (eine 0-Zeile Zeitlohn +
+  // eine 0-Zeile SFN), damit `lohn-core` konsistent bleibt und die
+  // Downstream-Anzeigen keine leere Zeilen-Liste sehen.
+  if (zeitlohnZeilen.length === 0) {
+    zeitlohnZeilen.push({
+      kategorie: kat,
       bezeichnung:
         person.beschaeftigung === "minijob"
           ? "Aushilfe-Zeitlohn (pauschal)"
           : "Zeitlohn (Stunden × Satz)",
-      betragCent: zeitlohnCent,
-      stunden: sfn.totalHours,
+      betragCent: 0,
+      stunden: 0,
       satzCent: sfn.hourlyRateCents,
-    },
-    {
+    });
+    sfnZeilen.push({
       kategorie: "zuschlag_frei",
       bezeichnung: `SFN-Zuschläge (${args.mode})`,
-      betragCent: chosen.zuschlagCents,
-    },
+      betragCent: 0,
+    });
+  }
+
+  const zeilen: Entgeltzeile[] = [
+    ...zeitlohnZeilen,
+    ...sfnZeilen,
     ...fixedZeilen,
     ...ukZeilen,
     ...recurringZeilen,

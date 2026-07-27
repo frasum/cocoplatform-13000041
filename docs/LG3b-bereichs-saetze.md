@@ -25,7 +25,7 @@ Aufbauend auf **PB2** (Anker 708e4906, 1924 Tests). Keine Migration, keine SQL.
 ## Lohnart-Zuordnung (Lohnbüro 27.07., LAM-Juli-Abrechnung als Referenz)
 
 | Bereich | edlohn-Lohnart |
-|---------|----------------|
+| ------- | -------------- |
 | Service | Zeitlohn       |
 | GL      | Zeitlohn 2     |
 | Küche   | Zeitlohn 3     |

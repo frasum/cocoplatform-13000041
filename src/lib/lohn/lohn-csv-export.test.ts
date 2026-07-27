@@ -127,8 +127,6 @@ describe("buildUebersichtCsv", () => {
     const line = csv.split("\r\n")[2];
     // Name enthält ";", muss in Anführungszeichen
     expect(line.startsWith('7;"Schmid; Max";')).toBe(true);
-    // Messspalten jetzt "0" statt leer
-    const row = line.split(";");
     // Achtung: name ist gequotet und enthält ein ";" → splittet in zwei Felder.
     // Wir prüfen daher explizit auf die Zero-Sequenz nach dem Namen. Die drei
     // `zeitlohn_<dept>_satz_cent`-Felder sind bei Fehlerzeilen leer (satz aus

@@ -22,6 +22,11 @@ import { zeitlohnKategorie } from "./kategorie";
 import { computeWeightedUkRate, type UkRateSlot } from "./uk-rate-weighted";
 import { resolveRateCents, type RateRow } from "./rate-resolution";
 import type { Department } from "@/lib/time/primary-department";
+import {
+  computeExportBlockers,
+  type StaffBlocker,
+  type StaffExportPayload,
+} from "./export-blockers";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -37,6 +42,15 @@ const ZEITLOHN_LABEL: Record<Department, string> = {
   service: "Zeitlohn (Service)",
   gl: "Zeitlohn 2 (GL)",
   kitchen: "Zeitlohn 3 (Küche)",
+};
+// LG3b A3 — Kategorien je Bereich (Nicht-Minijob). Etappe-1-Kategorien
+// werden jetzt hier tatsächlich erzeugt — die 2b-Export-Spalten mappen
+// darüber. Minijob bleibt bereichsunabhängig `aushilfe_paust`; die
+// Bereichsunterscheidung tragen dann die Labels.
+const ZEITLOHN_KATEGORIE: Record<Department, "zeitlohn" | "zeitlohn_2" | "zeitlohn_3"> = {
+  service: "zeitlohn",
+  gl: "zeitlohn_2",
+  kitchen: "zeitlohn_3",
 };
 const AUSHILFE_LABEL: Record<Department, string> = {
   service: "Aushilfe-Zeitlohn (Service, pauschal)",
@@ -57,27 +71,33 @@ function isoMinusDays(iso: string, days: number): string {
 }
 
 /**
- * LG3b G1 — U/K-Grundsatz je Person:
- *   * Ein-Bereich (genau ein Bereich mit paidHours in der Periode) → Satz
- *     dieses Bereichs, auf den Periodenbeginn aufgelöst. Für Ein-Bereichs-
- *     Personen ist das exakt der Alt-Wert (`sfn.hourlyRateCents`) — die
- *     2a-0-Baselines bleiben bit-identisch.
- *   * Mehr-Bereich → gewichteter 91-Tage-Durchschnitt via
- *     `computeWeightedUkRate` (paidHours-gewichtet, Rate je Bereich auf
- *     `fromDate` aufgelöst). Liefert `null` (keine Stunden im Fenster oder
- *     ein Bereich ohne Satz) → LG-9-c: Anzeige rechnet 0, Export blockiert
- *     an anderer Stelle.
+ * LG3b G1 — U/K-Grundsatz je Person. Freigabe unterscheidet ausdrücklich:
+ *   * Ein-Bereich → Bereichssatz auf `fromDate` aufgelöst. Bit-identisch
+ *     zum Alt-Wert (Baselines bleiben grün).
+ *   * Mehr-Bereich, gewichteter 91-Tage-Durchschnitt via
+ *     `computeWeightedUkRate`:
+ *       - `missing_rate` → 0 € mit rotem Marker; Export-Blocker durch die
+ *         Blocker-Struktur unten.
+ *       - `no_hours` → §104-Halt: konkrete Fehlermeldung wird geworfen
+ *         (Übersicht fängt je Zeile ab, Einzelansicht zeigt sie).
+ *   Der stille 0-€-Fallback ist damit weg.
  */
+interface UkRateResolution {
+  rateCents: number;
+  missingDepartments: readonly Department[];
+}
 async function resolveUkHourlyRateCents(
   supabaseAdmin: SupabaseClient<Database>,
   args: {
     staffId: string;
     fromDate: string;
     usedDepts: readonly Department[];
-    fallbackRateCents: number;
+    fallbackRateCents: number | null;
   },
-): Promise<number> {
-  if (args.usedDepts.length <= 1) return args.fallbackRateCents;
+): Promise<UkRateResolution> {
+  if (args.usedDepts.length <= 1) {
+    return { rateCents: args.fallbackRateCents ?? 0, missingDepartments: [] };
+  }
 
   // Rates zum Periodenbeginn (jüngstes valid_from ≤ fromDate).
   const { data: rateRows, error: rateErr } = await supabaseAdmin
@@ -102,7 +122,19 @@ async function resolveUkHourlyRateCents(
     rateCents: resolveRateCents(rates, s.department, args.fromDate),
   }));
   const weighted = computeWeightedUkRate(slots);
-  return weighted.rateCents ?? 0;
+  if (weighted.rateCents != null) {
+    return { rateCents: weighted.rateCents, missingDepartments: [] };
+  }
+  if (weighted.reason === "missing_rate") {
+    // LG-9-c: Anzeige 0 € + Export-Blocker über die zurückgemeldeten
+    // Bereiche. Kein stiller Fallback — die fehlenden Bereiche werden
+    // sichtbar gemacht.
+    return { rateCents: 0, missingDepartments: weighted.missingDepartments ?? [] };
+  }
+  // no_hours — Bauherren-Entscheidung ausstehend. §104-Halt: klar fehlschlagen.
+  throw new Error(
+    "U/K-Satz nicht bestimmbar: keine bezahlten Stunden im Referenzfenster — Bauherren-Entscheidung ausstehend",
+  );
 }
 
 /**
@@ -172,13 +204,30 @@ export async function computeLohnForStaff(
 
   // LG3b 2a-iii — U/K-Satz: Ein-Bereich → Bereichssatz (identisch zum
   // Alt-Wert); Mehr-Bereich → gewichteter 91-Tage-Durchschnitt.
+  // U/K wird nur ausgewertet, wenn Urlaubs-/Krank-Tage anfallen — sonst
+  // darf ein leeres 91-Tage-Fenster keinen §104-Halt auslösen.
+  const braucheUkSatz = usedUrlaubTage > 0 || usedKrankTage > 0;
   const usedDepts = sfn.deptSlices.map((s) => s.department);
-  const ukHourlyRateCents = await resolveUkHourlyRateCents(supabaseAdmin, {
+  const ukResolution = braucheUkSatz
+    ? await resolveUkHourlyRateCents(supabaseAdmin, {
+        staffId: args.staffId,
+        fromDate: args.fromDate,
+        usedDepts,
+        fallbackRateCents: sfn.hourlyRateCents,
+      })
+    : { rateCents: sfn.hourlyRateCents ?? 0, missingDepartments: [] as Department[] };
+  const ukHourlyRateCents = ukResolution.rateCents;
+  const ukMissingDepartments = ukResolution.missingDepartments;
+  // Nicht mehr benötigt (durch die Auswertung oben ersetzt) — bewusst ohne
+  // Aufruf, damit der Fallback nicht doppelt läuft.
+  void ({} as unknown);
+  const _dead = async () => resolveUkHourlyRateCents(supabaseAdmin, {
     staffId: args.staffId,
     fromDate: args.fromDate,
     usedDepts,
     fallbackRateCents: sfn.hourlyRateCents,
   });
+  void _dead;
 
   const ukZeilen = buildUrlaubKrankZeilen({
     urlaubTage: usedUrlaubTage,

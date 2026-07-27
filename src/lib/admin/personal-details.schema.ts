@@ -115,6 +115,14 @@ export const personalDetailsSchema = z.object({
 export type PersonalDetailsInput = z.input<typeof personalDetailsSchema>;
 export type PersonalDetailsFields = z.output<typeof personalDetailsSchema>;
 
+/**
+ * Sparse-Patch-Variante: validiert nur die tatsächlich mitgeschickten Felder.
+ * Ausgelassene Felder bleiben ausgelassen (kein Auto-Fill mit null), damit
+ * `upsert` bestehende DB-Werte NICHT auf null überschreibt.
+ */
+export const personalDetailsPatchSchema = personalDetailsSchema.partial().strict();
+export type PersonalDetailsPatch = z.output<typeof personalDetailsPatchSchema>;
+
 const SENSITIVE_KEYS = new Set<string>(SENSITIVE_FIELDS);
 
 /** Erzeugt eine audit-taugliche Liste der geänderten Feldnamen.

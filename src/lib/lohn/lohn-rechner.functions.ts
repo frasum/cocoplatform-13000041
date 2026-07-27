@@ -340,7 +340,7 @@ export async function computeLohnForStaff(
       department: s.department,
       paidHoursUnrounded: s.paidHours,
       rateCents: s.rateCents,
-      // LG3b 2b — SFN je Bereich für den Übersichts-Export (A7).
+      // LG3b 2b — SFN je Bereich für den Übersichts-Export.
       zuschlagCents: (args.mode === "extended" ? s.extended : s.simple).zuschlagCents,
     })),
     ukMissingDepartments,
@@ -462,12 +462,15 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
       krankTageEst: number | null;
       avgStdTag: number | null;
       avgSfnTagCent: number | null;
-      // LG3b 2b (A7) — Lohnart-Split (Bereichszeitlohn/SFN je Bereich).
+      // LG3b 2b — Lohnart-Split (Bereichszeitlohn/SFN je Bereich).
       zeitlohnServiceHours: number | null;
+      zeitlohnServiceSatzCent: number | null;
       zeitlohnServiceCent: number | null;
       zeitlohnGlHours: number | null;
+      zeitlohnGlSatzCent: number | null;
       zeitlohnGlCent: number | null;
       zeitlohnKitchenHours: number | null;
+      zeitlohnKitchenSatzCent: number | null;
       zeitlohnKitchenCent: number | null;
       sfnServiceCent: number | null;
       sfnGlCent: number | null;
@@ -501,7 +504,7 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
         });
         const sumCat = (cat: string) =>
           r.zeilen.filter((z) => z.kategorie === cat).reduce((sum, z) => sum + z.betragCent, 0);
-        // LG3b 2b — Lohnart-Split (A7) je Bereich aus `deptBuckets`.
+        // LG3b 2b — Lohnart-Split je Bereich aus `deptBuckets`.
         const bucketOf = (dept: "service" | "gl" | "kitchen") =>
           r.deptBuckets.find((b) => b.department === dept);
         const zeitlohnCent = (dept: "service" | "gl" | "kitchen") => {
@@ -509,6 +512,8 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           if (!b) return 0;
           return Math.round(b.paidHoursUnrounded * (b.rateCents ?? 0));
         };
+        const satzCent = (dept: "service" | "gl" | "kitchen") =>
+          bucketOf(dept)?.rateCents ?? null;
         const roundH = (h: number) => Math.round(h * 100) / 100;
         rows.push({
           staffId: s.id as string,
@@ -541,10 +546,13 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           avgStdTag: r.diagnose.avgStdTag,
           avgSfnTagCent: r.diagnose.avgSfnTagCent,
           zeitlohnServiceHours: roundH(bucketOf("service")?.paidHoursUnrounded ?? 0),
+          zeitlohnServiceSatzCent: satzCent("service"),
           zeitlohnServiceCent: zeitlohnCent("service"),
           zeitlohnGlHours: roundH(bucketOf("gl")?.paidHoursUnrounded ?? 0),
+          zeitlohnGlSatzCent: satzCent("gl"),
           zeitlohnGlCent: zeitlohnCent("gl"),
           zeitlohnKitchenHours: roundH(bucketOf("kitchen")?.paidHoursUnrounded ?? 0),
+          zeitlohnKitchenSatzCent: satzCent("kitchen"),
           zeitlohnKitchenCent: zeitlohnCent("kitchen"),
           sfnServiceCent: bucketOf("service")?.zuschlagCents ?? 0,
           sfnGlCent: bucketOf("gl")?.zuschlagCents ?? 0,
@@ -584,10 +592,13 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           avgStdTag: null,
           avgSfnTagCent: null,
           zeitlohnServiceHours: null,
+          zeitlohnServiceSatzCent: null,
           zeitlohnServiceCent: null,
           zeitlohnGlHours: null,
+          zeitlohnGlSatzCent: null,
           zeitlohnGlCent: null,
           zeitlohnKitchenHours: null,
+          zeitlohnKitchenSatzCent: null,
           zeitlohnKitchenCent: null,
           sfnServiceCent: null,
           sfnGlCent: null,

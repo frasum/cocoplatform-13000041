@@ -6,6 +6,7 @@ import type { Entgeltzeile, LohnErgebnis, PersonenParameter } from "./types";
 import type { SfnGeldErgebnis } from "./sfn-geld/types";
 import { isZeitlohnKategorie } from "./kategorie";
 import { downloadBlob as downloadBrowserBlob } from "@/lib/time/weekly-export";
+import { LohnExportBlockedError, type StaffBlocker } from "./export-blockers";
 
 export interface LohnExportInput {
   staffLabel: string;
@@ -20,6 +21,12 @@ export interface LohnExportInput {
   person: PersonenParameter;
   zeilen: Entgeltzeile[];
   ergebnis: LohnErgebnis;
+  /**
+   * LG3b A4 — Export-Gate. Ist die Liste nicht leer, wirft `buildLohnXlsx`
+   * `LohnExportBlockedError` vor dem Erzeugen der Mappe. Panel prüft für die
+   * ausgewählte Person; Übersichts-Gate sitzt in `buildUebersichtCsv`.
+   */
+  blockers?: readonly StaffBlocker[];
 }
 
 const EUR = '#,##0.00\\ "€";[Red]-#,##0.00\\ "€"';
@@ -52,6 +59,9 @@ function sectionHeader(sheet: ExcelJS.Worksheet, row: number, title: string) {
 }
 
 export async function buildLohnXlsx(d: LohnExportInput): Promise<Blob> {
+  if (d.blockers && d.blockers.length > 0) {
+    throw new LohnExportBlockedError(d.blockers);
+  }
   const ExcelJSRuntime = (await import("exceljs")).default;
   const wb = new ExcelJSRuntime.Workbook();
   wb.creator = "COCO";
@@ -93,6 +103,20 @@ export async function buildLohnXlsx(d: LohnExportInput): Promise<Blob> {
   setKv(s, r++, "Feiertag", d.buckets.holidayHours, HRS);
   setKv(s, r++, "Feiertag 150 %", d.buckets.holiday150Hours, HRS);
   r++;
+
+  // LG3b 2b (A7) — Lohnart-Split je Bereich, direkt aus den A3-Entgeltzeilen.
+  // Zeigt für Mehr-Bereichs-Personen alle Zeitlohn-Zeilen einzeln;
+  // Ein-Bereichs-Personen erhalten wie bisher eine Zeile.
+  const zeitlohnZeilen = d.zeilen.filter((z) =>
+    isZeitlohnKategorie(z.kategorie, d.person.beschaeftigung),
+  );
+  if (zeitlohnZeilen.length > 0) {
+    sectionHeader(s, r++, "Lohnart-Split (Bereich)");
+    for (const z of zeitlohnZeilen) {
+      setKv(s, r++, z.bezeichnung ?? z.kategorie, z.betragCent / 100, EUR);
+    }
+    r++;
+  }
 
   sectionHeader(s, r++, "Personenparameter");
   setKv(s, r++, "Steuerklasse", d.person.steuerklasse);

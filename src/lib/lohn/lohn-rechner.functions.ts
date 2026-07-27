@@ -340,6 +340,8 @@ export async function computeLohnForStaff(
       department: s.department,
       paidHoursUnrounded: s.paidHours,
       rateCents: s.rateCents,
+      // LG3b 2b — SFN je Bereich für den Übersichts-Export (A7).
+      zuschlagCents: (args.mode === "extended" ? s.extended : s.simple).zuschlagCents,
     })),
     ukMissingDepartments,
   };
@@ -460,6 +462,17 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
       krankTageEst: number | null;
       avgStdTag: number | null;
       avgSfnTagCent: number | null;
+      // LG3b 2b (A7) — Lohnart-Split (Bereichszeitlohn/SFN je Bereich).
+      zeitlohnServiceHours: number | null;
+      zeitlohnServiceCent: number | null;
+      zeitlohnGlHours: number | null;
+      zeitlohnGlCent: number | null;
+      zeitlohnKitchenHours: number | null;
+      zeitlohnKitchenCent: number | null;
+      sfnServiceCent: number | null;
+      sfnGlCent: number | null;
+      sfnKitchenCent: number | null;
+      unresolvedHours: number | null;
       error: string | null;
     };
     const rows: Row[] = [];
@@ -488,6 +501,15 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
         });
         const sumCat = (cat: string) =>
           r.zeilen.filter((z) => z.kategorie === cat).reduce((sum, z) => sum + z.betragCent, 0);
+        // LG3b 2b — Lohnart-Split (A7) je Bereich aus `deptBuckets`.
+        const bucketOf = (dept: "service" | "gl" | "kitchen") =>
+          r.deptBuckets.find((b) => b.department === dept);
+        const zeitlohnCent = (dept: "service" | "gl" | "kitchen") => {
+          const b = bucketOf(dept);
+          if (!b) return 0;
+          return Math.round(b.paidHoursUnrounded * (b.rateCents ?? 0));
+        };
+        const roundH = (h: number) => Math.round(h * 100) / 100;
         rows.push({
           staffId: s.id as string,
           persoNr,
@@ -518,6 +540,16 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           krankTageEst: r.diagnose.krankTage,
           avgStdTag: r.diagnose.avgStdTag,
           avgSfnTagCent: r.diagnose.avgSfnTagCent,
+          zeitlohnServiceHours: roundH(bucketOf("service")?.paidHoursUnrounded ?? 0),
+          zeitlohnServiceCent: zeitlohnCent("service"),
+          zeitlohnGlHours: roundH(bucketOf("gl")?.paidHoursUnrounded ?? 0),
+          zeitlohnGlCent: zeitlohnCent("gl"),
+          zeitlohnKitchenHours: roundH(bucketOf("kitchen")?.paidHoursUnrounded ?? 0),
+          zeitlohnKitchenCent: zeitlohnCent("kitchen"),
+          sfnServiceCent: bucketOf("service")?.zuschlagCents ?? 0,
+          sfnGlCent: bucketOf("gl")?.zuschlagCents ?? 0,
+          sfnKitchenCent: bucketOf("kitchen")?.zuschlagCents ?? 0,
+          unresolvedHours: roundH(r.unresolvedHoursUnrounded),
           error: null,
         });
       } catch (e) {
@@ -551,6 +583,16 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           krankTageEst: null,
           avgStdTag: null,
           avgSfnTagCent: null,
+          zeitlohnServiceHours: null,
+          zeitlohnServiceCent: null,
+          zeitlohnGlHours: null,
+          zeitlohnGlCent: null,
+          zeitlohnKitchenHours: null,
+          zeitlohnKitchenCent: null,
+          sfnServiceCent: null,
+          sfnGlCent: null,
+          sfnKitchenCent: null,
+          unresolvedHours: null,
           error: e instanceof Error ? e.message : "Berechnung fehlgeschlagen",
         });
       }

@@ -33,6 +33,7 @@ import {
 } from "@/lib/lohn/lohn-rechner.functions";
 import { buildLohnFileName, buildLohnXlsx, downloadBlob } from "@/lib/lohn/lohn-excel-export";
 import { buildUebersichtCsv } from "@/lib/lohn/lohn-csv-export";
+import { LohnExportBlockedError, type StaffBlocker } from "@/lib/lohn/export-blockers";
 import { FileSpreadsheet, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -143,15 +144,24 @@ export function LohnrechnerPanel() {
       toast.error("Keine Daten zum Exportieren.");
       return;
     }
-    const csv = buildUebersichtCsv(rows, { periodLabel, mode });
-    const safeLabel = periodLabel.replace(/[\\/]/g, "-").replace(/\s+/g, "_");
-    const filename = `lohn-uebersicht_${safeLabel}_${mode}.csv`;
-    downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), filename);
+    try {
+      const csv = buildUebersichtCsv(rows, { periodLabel, mode }, blockers);
+      const safeLabel = periodLabel.replace(/[\\/]/g, "-").replace(/\s+/g, "_");
+      const filename = `lohn-uebersicht_${safeLabel}_${mode}.csv`;
+      downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), filename);
+    } catch (e) {
+      if (e instanceof LohnExportBlockedError) {
+        toast.error(`Export blockiert für ${e.blockers.length} Person(en). Bitte oben prüfen.`);
+        return;
+      }
+      toast.error(e instanceof Error ? e.message : "CSV-Export fehlgeschlagen.");
+    }
   }
 
   async function handleExport() {
     if (!result) return;
     try {
+      const staffBlockers = blockers.filter((b) => b.staffId === staffId);
       const blob = await buildLohnXlsx({
         staffLabel: selectedStaffLabel,
         fromDate,
@@ -165,12 +175,20 @@ export function LohnrechnerPanel() {
         person: result.person,
         zeilen: result.zeilen,
         ergebnis: result.ergebnis,
+        blockers: staffBlockers,
       });
       downloadBlob(blob, buildLohnFileName(selectedStaffLabel, fromDate, toDate));
     } catch (e) {
+      if (e instanceof LohnExportBlockedError) {
+        toast.error("Excel-Export blockiert: Person unvollständig gepflegt (siehe Banner).");
+        return;
+      }
       toast.error(e instanceof Error ? e.message : "Excel-Export fehlgeschlagen.");
     }
   }
+
+  const blockers: StaffBlocker[] = uebersichtQ.data?.blockers ?? [];
+  const exportBlocked = blockers.length > 0;
 
   return (
     <div className="space-y-6">
@@ -183,6 +201,8 @@ export function LohnrechnerPanel() {
           gegen edlohn.
         </p>
       </div>
+
+      {exportBlocked && <BlockerBanner blockers={blockers} />}
 
       <Card className="space-y-4 p-4">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -228,7 +248,8 @@ export function LohnrechnerPanel() {
             variant="outline"
             size="sm"
             onClick={handleCsvExport}
-            disabled={uebersichtQ.isLoading || !uebersichtQ.data?.rows.length}
+            disabled={uebersichtQ.isLoading || !uebersichtQ.data?.rows.length || exportBlocked}
+            title={exportBlocked ? "Export blockiert — bitte Banner oben prüfen." : undefined}
           >
             <Download className="mr-2 h-4 w-4" />
             CSV exportieren
@@ -322,7 +343,16 @@ export function LohnrechnerPanel() {
       {result && (
         <div className="space-y-6">
           <div className="flex justify-end">
-            <Button variant="outline" onClick={handleExport}>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={blockers.some((b) => b.staffId === staffId)}
+              title={
+                blockers.some((b) => b.staffId === staffId)
+                  ? "Excel-Export blockiert — bitte Banner oben prüfen."
+                  : undefined
+              }
+            >
               <FileSpreadsheet className="mr-2 h-4 w-4" />
               Excel exportieren
             </Button>
@@ -433,5 +463,52 @@ function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
       <span className="text-muted-foreground">{k}</span>
       <span className={"tabular-nums " + (strong ? "font-semibold text-foreground" : "")}>{v}</span>
     </div>
+  );
+}
+
+/**
+ * LG3b A4 — Blocker-Banner. Zeigt fehlende Personalnummern, Bereichs-Sätze
+ * und unresolved WZ2-Attributionen; keine Rechenwirkung, nur Anzeige.
+ */
+function BlockerBanner({ blockers }: { blockers: StaffBlocker[] }) {
+  const REASON_LABEL: Record<string, string> = {
+    missing_perso_nr: "Personalnummer fehlt",
+    missing_rate: "Stundensatz fehlt",
+    unresolved_department: "Bereich nicht zuordenbar",
+  };
+  const DEPT_LABEL: Record<string, string> = {
+    service: "Service",
+    gl: "GL",
+    kitchen: "Küche",
+  };
+  return (
+    <Card className="border-destructive/40 bg-destructive/5 p-4">
+      <h2 className="mb-2 text-sm font-semibold text-destructive">
+        Export blockiert — {blockers.length} Person(en) unvollständig gepflegt
+      </h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Keine Teil-Exporte. Bitte die genannten Punkte in den Stammdaten korrigieren; anschließend
+        wird der Export automatisch freigegeben.
+      </p>
+      <ul className="space-y-1 text-sm">
+        {blockers.map((b) => (
+          <li key={b.staffId}>
+            <span className="font-medium">{b.staffLabel}</span>
+            <span className="text-muted-foreground">
+              {" — "}
+              {b.reasons
+                .map((r) => {
+                  const base = REASON_LABEL[r.reason] ?? r.reason;
+                  if (r.reason === "missing_rate" && r.department) {
+                    return `${base} (${DEPT_LABEL[r.department] ?? r.department})`;
+                  }
+                  return base;
+                })
+                .join(", ")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }

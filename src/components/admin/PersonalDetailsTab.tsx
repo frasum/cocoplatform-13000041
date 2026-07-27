@@ -464,6 +464,9 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
                 city={form.city}
               />
             )}
+            {"note" in sec && sec.note && (
+              <p className="pt-1 text-xs text-muted-foreground">{sec.note}</p>
+            )}
           </div>
           {sec.title === "Beschäftigung & Urlaub" && vacEditing && (
             <div className="space-y-2 pt-1">

@@ -185,12 +185,20 @@ export const getProvisionOverview = createServerFn({ method: "POST" })
         );
         let mins = 0;
         for (const e of filtered) {
-          const net = entryNetMinutes({
-            businessDate: e.business_date as string,
-            startedAt: e.started_at as string,
-            endedAt: (e.ended_at as string | null) ?? null,
-            breakMinutes: (e.break_minutes as number | null) ?? 0,
-          });
+          // PB2 — Verhaltens-Einfrierung: Provision rechnet unabhängig vom
+          // Org-Schalter `pausen_bezahlt` weiterhin mit Netto-Minuten
+          // (`pausenBezahlt = false` explizit). Ob Provisions-/Trinkgeldstunden
+          // dem Pausen-Schalter folgen sollen, ist eine offene Bauherren-Frage
+          // — keine steuerliche Notwendigkeit. Bei Änderung: PB2-Doku aktualisieren.
+          const net = entryNetMinutes(
+            {
+              businessDate: e.business_date as string,
+              startedAt: e.started_at as string,
+              endedAt: (e.ended_at as string | null) ?? null,
+              breakMinutes: (e.break_minutes as number | null) ?? 0,
+            },
+            false,
+          );
           if (net !== null) mins += net;
         }
         minutesByStaff.set(sid, mins);

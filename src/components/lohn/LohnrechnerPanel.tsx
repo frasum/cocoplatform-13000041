@@ -465,3 +465,50 @@ function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
     </div>
   );
 }
+
+/**
+ * LG3b A4 — Blocker-Banner. Zeigt fehlende Personalnummern, Bereichs-Sätze
+ * und unresolved WZ2-Attributionen; keine Rechenwirkung, nur Anzeige.
+ */
+function BlockerBanner({ blockers }: { blockers: StaffBlocker[] }) {
+  const REASON_LABEL: Record<string, string> = {
+    missing_perso_nr: "Personalnummer fehlt",
+    missing_rate: "Stundensatz fehlt",
+    unresolved_department: "Bereich nicht zuordenbar",
+  };
+  const DEPT_LABEL: Record<string, string> = {
+    service: "Service",
+    gl: "GL",
+    kitchen: "Küche",
+  };
+  return (
+    <Card className="border-destructive/40 bg-destructive/5 p-4">
+      <h2 className="mb-2 text-sm font-semibold text-destructive">
+        Export blockiert — {blockers.length} Person(en) unvollständig gepflegt
+      </h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Keine Teil-Exporte. Bitte die genannten Punkte in den Stammdaten
+        korrigieren; anschließend wird der Export automatisch freigegeben.
+      </p>
+      <ul className="space-y-1 text-sm">
+        {blockers.map((b) => (
+          <li key={b.staffId}>
+            <span className="font-medium">{b.staffLabel}</span>
+            <span className="text-muted-foreground">
+              {" — "}
+              {b.reasons
+                .map((r) => {
+                  const base = REASON_LABEL[r.reason] ?? r.reason;
+                  if (r.reason === "missing_rate" && r.department) {
+                    return `${base} (${DEPT_LABEL[r.department] ?? r.department})`;
+                  }
+                  return base;
+                })
+                .join(", ")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}

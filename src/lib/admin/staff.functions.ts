@@ -539,3 +539,62 @@ export const setStaffParticipatesInPool = createServerFn({ method: "POST" })
       };
     });
   });
+
+// Personalnummer manuell setzen/entfernen. Admin- und payroll-only; PII-nah
+// über payroll bereits abgedeckt (Import läuft dort). Uniqueness wird
+// weich pro Organisation geprüft (kein DB-Unique — Historie kann Kollisionen
+// enthalten, die wir hier nicht stillschweigend erzwingen).
+export const setStaffPersoNr = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        staffId: z.string().uuid(),
+        persoNr: z.number().int().positive().max(2_147_483_647).nullable(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]);
+    return runAllowed(caller.role, ["admin", "payroll"], makeAuditWriter(caller), async () => {
+      await assertStaffInOrg(data.staffId, caller.organizationId);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      if (data.persoNr !== null) {
+        // Weiche Eindeutigkeitsprüfung pro Organisation.
+        const conflict = expectOk<{ id: string; display_name: string }[]>(
+          await supabaseAdmin
+            .from("staff")
+            .select("id, display_name")
+            .eq("organization_id", caller.organizationId)
+            .eq("perso_nr", data.persoNr)
+            .neq("id", data.staffId)
+            .limit(1),
+          "setStaffPersoNr.conflict",
+        );
+        if (conflict && conflict.length > 0) {
+          throw new Error(
+            `Personalnummer ${data.persoNr} ist bereits vergeben (${conflict[0].display_name}).`,
+          );
+        }
+      }
+
+      expectVoid(
+        await supabaseAdmin
+          .from("staff")
+          .update({ perso_nr: data.persoNr })
+          .eq("id", data.staffId)
+          .eq("organization_id", caller.organizationId),
+        "setStaffPersoNr",
+      );
+      return {
+        result: { ok: true as const },
+        audit: {
+          action: "staff.set_perso_nr",
+          entity: "staff",
+          entityId: data.staffId,
+          meta: { persoNr: data.persoNr },
+        },
+      };
+    });
+  });

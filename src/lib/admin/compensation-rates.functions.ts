@@ -44,7 +44,12 @@ export const listStaffCompensationRates = createServerFn({ method: "GET" })
     const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const rows = expectOk<
-      Array<{ id: string; department: StaffDepartment; hourly_rate: number | string; valid_from: string }>
+      Array<{
+        id: string;
+        department: StaffDepartment;
+        hourly_rate: number | string;
+        valid_from: string;
+      }>
     >(
       await supabaseAdmin
         .from("staff_compensation_rates")
@@ -117,9 +122,7 @@ export const upsertStaffCompensationRate = createServerFn({ method: "POST" })
         const today = todayIso();
         const validFrom = data.validFrom ?? today;
         if (!isValidFromAllowed(validFrom, today)) {
-          throw new Error(
-            `Rückwirkung nur bis Periodenbeginn (${periodStart(today)}) erlaubt.`,
-          );
+          throw new Error(`Rückwirkung nur bis Periodenbeginn (${periodStart(today)}) erlaubt.`);
         }
 
         if (data.id) {

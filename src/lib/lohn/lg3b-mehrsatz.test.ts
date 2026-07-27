@@ -365,8 +365,8 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     // A2 — zwei SFN-Zeilen (je Bereich), beide mit Betrag > 0
     // (GL: Nacht25/40 + Sonntag zu 2200 c; Service: Nacht25/40 zu 1600 c).
     const sfnRows = r.zeilen.filter((z) => z.kategorie === "zuschlag_frei");
-    const sfnGl = sfnRows.find((z) => (z.bezeichnung ?? "").includes("(GL)"));
-    const sfnSv = sfnRows.find((z) => (z.bezeichnung ?? "").includes("(Service)"));
+    const sfnGl = sfnRows.find((z) => (z.bezeichnung ?? "").includes("SFN-Zuschläge GL"));
+    const sfnSv = sfnRows.find((z) => (z.bezeichnung ?? "").includes("SFN-Zuschläge Service"));
     expect(sfnGl).toBeDefined();
     expect(sfnSv).toBeDefined();
     expect(sfnGl!.betragCent).toBeGreaterThan(0);

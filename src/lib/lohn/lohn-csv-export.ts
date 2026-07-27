@@ -8,6 +8,10 @@
 //     bilden die Lohnart-Aufteilung (Service→Zeitlohn, GL→Zeitlohn 2,
 //     Küche→Zeitlohn 3) direkt in den Export ab, ohne die Anzeige zu
 //     verändern (A4 — Gate/Spalten sitzen in den Build-Funktionen).
+//   * Zusätzlich `zeitlohn_<bereich>_satz_cent`: der Bereichssatz aus
+//     `bucket.rateCents` (leer, wenn kein Satz gepflegt). Das Lohnbüro
+//     spielt in edlohn *Stunden + Satz* ein; der Betrag ist ableitbar,
+//     der Satz nicht (0-€-Zeilen ohne Satz).
 //   * `unresolved_std` weist A5-Stunden (Bereich nicht zuordenbar) aus.
 //   * Wird die Funktion mit einer nicht-leeren `blockers`-Liste gerufen,
 //     wirft sie `LohnExportBlockedError` — keine Teil-Exporte
@@ -44,13 +48,18 @@ export type UebersichtCsvRow = {
   krankTageEst: number | null;
   avgStdTag: number | null;
   avgSfnTagCent: number | null;
-  // LG3b 2b — Lohnart-Split (A7). Alle Werte in Cent bzw. Dezimal-Stunden.
+  // LG3b 2b — Lohnart-Split je Bereich. Alle Werte in Cent bzw. Dezimal-
+  // Stunden. `zeitlohn<Dept>SatzCent` ist der zum Zeitpunkt der Berechnung
+  // aufgelöste Bereichssatz (null → CSV-Feld bleibt leer).
   // `null` nur bei Fehlerzeilen; sonst 0 wenn Bereich in der Periode ungenutzt.
   zeitlohnServiceHours: number | null;
+  zeitlohnServiceSatzCent: number | null;
   zeitlohnServiceCent: number | null;
   zeitlohnGlHours: number | null;
+  zeitlohnGlSatzCent: number | null;
   zeitlohnGlCent: number | null;
   zeitlohnKitchenHours: number | null;
+  zeitlohnKitchenSatzCent: number | null;
   zeitlohnKitchenCent: number | null;
   sfnServiceCent: number | null;
   sfnGlCent: number | null;
@@ -92,12 +101,15 @@ const HEADERS = [
   "krank_tage_est",
   "avg_std_tag",
   "avg_sfn_tag_cent",
-  // LG3b 2b — A7-Labels (Lohnart-Split je Bereich).
+  // LG3b 2b — Lohnart-Split je Bereich (Stunden, Satz, Betrag) + SFN je Bereich.
   "zeitlohn_service_std",
+  "zeitlohn_service_satz_cent",
   "zeitlohn_service_cent",
   "zeitlohn_gl_std",
+  "zeitlohn_gl_satz_cent",
   "zeitlohn_gl_cent",
   "zeitlohn_kitchen_std",
+  "zeitlohn_kitchen_satz_cent",
   "zeitlohn_kitchen_cent",
   "sfn_service_cent",
   "sfn_gl_cent",
@@ -170,10 +182,13 @@ export function buildUebersichtCsv(
       fmtHoursZero(r.avgStdTag),
       fmtIntZero(r.avgSfnTagCent),
       fmtHoursZero(r.zeitlohnServiceHours),
+      fmtInt(r.zeitlohnServiceSatzCent),
       fmtIntZero(r.zeitlohnServiceCent),
       fmtHoursZero(r.zeitlohnGlHours),
+      fmtInt(r.zeitlohnGlSatzCent),
       fmtIntZero(r.zeitlohnGlCent),
       fmtHoursZero(r.zeitlohnKitchenHours),
+      fmtInt(r.zeitlohnKitchenSatzCent),
       fmtIntZero(r.zeitlohnKitchenCent),
       fmtIntZero(r.sfnServiceCent),
       fmtIntZero(r.sfnGlCent),

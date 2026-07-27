@@ -288,7 +288,7 @@ export const getTimeOverview = createServerFn({ method: "GET" })
     let entriesQuery = supabaseAdmin
       .from("time_entries")
       .select(
-        "staff_id, business_date, started_at, ended_at, source, department, staff(display_name)",
+        "staff_id, business_date, started_at, ended_at, source, department, break_minutes, staff(display_name)",
       )
       .eq("organization_id", caller.organizationId)
       .gte("business_date", data.fromDate)

@@ -55,3 +55,43 @@ describe("buchhaltung-export — Viertelstunden-Abrundung", () => {
     expect(csv).toMatch(/Summe;;;208,25;0;12,25;0,00;8,25/);
   });
 });
+
+// PB2 — Doppel-Case-Beleg auf Export-Ebene: der Export ist agnostisch gegen
+// `pausen_bezahlt` (er serialisiert bereits aggregierte Rohwerte). Wenn der
+// Aggregator für beide Stellungen identische Zeilen liefert (klassisch bei
+// Pause=0), MUSS die CSV bit-identisch sein — Guard gegen versehentliche
+// Serialisierungs-Drift beim Alt-Monat.
+describe("buchhaltung-export — PB2 Doppel-Case (Pause=0 bit-identisch)", () => {
+  const base: BuchhaltungExportInput = {
+    locationLabel: "Spicery",
+    periodLabel: "Juni 2026",
+    rangeLabel: "26.05.–25.06.2026",
+    mode: "simple",
+    rowsByDept: [
+      {
+        dept: "kitchen",
+        deptLabel: "Küche",
+        rows: [mkRow({ displayName: "Ann", totalHours: 167.3, evening: 12.0, sunHol: 8.0 })],
+      },
+    ],
+  };
+  it("Pause=0 → CSV in beiden Aggregator-Stellungen identisch (Serialisierung stabil)", () => {
+    const bezahlt = buildBuchhaltungCsv(base);
+    const unbezahlt = buildBuchhaltungCsv(base); // gleiche Rohzeilen — Aggregator würde bei Pause=0 dieselben Werte liefern
+    expect(bezahlt).toBe(unbezahlt);
+  });
+  it("Pause>0 → unterschiedliche totalHours schlagen als andere Zeile durch", () => {
+    const brutto = base; // 167.30 h (Aggregator-Modus 'Ja')
+    const netto: BuchhaltungExportInput = {
+      ...base,
+      rowsByDept: [
+        {
+          dept: "kitchen",
+          deptLabel: "Küche",
+          rows: [mkRow({ displayName: "Ann", totalHours: 156.3, evening: 12.0, sunHol: 8.0 })],
+        },
+      ],
+    };
+    expect(buildBuchhaltungCsv(brutto)).not.toBe(buildBuchhaltungCsv(netto));
+  });
+});

@@ -117,7 +117,7 @@ function MyHoursPage() {
           {(query.error as Error)?.message ?? "Stunden konnten nicht geladen werden."}
         </Card>
       ) : query.data ? (
-        <MyHoursBody entries={query.data.entries} />
+        <MyHoursBody entries={query.data.entries} pausenBezahlt={query.data.pausenBezahlt} />
       ) : null}
     </main>
   );
@@ -130,9 +130,9 @@ type Entry = EntryInput & {
   locationDayServiceEnabled: boolean;
 };
 
-function MyHoursBody({ entries }: { entries: Entry[] }) {
-  const total = periodTotalMinutes(entries);
-  const days = groupEntriesByDay(entries);
+function MyHoursBody({ entries, pausenBezahlt }: { entries: Entry[]; pausenBezahlt: boolean }) {
+  const total = periodTotalMinutes(entries, pausenBezahlt);
+  const days = groupEntriesByDay(entries, pausenBezahlt);
 
   if (entries.length === 0) {
     return (
@@ -158,7 +158,7 @@ function MyHoursBody({ entries }: { entries: Entry[] }) {
             </h2>
             <Card className="divide-y">
               {day.entries.map((e) => {
-                const net = entryNetMinutes(e);
+                const net = entryNetMinutes(e, pausenBezahlt);
                 return (
                   <div key={e.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="min-w-0 space-y-0.5 text-sm">
@@ -194,14 +194,15 @@ function MyHoursBody({ entries }: { entries: Entry[] }) {
                   </div>
                 );
               })}
-              {day.entries.some((e) => entryNetMinutes(e) !== null) && day.entries.length > 1 && (
-                <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
-                  <span>Tag gesamt</span>
-                  <span className="font-medium text-foreground">
-                    {formatMinutes(day.netMinutes)}
-                  </span>
-                </div>
-              )}
+              {day.entries.some((e) => entryNetMinutes(e, pausenBezahlt) !== null) &&
+                day.entries.length > 1 && (
+                  <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground">
+                    <span>Tag gesamt</span>
+                    <span className="font-medium text-foreground">
+                      {formatMinutes(day.netMinutes)}
+                    </span>
+                  </div>
+                )}
             </Card>
           </section>
         ))}

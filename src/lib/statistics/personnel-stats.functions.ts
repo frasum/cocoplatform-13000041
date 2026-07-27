@@ -15,6 +15,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { grossMinutesBetween } from "@/lib/time/break-rules";
+import { paidMinutes } from "@/lib/time/paid-hours";
 import { selectAllPaged } from "@/lib/supabase/select-all";
 import { computeTrend, type Trend } from "./revenue-core";
 import {
@@ -62,6 +63,17 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
     ]);
     const org = caller.organizationId;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // PB2 — Vergütungsminuten der Personalquote folgen dem Org-Schalter
+    // `pausen_bezahlt` (Default TRUE). Einmal je Request geladen; SFN-Töpfe
+    // sind hier nicht beteiligt.
+    const { data: orgSet, error: orgSetErr } = await supabaseAdmin
+      .from("organization_settings")
+      .select("pausen_bezahlt")
+      .eq("organization_id", org)
+      .maybeSingle();
+    if (orgSetErr) throw orgSetErr;
+    const pausenBezahlt = orgSet?.pausen_bezahlt ?? true;
 
     // Zeitraum + Vorperiode auflösen (identisch zu getTipStats).
     let current: Window;
@@ -123,7 +135,7 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
       for (const r of rows ?? []) {
         if (!r.ended_at || !r.started_at || !r.business_date || !r.staff_id) continue;
         const gross = grossMinutesBetween(new Date(r.started_at), new Date(r.ended_at));
-        const net = Math.max(0, gross - (r.break_minutes ?? 0));
+        const net = paidMinutes(gross, r.break_minutes ?? 0, pausenBezahlt);
         totalNetMinutes += net;
         staffIdSet.add(r.staff_id);
         if (net > 0 && (lastDataDay === null || r.business_date > lastDataDay)) {

@@ -1,11 +1,13 @@
-// Z1 — reines Modul: Netto-Minuten je Zeit-Eintrag, Gruppierung nach
+// Z1 — reines Modul: Vergütungs-Minuten je Zeit-Eintrag, Gruppierung nach
 // business_date und Periodensummen. Keine I/O, keine DB-Zugriffe.
 //
-// Netto = grossMinutesBetween(started_at, ended_at) − break_minutes,
-// identisch zur Admin-Zeitübersicht. Offene Einträge (endedAt = null)
-// haben KEINE Netto-Zeit und fließen NICHT in Tages-/Periodensummen.
+// PB2 — die Vergütungsminuten folgen dem Org-Schalter `pausenBezahlt`
+// (`paidMinutes`): Nein → grossMinutes − breakMinutes (bit-identisch zum
+// vor-PB2-Verhalten), Ja → grossMinutes. Offene Einträge (endedAt = null)
+// fließen NICHT in Tages-/Periodensummen.
 
 import { grossMinutesBetween } from "./break-rules";
+import { paidMinutes } from "./paid-hours";
 
 export type EntryInput = {
   businessDate: string;
@@ -14,11 +16,10 @@ export type EntryInput = {
   breakMinutes: number;
 };
 
-export function entryNetMinutes(e: EntryInput): number | null {
+export function entryNetMinutes(e: EntryInput, pausenBezahlt: boolean = false): number | null {
   if (!e.endedAt) return null;
   const gross = grossMinutesBetween(new Date(e.startedAt), new Date(e.endedAt));
-  const net = gross - (e.breakMinutes ?? 0);
-  return net < 0 ? 0 : net;
+  return paidMinutes(gross, e.breakMinutes ?? 0, pausenBezahlt);
 }
 
 export type DayGroup<E extends EntryInput> = {
@@ -27,7 +28,10 @@ export type DayGroup<E extends EntryInput> = {
   netMinutes: number;
 };
 
-export function groupEntriesByDay<E extends EntryInput>(entries: E[]): DayGroup<E>[] {
+export function groupEntriesByDay<E extends EntryInput>(
+  entries: E[],
+  pausenBezahlt: boolean = false,
+): DayGroup<E>[] {
   const byDay = new Map<string, E[]>();
   for (const e of entries) {
     const list = byDay.get(e.businessDate);
@@ -39,17 +43,17 @@ export function groupEntriesByDay<E extends EntryInput>(entries: E[]): DayGroup<
     const dayEntries = byDay.get(businessDate)!;
     let net = 0;
     for (const e of dayEntries) {
-      const n = entryNetMinutes(e);
+      const n = entryNetMinutes(e, pausenBezahlt);
       if (n !== null) net += n;
     }
     return { businessDate, entries: dayEntries, netMinutes: net };
   });
 }
 
-export function periodTotalMinutes(entries: EntryInput[]): number {
+export function periodTotalMinutes(entries: EntryInput[], pausenBezahlt: boolean = false): number {
   let total = 0;
   for (const e of entries) {
-    const n = entryNetMinutes(e);
+    const n = entryNetMinutes(e, pausenBezahlt);
     if (n !== null) total += n;
   }
   return total;

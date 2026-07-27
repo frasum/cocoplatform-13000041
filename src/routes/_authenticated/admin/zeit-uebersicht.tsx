@@ -1068,6 +1068,7 @@ function ZeitUebersichtPage() {
     toDate,
     fullNameByStaffId,
     persoNrByStaffId,
+    pausenBezahlt,
   ]);
 
   const [exportBusy, setExportBusy] = useState<string | null>(null);

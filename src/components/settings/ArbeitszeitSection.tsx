@@ -22,6 +22,15 @@ type Props = {
   err: string | null;
   isPending: boolean;
   onChange: (next: boolean) => void;
+  /** PB2 — Vorschau der aktuellen Periode: Σ Pausenstunden + Anzahl
+   *  Mitarbeiter mit erfassten Pausen. Erscheint als Delta-Hinweis im
+   *  Bestätigungsdialog beim Umschalten. Optional — bei `null` wird die
+   *  Zeile nicht gerendert. */
+  breakSummary?: {
+    totalBreakHours: number;
+    staffCount: number;
+    periodLabel: string | null;
+  } | null;
 };
 
 export function ArbeitszeitSection({
@@ -31,6 +40,7 @@ export function ArbeitszeitSection({
   err,
   isPending,
   onChange,
+  breakSummary,
 }: Props) {
   const [pending, setPending] = useState<boolean | null>(null);
   const open = pending !== null;
@@ -79,17 +89,17 @@ export function ArbeitszeitSection({
           </p>
           <p>
             <span className="font-medium text-foreground">Gastronomie-Praxis:</span> Kein
-            einschlägiger Flächentarifvertrag mit Pausenvergütungspflicht. Üblich und rechtlich
-            sauber: „Pausen bezahlt = Nein". „Ja" ist zulässig, aber freiwillig günstiger als das
-            Gesetz verlangt.
+            einschlägiger Flächentarifvertrag mit Pausenvergütungspflicht. Beide Einstellungen sind
+            zulässig; die Wahl trifft der Arbeitgeber.
           </p>
           <p>
             <span className="font-medium text-foreground">
               Steuerlicher Hinweis (SFN, § 3b EStG):
             </span>{" "}
             SFN-Zuschläge sind nur auf tatsächlich geleistete Arbeitsstunden steuerfrei. Auf
-            bezahlte Pausenminuten entfallende Zuschlagsanteile wären streng genommen nicht §
-            3b-fähig. Details/Umsetzung folgen in PB2.
+            bezahlte Pausenminuten entfallende Zuschlagsanteile sind streng genommen nicht §
+            3b-fähig; SFN-Töpfe werden daher unabhängig vom Schalter stets aus Netto-Minuten
+            gebildet.
           </p>
           <details className="rounded-md border border-border bg-background/60 p-3">
             <summary className="cursor-pointer text-xs font-medium text-foreground">
@@ -158,10 +168,10 @@ export function ArbeitszeitSection({
                 suggerieren.
               </p>
               <p>
-                <span className="font-medium text-foreground">Für PB2 vorgesehene Regel:</span> Bei{" "}
-                „Pausen bezahlt = Nein" wird eine fehlende Pausenerfassung durch die
-                ArbZG-Mindestpause je Schicht ersetzt (0 / 30 / 45 min gestaffelt nach
-                Schichtlänge). Wo eine Pause erfasst ist, gilt der erfasste Wert.
+                <span className="font-medium text-foreground">Regel:</span> Bei „Pausen bezahlt =
+                Nein" werden erfasste Pausenminuten von den Vergütungsstunden abgezogen; bei „Ja"
+                fließen sie in die Vergütungsstunden ein. SFN-Töpfe bleiben in beiden Stellungen
+                netto.
               </p>
             </div>
           </details>
@@ -236,6 +246,19 @@ export function ArbeitszeitSection({
                   Die Änderung gilt organisationsweit und wirkt rückwirkend auf alle Perioden, auch
                   auf bereits abgeschlossene.
                 </p>
+                {breakSummary && breakSummary.totalBreakHours > 0 && (
+                  <p className="rounded-md bg-muted/50 p-2 text-xs text-foreground">
+                    Δ laufende Periode
+                    {breakSummary.periodLabel ? ` (${breakSummary.periodLabel})` : ""}:{" "}
+                    <strong>Σ {breakSummary.totalBreakHours.toString().replace(".", ",")} h</strong>{" "}
+                    über <strong>{breakSummary.staffCount}</strong> Mitarbeiter
+                    {pausenBezahlt && pending === false
+                      ? ' würden bei "Nein" von den Vergütungsstunden abgezogen.'
+                      : !pausenBezahlt && pending === true
+                        ? ' würden bei "Ja" zusätzlich in die Vergütungsstunden fließen.'
+                        : "."}
+                  </p>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

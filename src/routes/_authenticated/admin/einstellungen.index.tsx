@@ -21,6 +21,7 @@ import {
   getOrgSettings,
   updateOrgSettings,
   setPausenBezahlt,
+  getCurrentPeriodBreakSummary,
 } from "@/lib/admin/org-settings.functions";
 import { TrinkgeldpoolSection } from "@/components/settings/TrinkgeldpoolSection";
 import { ArbeitszeitSection } from "@/components/settings/ArbeitszeitSection";
@@ -81,6 +82,14 @@ function OrgSettingsPage() {
   const settingsQ = useQuery({
     queryKey: ["admin", "org-settings"],
     queryFn: () => getOrgSettings(),
+  });
+
+  // PB2 — Vorschau Σ Pause laufende Periode (nur Admin, nur bei Bedarf laden).
+  const breakSummaryQ = useQuery({
+    queryKey: ["admin", "pausen-break-summary"],
+    queryFn: () => getCurrentPeriodBreakSummary(),
+    enabled: canEdit && tab === "arbeitszeit",
+    staleTime: 60_000,
   });
 
   // Geteilter Form-State für Trinkgeldpool + Bestellungen (siehe Kopf-Kommentar).
@@ -218,6 +227,7 @@ function OrgSettingsPage() {
             msg={pausenMsg}
             err={pausenErr}
             isPending={pausenMutation.isPending}
+            breakSummary={breakSummaryQ.data ?? null}
             onChange={(next) => {
               setPausenMsg(null);
               setPausenErr(null);

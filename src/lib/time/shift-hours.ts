@@ -184,6 +184,7 @@ export function computeShiftHours(
       totalHours: bruttoHours,
       eveningHours: sundayHoliday ? 0 : rawEveningHours,
       nightHours: sundayHoliday ? 0 : rawNightHours,
+      nightDeepHours: 0,
       sundayHolidayHours: rawSundayHolidayHours,
     },
     breakMinutes,

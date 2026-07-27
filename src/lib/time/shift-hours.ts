@@ -8,6 +8,9 @@
 //
 // Bayerische Feiertage: fest kodiert + bewegliche aus Ostersonntag (Gauß).
 
+import { applyBreakProration } from "@/lib/lohn/time-entry-sfn";
+import { paidHours } from "./paid-hours";
+
 export type ShiftHourResult = {
   totalHours: number;
   eveningHours: number;
@@ -146,10 +149,13 @@ export function computeShiftHours(
   startedAt: string,
   endedAt: string,
   businessDate: string,
+  breakMinutes: number,
+  pausenBezahlt: boolean,
 ): ShiftHourResult {
   const start = new Date(startedAt).getTime();
   const end = new Date(endedAt).getTime();
-  const totalHours = Math.max(0, (end - start) / 3_600_000);
+  const bruttoHours = Math.max(0, (end - start) / 3_600_000);
+  const totalHours = paidHours(bruttoHours, breakMinutes, pausenBezahlt);
 
   // Lokale 20:00 und 24:00 (Mitternacht) des businessDate in Europe/Berlin.
   const businessDay = parseIsoDateUTC(businessDate);
@@ -162,17 +168,31 @@ export function computeShiftHours(
   // Endpunkt für Nachtfenster: bis 24h nach Mitternacht ist mehr als genug.
   const nightEndCapMs = midnightMs + 24 * 3_600_000;
 
-  const eveningHours = overlapMs(start, end, eveningStartMs, midnightMs) / 3_600_000;
-  const nightHours =
+  const rawEveningHours = overlapMs(start, end, eveningStartMs, midnightMs) / 3_600_000;
+  const rawNightHours =
     end > midnightMs ? overlapMs(start, end, midnightMs, nightEndCapMs) / 3_600_000 : 0;
 
   const sundayHoliday = isSundayOrHoliday(businessDay);
-  const sundayHolidayHours = sundayHoliday ? totalHours : 0;
+  const rawSundayHolidayHours = sundayHoliday ? bruttoHours : 0;
+
+  // PB2: SFN-Töpfe laufen IMMER netto (via applyBreakProration) — unabhängig
+  // vom Pausen-bezahlt-Schalter. Bezahlungsseitig entscheidet paidHours(),
+  // steuerlich (§3b) entscheidet die netto-Zerlegung. Bit-identisch zur
+  // bisherigen Zerlegung, wenn break_minutes = 0.
+  const prorated = applyBreakProration(
+    {
+      totalHours: bruttoHours,
+      eveningHours: sundayHoliday ? 0 : rawEveningHours,
+      nightHours: sundayHoliday ? 0 : rawNightHours,
+      sundayHolidayHours: rawSundayHolidayHours,
+    },
+    breakMinutes,
+  );
 
   return {
     totalHours,
-    eveningHours: sundayHoliday ? 0 : eveningHours,
-    nightHours: sundayHoliday ? 0 : nightHours,
-    sundayHolidayHours,
+    eveningHours: prorated.eveningHours,
+    nightHours: prorated.nightHours,
+    sundayHolidayHours: prorated.sundayHolidayHours,
   };
 }

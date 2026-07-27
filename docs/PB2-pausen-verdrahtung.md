@@ -19,10 +19,10 @@ Die Spalte ist `boolean NOT NULL DEFAULT TRUE` (PB1-Migration). Es gibt keinen N
 
 Ein einziger Stundenbegriff, überall gleich:
 
-| Größe | Regel |
-| --- | --- |
-| Vergütungsstunden | `pausen_bezahlt = true` → brutto (`ended − started`); `false` → netto (`− break_minutes`) |
-| SFN-Töpfe (Abend/Nacht/Tiefnacht/SO/Feiertag) | immer netto via `applyBreakProration` — von der Einstellung unberührt |
+| Größe                                         | Regel                                                                                     |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Vergütungsstunden                             | `pausen_bezahlt = true` → brutto (`ended − started`); `false` → netto (`− break_minutes`) |
+| SFN-Töpfe (Abend/Nacht/Tiefnacht/SO/Feiertag) | immer netto via `applyBreakProration` — von der Einstellung unberührt                     |
 
 Damit verschwindet die heutige Drift: Buchhaltungs-Tab/Wochenplan/Buchhaltungs-Export rechnen brutto, Lohn-Engine/Selbstansicht/Statistik netto. Nach PB2 zeigen alle dieselben Vergütungsstunden, und die SFN-Zerlegung bleibt überall die heutige Netto-Logik.
 

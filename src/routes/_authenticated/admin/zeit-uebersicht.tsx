@@ -560,7 +560,14 @@ function ZeitUebersichtPage() {
       rosterGlByStaffDate: periodRoster.rosterGlByStaffDate,
       pausenBezahlt,
     });
-  }, [overviewEntries, staffAllQ.data, isAllLocations, effectiveLocationId, periodRoster, pausenBezahlt]);
+  }, [
+    overviewEntries,
+    staffAllQ.data,
+    isAllLocations,
+    effectiveLocationId,
+    periodRoster,
+    pausenBezahlt,
+  ]);
 
   const byDept = useMemo(() => {
     const m = new Map<Department, StaffDeptRow[]>();

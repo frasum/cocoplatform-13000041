@@ -250,12 +250,11 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
             { key: "date_of_birth", label: "Geburtsdatum", type: "date" },
             { key: "place_of_birth", label: "Geburtsort", type: "text" },
             { key: "nationality", label: "Nationalität", type: "text" },
-            { key: "phone", label: "Telefon", type: "text" },
-            { key: "email", label: "E-Mail", type: "email" },
             { key: "street", label: "Straße", type: "text" },
             { key: "postal_code", label: "PLZ", type: "text" },
             { key: "city", label: "Ort", type: "text" },
           ],
+          note: "Telefon und E-Mail werden aus den Stammdaten übernommen.",
         },
         {
           title: "Steuer & Sozialversicherung",

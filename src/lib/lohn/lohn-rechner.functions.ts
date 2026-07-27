@@ -462,6 +462,17 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
       krankTageEst: number | null;
       avgStdTag: number | null;
       avgSfnTagCent: number | null;
+      // LG3b 2b (A7) — Lohnart-Split (Bereichszeitlohn/SFN je Bereich).
+      zeitlohnServiceHours: number | null;
+      zeitlohnServiceCent: number | null;
+      zeitlohnGlHours: number | null;
+      zeitlohnGlCent: number | null;
+      zeitlohnKitchenHours: number | null;
+      zeitlohnKitchenCent: number | null;
+      sfnServiceCent: number | null;
+      sfnGlCent: number | null;
+      sfnKitchenCent: number | null;
+      unresolvedHours: number | null;
       error: string | null;
     };
     const rows: Row[] = [];

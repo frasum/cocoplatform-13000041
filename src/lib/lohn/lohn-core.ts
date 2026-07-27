@@ -16,6 +16,15 @@ function sumBy(zeilen: Entgeltzeile[], pred: (k: Kategorie) => boolean): number 
   return s;
 }
 
+/**
+ * LG3b: Zeitlohn-Kategorien inkl. der Bereichs-Varianten. Für St-/SV-Brutto
+ * und Minijob-Guard identisch zu `zeitlohn` behandelt — nur die Herkunft
+ * (Bereichs-Satz) unterscheidet sich in der Anzeige/Export-Aufteilung.
+ */
+function isZeitlohnKategorie(k: Kategorie): boolean {
+  return k === "zeitlohn" || k === "zeitlohn_2" || k === "zeitlohn_3";
+}
+
 /** Kaufmännische Cent-Rundung. */
 function roundCent(centValue: number): number {
   return Math.sign(centValue) * Math.round(Math.abs(centValue));
@@ -35,10 +44,12 @@ export function berechneLohn(eingabe: LohnEingabe): LohnErgebnis {
   // Beträge liefen still an der SV vorbei (RV-Eigenanteil würde fehlen).
   // Lieber hart scheitern; die Übersicht fängt Fehler pro Zeile bereits ab.
   if (person.beschaeftigung === "minijob") {
-    const bad = zeilen.find((z) => z.kategorie === "zeitlohn" || z.kategorie === "einmalbezug");
+    const bad = zeilen.find(
+      (z) => isZeitlohnKategorie(z.kategorie) || z.kategorie === "einmalbezug",
+    );
     if (bad) {
       throw new Error(
-        "Minijob: Kategorie 'zeitlohn'/'einmalbezug' nicht unterstützt — als 'aushilfe_paust' buchen.",
+        "Minijob: Kategorie 'zeitlohn(_2|_3)'/'einmalbezug' nicht unterstützt — als 'aushilfe_paust' buchen.",
       );
     }
   }

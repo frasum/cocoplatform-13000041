@@ -8,7 +8,7 @@ import {
   type PersonalDetailsDto,
 } from "@/lib/admin/personal-details.functions";
 import {
-  personalDetailsSchema,
+  parsePersonalDetailsPatch,
   type PersonalDetailsFields,
 } from "@/lib/admin/personal-details.schema";
 import { getStaffCompensation, upsertStaffCompensation } from "@/lib/admin/compensation.functions";
@@ -172,8 +172,8 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
       if (Object.keys(patch).length === 0) {
         return Promise.resolve({ ok: true as const, noop: true as const });
       }
-      // Client-Validierung (gleiches Schema wie Server)
-      personalDetailsSchema.parse(patch);
+      // Client-Validierung (Sparse-Patch: nur mitgeschickte Felder prüfen).
+      parsePersonalDetailsPatch(patch);
       return saveFn({ data: { staffId, fields: patch } });
     },
     onSuccess: async (res) => {
@@ -201,7 +201,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
         if (!Number.isFinite(n)) throw new Error(`${k}: Zahl erwartet`);
         patch[k] = n;
       }
-      personalDetailsSchema.parse(patch);
+      parsePersonalDetailsPatch(patch);
       return saveFn({ data: { staffId, fields: patch } });
     },
     onSuccess: async () => {

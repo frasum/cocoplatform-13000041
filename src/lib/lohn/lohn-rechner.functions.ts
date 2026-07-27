@@ -22,6 +22,11 @@ import { zeitlohnKategorie } from "./kategorie";
 import { computeWeightedUkRate, type UkRateSlot } from "./uk-rate-weighted";
 import { resolveRateCents, type RateRow } from "./rate-resolution";
 import type { Department } from "@/lib/time/primary-department";
+import {
+  computeExportBlockers,
+  type StaffBlocker,
+  type StaffExportPayload,
+} from "./export-blockers";
 
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -37,6 +42,15 @@ const ZEITLOHN_LABEL: Record<Department, string> = {
   service: "Zeitlohn (Service)",
   gl: "Zeitlohn 2 (GL)",
   kitchen: "Zeitlohn 3 (Küche)",
+};
+// LG3b A3 — Kategorien je Bereich (Nicht-Minijob). Etappe-1-Kategorien
+// werden jetzt hier tatsächlich erzeugt — die 2b-Export-Spalten mappen
+// darüber. Minijob bleibt bereichsunabhängig `aushilfe_paust`; die
+// Bereichsunterscheidung tragen dann die Labels.
+const ZEITLOHN_KATEGORIE: Record<Department, "zeitlohn" | "zeitlohn_2" | "zeitlohn_3"> = {
+  service: "zeitlohn",
+  gl: "zeitlohn_2",
+  kitchen: "zeitlohn_3",
 };
 const AUSHILFE_LABEL: Record<Department, string> = {
   service: "Aushilfe-Zeitlohn (Service, pauschal)",
@@ -57,27 +71,33 @@ function isoMinusDays(iso: string, days: number): string {
 }
 
 /**
- * LG3b G1 — U/K-Grundsatz je Person:
- *   * Ein-Bereich (genau ein Bereich mit paidHours in der Periode) → Satz
- *     dieses Bereichs, auf den Periodenbeginn aufgelöst. Für Ein-Bereichs-
- *     Personen ist das exakt der Alt-Wert (`sfn.hourlyRateCents`) — die
- *     2a-0-Baselines bleiben bit-identisch.
- *   * Mehr-Bereich → gewichteter 91-Tage-Durchschnitt via
- *     `computeWeightedUkRate` (paidHours-gewichtet, Rate je Bereich auf
- *     `fromDate` aufgelöst). Liefert `null` (keine Stunden im Fenster oder
- *     ein Bereich ohne Satz) → LG-9-c: Anzeige rechnet 0, Export blockiert
- *     an anderer Stelle.
+ * LG3b G1 — U/K-Grundsatz je Person. Freigabe unterscheidet ausdrücklich:
+ *   * Ein-Bereich → Bereichssatz auf `fromDate` aufgelöst. Bit-identisch
+ *     zum Alt-Wert (Baselines bleiben grün).
+ *   * Mehr-Bereich, gewichteter 91-Tage-Durchschnitt via
+ *     `computeWeightedUkRate`:
+ *       - `missing_rate` → 0 € mit rotem Marker; Export-Blocker durch die
+ *         Blocker-Struktur unten.
+ *       - `no_hours` → §104-Halt: konkrete Fehlermeldung wird geworfen
+ *         (Übersicht fängt je Zeile ab, Einzelansicht zeigt sie).
+ *   Der stille 0-€-Fallback ist damit weg.
  */
+interface UkRateResolution {
+  rateCents: number;
+  missingDepartments: readonly Department[];
+}
 async function resolveUkHourlyRateCents(
   supabaseAdmin: SupabaseClient<Database>,
   args: {
     staffId: string;
     fromDate: string;
     usedDepts: readonly Department[];
-    fallbackRateCents: number;
+    fallbackRateCents: number | null;
   },
-): Promise<number> {
-  if (args.usedDepts.length <= 1) return args.fallbackRateCents;
+): Promise<UkRateResolution> {
+  if (args.usedDepts.length <= 1) {
+    return { rateCents: args.fallbackRateCents ?? 0, missingDepartments: [] };
+  }
 
   // Rates zum Periodenbeginn (jüngstes valid_from ≤ fromDate).
   const { data: rateRows, error: rateErr } = await supabaseAdmin
@@ -102,7 +122,19 @@ async function resolveUkHourlyRateCents(
     rateCents: resolveRateCents(rates, s.department, args.fromDate),
   }));
   const weighted = computeWeightedUkRate(slots);
-  return weighted.rateCents ?? 0;
+  if (weighted.rateCents != null) {
+    return { rateCents: weighted.rateCents, missingDepartments: [] };
+  }
+  if (weighted.reason === "missing_rate") {
+    // LG-9-c: Anzeige 0 € + Export-Blocker über die zurückgemeldeten
+    // Bereiche. Kein stiller Fallback — die fehlenden Bereiche werden
+    // sichtbar gemacht.
+    return { rateCents: 0, missingDepartments: weighted.missingDepartments ?? [] };
+  }
+  // no_hours — Bauherren-Entscheidung ausstehend. §104-Halt: klar fehlschlagen.
+  throw new Error(
+    "U/K-Satz nicht bestimmbar: keine bezahlten Stunden im Referenzfenster — Bauherren-Entscheidung ausstehend",
+  );
 }
 
 /**
@@ -170,15 +202,22 @@ export async function computeLohnForStaff(
   const usedUrlaubTage = override?.urlaub_tage ?? 0;
   const usedKrankTage = override?.krank_tage ?? 0;
 
-  // LG3b 2a-iii — U/K-Satz: Ein-Bereich → Bereichssatz (identisch zum
-  // Alt-Wert); Mehr-Bereich → gewichteter 91-Tage-Durchschnitt.
+  // LG3b 2a-iii — U/K-Satz: Ein-Bereich → Bereichssatz; Mehr-Bereich →
+  // gewichteter 91-Tage-Durchschnitt. U/K wird nur ausgewertet, wenn
+  // U/K-Tage anfallen — sonst darf ein leeres 91-Tage-Fenster keinen
+  // §104-Halt auslösen.
+  const braucheUkSatz = usedUrlaubTage > 0 || usedKrankTage > 0;
   const usedDepts = sfn.deptSlices.map((s) => s.department);
-  const ukHourlyRateCents = await resolveUkHourlyRateCents(supabaseAdmin, {
-    staffId: args.staffId,
-    fromDate: args.fromDate,
-    usedDepts,
-    fallbackRateCents: sfn.hourlyRateCents,
-  });
+  const ukResolution: UkRateResolution = braucheUkSatz
+    ? await resolveUkHourlyRateCents(supabaseAdmin, {
+        staffId: args.staffId,
+        fromDate: args.fromDate,
+        usedDepts,
+        fallbackRateCents: sfn.hourlyRateCents,
+      })
+    : { rateCents: sfn.hourlyRateCents ?? 0, missingDepartments: [] };
+  const ukHourlyRateCents = ukResolution.rateCents;
+  const ukMissingDepartments = ukResolution.missingDepartments;
 
   const ukZeilen = buildUrlaubKrankZeilen({
     urlaubTage: usedUrlaubTage,
@@ -203,16 +242,21 @@ export async function computeLohnForStaff(
 
   // LG3b 2a-iii — Zeitlohn und SFN je Bereich (Lohnart-Split). Bei
   // Ein-Bereichs-Personen entsteht wie im Alt-Pfad genau eine Zeitlohn-Zeile
-  // und genau eine SFN-Zeile — die Baseline-Nullmessung bleibt bit-identisch.
-  const kat = zeitlohnKategorie(person.beschaeftigung);
+  // und genau eine SFN-Zeile — die Baseline-Nullmessung bleibt bit-identisch
+  // (service → `zeitlohn`).
+  const fallbackKat = zeitlohnKategorie(person.beschaeftigung);
   const zeitlohnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
     const rate = slice.rateCents ?? 0;
-    const label =
-      person.beschaeftigung === "minijob"
-        ? AUSHILFE_LABEL[slice.department]
-        : ZEITLOHN_LABEL[slice.department];
+    const isMinijob = person.beschaeftigung === "minijob";
+    const label = isMinijob
+      ? AUSHILFE_LABEL[slice.department]
+      : ZEITLOHN_LABEL[slice.department];
+    // A3 — Kategorie je Bereich (Nicht-Minijob). Minijob bleibt bereichs-
+    // unabhängig `aushilfe_paust`; die Bereichsunterscheidung tragen die
+    // Labels. Etappe-1-Kategorien werden hierüber tatsächlich erzeugt.
+    const kategorie: Kategorie = isMinijob ? "aushilfe_paust" : ZEITLOHN_KATEGORIE[slice.department];
     return {
-      kategorie: kat,
+      kategorie,
       bezeichnung: label,
       betragCent: Math.round(slice.paidHours * rate),
       stunden: slice.paidHours,
@@ -234,14 +278,14 @@ export async function computeLohnForStaff(
   // Downstream-Anzeigen keine leere Zeilen-Liste sehen.
   if (zeitlohnZeilen.length === 0) {
     zeitlohnZeilen.push({
-      kategorie: kat,
+      kategorie: fallbackKat,
       bezeichnung:
         person.beschaeftigung === "minijob"
           ? "Aushilfe-Zeitlohn (pauschal)"
           : "Zeitlohn (Stunden × Satz)",
       betragCent: 0,
       stunden: 0,
-      satzCent: sfn.hourlyRateCents,
+      satzCent: sfn.hourlyRateCents ?? undefined,
     });
     sfnZeilen.push({
       kategorie: "zuschlag_frei",
@@ -250,9 +294,24 @@ export async function computeLohnForStaff(
     });
   }
 
+  // LG3b A5 — „Bereich nicht zuordenbar": Stunden aus Einträgen, deren
+  // Bereich WZ2 nicht klären konnte, sichtbar machen (0 € — der Betrag
+  // steckt in den Bereichszeilen 0). Zeile erscheint nur bei > 0 h.
+  const unresolvedZeilen: Entgeltzeile[] = [];
+  if (sfn.unresolvedHoursUnrounded > 0) {
+    const h = Math.round(sfn.unresolvedHoursUnrounded * 100) / 100;
+    unresolvedZeilen.push({
+      kategorie: fallbackKat,
+      bezeichnung: `Bereich nicht zuordenbar — ${h.toLocaleString("de-DE")} h, 0 €`,
+      betragCent: 0,
+      stunden: h,
+    });
+  }
+
   const zeilen: Entgeltzeile[] = [
     ...zeitlohnZeilen,
     ...sfnZeilen,
+    ...unresolvedZeilen,
     ...fixedZeilen,
     ...ukZeilen,
     ...recurringZeilen,
@@ -275,6 +334,14 @@ export async function computeLohnForStaff(
     diagnose,
     usedUrlaubTage,
     usedKrankTage,
+    // LG3b — Blocker-Rohdaten für den Export-Gate (Etappe 2b: CSV/XLSX).
+    unresolvedHoursUnrounded: sfn.unresolvedHoursUnrounded,
+    deptBuckets: sfn.deptSlices.map((s) => ({
+      department: s.department,
+      paidHoursUnrounded: s.paidHours,
+      rateCents: s.rateCents,
+    })),
+    ukMissingDepartments,
   };
 }
 
@@ -396,6 +463,7 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
       error: string | null;
     };
     const rows: Row[] = [];
+    const blockerPayloads: StaffExportPayload[] = [];
     for (const s of visibleStaffRows) {
       const displayName =
         (s.display_name as string | null)?.trim() ||
@@ -410,6 +478,13 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           toDate: data.toDate,
           mode: data.mode,
           zusatzZeilen: [],
+        });
+        blockerPayloads.push({
+          staffId: s.id as string,
+          staffLabel: displayName,
+          persoNr: persoNr == null ? null : String(persoNr),
+          buckets: r.deptBuckets,
+          unresolvedHoursUnrounded: r.unresolvedHoursUnrounded,
         });
         const sumCat = (cat: string) =>
           r.zeilen.filter((z) => z.kategorie === cat).reduce((sum, z) => sum + z.betragCent, 0);
@@ -480,5 +555,6 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
         });
       }
     }
-    return { mode: data.mode, fromDate: data.fromDate, toDate: data.toDate, rows };
+    const blockers: StaffBlocker[] = computeExportBlockers(blockerPayloads);
+    return { mode: data.mode, fromDate: data.fromDate, toDate: data.toDate, rows, blockers };
   });

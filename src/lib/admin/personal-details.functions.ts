@@ -11,6 +11,7 @@ import { assertPermission, runWithPermission } from "./admin-call";
 import { writeAuditLog } from "./audit";
 import {
   personalDetailsSchema,
+  parsePersonalDetailsPatch,
   redactForAudit,
   type PersonalDetailsFields,
 } from "./personal-details.schema";
@@ -88,7 +89,7 @@ export const upsertStaffPersonalDetails = createServerFn({ method: "POST" })
       .object({ staffId: z.string().uuid(), fields: z.unknown() })
       .transform((v) => ({
         staffId: v.staffId,
-        fields: personalDetailsSchema.parse(v.fields),
+        fields: parsePersonalDetailsPatch(v.fields),
       }))
       .parse(input),
   )

@@ -845,3 +845,246 @@ function LegacyAddressPuffer({
     </div>
   );
 }
+
+// LG3a — Stundensätze je Arbeitsbereich. Runde 1 von 2: pflegbar, aber ohne
+// Lohnwirkung (Berechnung liest weiterhin `staff_compensation.hourly_rate`).
+// Anzeige-Reihenfolge fix: gl → kitchen → service, damit sich die Anzeige mit
+// LG2 (Buchhaltung-Split) deckt.
+const DEPT_ORDER = ["gl", "kitchen", "service"] as const;
+const DEPT_LABEL: Record<(typeof DEPT_ORDER)[number], string> = {
+  gl: "Geschäftsleitung",
+  kitchen: "Küche",
+  service: "Service",
+};
+
+function CompensationRatesSection({ staffId }: { staffId: string }) {
+  const queryClient = useQueryClient();
+  const listFn = useServerFn(listStaffCompensationRates);
+  const saveFn = useServerFn(upsertStaffCompensationRate);
+  const deleteFn = useServerFn(deleteStaffCompensationRate);
+
+  const q = useQuery({
+    queryKey: ["admin", "staff", staffId, "compensation-rates"],
+    queryFn: () => listFn({ data: { staffId } }),
+  });
+
+  const [msg, setMsg] = useState<string | null>(null);
+  const today = useMemo(() => todayIso(), []);
+  const cutoff = useMemo(() => periodStart(today), [today]);
+
+  const saveMut = useMutation({
+    mutationFn: async (payload: {
+      id: string | null;
+      department: (typeof DEPT_ORDER)[number];
+      hourlyRate: number;
+      validFrom: string | null;
+    }) => saveFn({ data: { staffId, ...payload } }),
+    onSuccess: async () => {
+      setMsg("Gespeichert.");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "staff", staffId, "compensation-rates"],
+      });
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler beim Speichern."),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: async (id: string) => deleteFn({ data: { id, staffId } }),
+    onSuccess: async () => {
+      setMsg("Gelöscht.");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "staff", staffId, "compensation-rates"],
+      });
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler beim Löschen."),
+  });
+
+  return (
+    <fieldset className="space-y-3 rounded-md border border-border p-4">
+      <legend className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Sätze je Arbeitsbereich (nur Admin) — noch ohne Lohnwirkung
+      </legend>
+      <p className="text-xs text-muted-foreground">
+        Rückwirkung nur bis Periodenbeginn (<span className="tabular-nums">{cutoff}</span>) erlaubt.
+        Ältere Zeilen sind gesperrt. Die Payroll rechnet in dieser Runde noch mit dem einheitlichen
+        Stundenlohn oben.
+      </p>
+      {q.isLoading ? (
+        <p className="text-sm text-muted-foreground">Lade…</p>
+      ) : q.error || !q.data ? (
+        <p className="text-sm text-destructive">Sätze konnten nicht geladen werden.</p>
+      ) : (
+        <div className="space-y-3">
+          {DEPT_ORDER.map((dept) => (
+            <DepartmentRatesRow
+              key={dept}
+              department={dept}
+              entries={q.data.departments[dept]}
+              today={today}
+              onSave={(payload) => {
+                setMsg(null);
+                saveMut.mutate({ department: dept, ...payload });
+              }}
+              onDelete={(id) => {
+                setMsg(null);
+                deleteMut.mutate(id);
+              }}
+              pending={saveMut.isPending || deleteMut.isPending}
+            />
+          ))}
+        </div>
+      )}
+      {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
+    </fieldset>
+  );
+}
+
+function DepartmentRatesRow({
+  department,
+  entries,
+  today,
+  onSave,
+  onDelete,
+  pending,
+}: {
+  department: (typeof DEPT_ORDER)[number];
+  entries: CompensationRateEntry[];
+  today: string;
+  onSave: (p: { id: string | null; hourlyRate: number; validFrom: string | null }) => void;
+  onDelete: (id: string) => void;
+  pending: boolean;
+}) {
+  const [showHistory, setShowHistory] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newRate, setNewRate] = useState("");
+  const [newFrom, setNewFrom] = useState("");
+
+  // Neueste Zeile (max valid_from) als aktueller Satz — Historie hat listServer
+  // bereits absteigend sortiert.
+  const current = entries[0] ?? null;
+  const history = entries.slice(1);
+
+  function submitNew() {
+    const trimmed = newRate.trim().replace(",", ".");
+    if (trimmed === "") return;
+    const num = Number(trimmed);
+    if (!Number.isFinite(num)) return;
+    onSave({
+      id: null,
+      hourlyRate: num,
+      validFrom: newFrom.trim() === "" ? null : newFrom.trim(),
+    });
+    setAdding(false);
+    setNewRate("");
+    setNewFrom("");
+  }
+
+  return (
+    <div className="rounded-md border border-border/70 p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <div className="text-sm font-medium">{DEPT_LABEL[department]}</div>
+        <div className="text-sm tabular-nums">
+          {current ? (
+            <span>
+              {current.hourlyRate.toFixed(2)} €/h{" "}
+              <span className="text-xs text-muted-foreground">ab {current.validFrom}</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">— kein Satz —</span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            disabled={pending}
+            className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            Neuen Satz eintragen
+          </button>
+        )}
+        {current && isValidFromAllowed(current.validFrom, today) && !adding && (
+          <button
+            type="button"
+            onClick={() => onDelete(current.id)}
+            disabled={pending}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            Aktuelle Zeile löschen
+          </button>
+        )}
+        {history.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            {showHistory ? "Historie ausblenden" : `Historie zeigen (${history.length})`}
+          </button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="flex flex-col text-xs">
+            <span className="text-muted-foreground">Satz (€/h)</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={newRate}
+              onChange={(e) => setNewRate(e.target.value)}
+              className="w-28 rounded-md border border-input bg-background px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="flex flex-col text-xs">
+            <span className="text-muted-foreground">Gültig ab</span>
+            <input
+              type="date"
+              value={newFrom}
+              onChange={(e) => setNewFrom(e.target.value)}
+              className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={submitNew}
+            disabled={pending || newRate.trim() === ""}
+            className="rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            Speichern
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAdding(false);
+              setNewRate("");
+              setNewFrom("");
+            }}
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
+          >
+            Abbrechen
+          </button>
+          <span className="text-[11px] text-muted-foreground">Leer ⇒ heute.</span>
+        </div>
+      )}
+
+      {showHistory && history.length > 0 && (
+        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+          {history.map((e) => (
+            <li key={e.id} className="flex justify-between tabular-nums">
+              <span>ab {e.validFrom}</span>
+              <span>{e.hourlyRate.toFixed(2)} €/h</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// Silences TS: CompensationRatesDto ist Rückgabetyp von listStaffCompensationRates.
+export type _CompensationRatesDtoRef = CompensationRatesDto;

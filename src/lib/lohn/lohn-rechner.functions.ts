@@ -512,8 +512,7 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           if (!b) return 0;
           return Math.round(b.paidHoursUnrounded * (b.rateCents ?? 0));
         };
-        const satzCent = (dept: "service" | "gl" | "kitchen") =>
-          bucketOf(dept)?.rateCents ?? null;
+        const satzCent = (dept: "service" | "gl" | "kitchen") => bucketOf(dept)?.rateCents ?? null;
         const roundH = (h: number) => Math.round(h * 100) / 100;
         rows.push({
           staffId: s.id as string,

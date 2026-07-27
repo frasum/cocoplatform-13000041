@@ -667,9 +667,9 @@ function CompensationSection({ staffId }: { staffId: string }) {
         Vergütung — Alt-Satz (nur Admin)
       </legend>
       <p className="text-xs text-muted-foreground">
-        Alt-Satz — von der Lohnrechnung nicht mehr gelesen. Die Payroll rechnet
-        seit LG3b mit den Bereichssätzen unten. Feld bleibt aus historischen
-        Gründen sichtbar; ein Abriss ist als späterer Schritt geplant.
+        Alt-Satz — von der Lohnrechnung nicht mehr gelesen. Die Payroll rechnet seit LG3b mit den
+        Bereichssätzen unten. Feld bleibt aus historischen Gründen sichtbar; ein Abriss ist als
+        späterer Schritt geplant.
       </p>
 
       {compQ.isLoading ? (
@@ -914,9 +914,8 @@ function CompensationRatesSection({ staffId }: { staffId: string }) {
       </legend>
       <p className="text-xs text-muted-foreground">
         Rückwirkung nur bis Periodenbeginn (<span className="tabular-nums">{cutoff}</span>) erlaubt.
-        Ältere Zeilen sind gesperrt. Diese Sätze sind lohnwirksam: die Payroll
-        löst je Zeiteintrag den Bereich auf und rechnet mit dem hier gepflegten
-        Satz.
+        Ältere Zeilen sind gesperrt. Diese Sätze sind lohnwirksam: die Payroll löst je Zeiteintrag
+        den Bereich auf und rechnet mit dem hier gepflegten Satz.
       </p>
       {q.isLoading ? (
         <p className="text-sm text-muted-foreground">Lade…</p>

@@ -111,6 +111,51 @@ describe("periodTotalMinutes", () => {
   });
 });
 
+// PB2 — Doppelt-Case: pausenBezahlt=true zählt Pause mit, =false zieht sie ab.
+// Default (Parameter weggelassen) muss bit-identisch zum vor-PB2-Verhalten
+// bleiben.
+describe("PB2 — pausenBezahlt-Schalter", () => {
+  const e = entry({
+    businessDate: "2026-06-26",
+    startedAt: "2026-06-26T10:00:00Z",
+    endedAt: "2026-06-26T18:30:00Z",
+    breakMinutes: 30,
+  });
+
+  it("entryNetMinutes: false → 480 (Netto), true → 510 (brutto)", () => {
+    expect(entryNetMinutes(e, false)).toBe(480);
+    expect(entryNetMinutes(e, true)).toBe(510);
+  });
+
+  it("Default (kein Parameter) bit-identisch zu false", () => {
+    expect(entryNetMinutes(e)).toBe(entryNetMinutes(e, false));
+    expect(periodTotalMinutes([e])).toBe(periodTotalMinutes([e], false));
+    expect(groupEntriesByDay([e])[0].netMinutes).toBe(groupEntriesByDay([e], false)[0].netMinutes);
+  });
+
+  it("break=0: beide Stellungen bit-identisch", () => {
+    const noBreak = entry({
+      businessDate: "2026-06-26",
+      startedAt: "2026-06-26T10:00:00Z",
+      endedAt: "2026-06-26T18:00:00Z",
+      breakMinutes: 0,
+    });
+    expect(entryNetMinutes(noBreak, true)).toBe(entryNetMinutes(noBreak, false));
+    expect(periodTotalMinutes([noBreak], true)).toBe(periodTotalMinutes([noBreak], false));
+  });
+
+  it("klemmt auf 0, wenn Pause > Brutto (Modus false)", () => {
+    const tiny = entry({
+      businessDate: "2026-06-26",
+      startedAt: "2026-06-26T10:00:00Z",
+      endedAt: "2026-06-26T10:20:00Z",
+      breakMinutes: 30,
+    });
+    expect(entryNetMinutes(tiny, false)).toBe(0);
+    expect(entryNetMinutes(tiny, true)).toBe(20);
+  });
+});
+
 describe("formatMinutes", () => {
   it("450 = 7:30 h", () => expect(formatMinutes(450)).toBe("7:30 h"));
   it("65 = 1:05 h", () => expect(formatMinutes(65)).toBe("1:05 h"));

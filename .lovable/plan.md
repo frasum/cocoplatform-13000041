@@ -1,45 +1,46 @@
-## Diagnose
+## PB2 — Pausen-Einstellung verdrahten (paidHours überall)
 
-Die Sparse-Patch-Absicherung im Client ist intakt. Der Wipe passiert **serverseitig** in `src/lib/admin/personal-details.functions.ts` beim Input-Validieren:
+Vorgänger PB1 abgeschlossen (Spalte `organization_settings.pausen_bezahlt boolean NOT NULL DEFAULT TRUE`, aktuell `true`, kein Leser). LG3b wartet bis PB2 abgenommen ist.
 
-```
-inputValidator: personalDetailsSchema.parse(v.fields)
-```
+### 1) Spec-Ablage
+- `docs/PB2-pausen-verdrahtung.md` anlegen mit der vom Bauherrn gelieferten PB2-Spec (wortgleich).
 
-`personalDetailsSchema` ist ein `z.object({...})`, bei dem jedes Feld
-`.optional().transform(v => v === undefined ? null : v)` ist. Das heißt: übergibt der Client einen sparsen Patch (z. B. nur `{ tax_class: "III" }`), füllt Zod **alle 28 anderen Felder mit `null` auf**. Der anschließende `upsert(..., { onConflict: "staff_id" })` schreibt genau diese Nulls in die Zeile und leert Adresse, IBAN, Bank, Tax-ID, SV-Nr., Urlaubstage usw.
+### 2) Reines Modul
+- Neu `src/lib/time/paid-hours.ts` mit `paidHours(grossHours, breakMinutes, pausenBezahlt) → number` (bei `false`: `max(0, grossHours − breakMinutes/60)`; bei `true`: `grossHours`).
+- Tests `paid-hours.test.ts`: beide Schalterstellungen, 0-Kappung, `breakMinutes = 0` ⇒ identisch zu Alt.
 
-Beweis im Audit-Log: alle 4 Speichervorgänge zwischen 07:54 und 07:57 melden **jedes** Feld als `changed:true` — obwohl der Client (nach BU-Fix) nur wenige Felder gesendet hat.
+### 3) Buchhaltungs-Pfad (`computeShiftHours`)
+- `src/lib/time/shift-hours.ts`: Signatur um `breakMinutes: number` und `pausenBezahlt: boolean` erweitern; `totalHours = paidHours(...)`; SFN-Töpfe weiterhin über `applyBreakProration` (Import aus `lohn/time-entry-sfn.ts`, nicht nachbauen) — **unabhängig vom Schalter**.
+- Aufrufer durchreichen: `src/lib/time/zeit-uebersicht-core.ts` (LG2-Aggregation) und `src/routes/_authenticated/admin/zeit-uebersicht.tsx` (×2). `pausenBezahlt` einmal pro Request aus `getOrgSettings` laden, nicht je Eintrag.
+- Tests: Konsistenz Buchhaltung ↔ Export ↔ Lohn-Grundlohn für einen Fixture-Mitarbeiter unter beiden Schalterstellungen; Schalter-Invarianz der SFN-Töpfe.
 
-## Ziel
+### 4) Lohn-Engine
+- `src/lib/lohn/compute-staff-sfn.ts` und `src/lib/lohn/lohn-period.functions.ts`: **Grundlohn-Stundenbasis** wird `paidHours(...)`. SFN-Geld-Berechnung bleibt unverändert (netto via `applyBreakProration`). Konsequenz bei `true`: Grundlohn brutto, Zuschläge netto — Lohnbüro-Auskunft 27.07.
+- **Vorab-Verifikation (Auflage 3):** vor Änderung ein `rg -n "break" src/lib/lohn/pap-2026 src/lib/lohn/golden-master` laufen lassen. Bestätigt sich Pause=0 überall in den Fixtures: ein Satz im Bericht. Findet sich ein Fixture mit `break_minutes > 0`: §104-Halt, weil Schritt 4 dann Golden-Master-Ergebnisse verändert und die Nullmessung neu zu schneiden ist.
 
-Sparse-Save darf ausschließlich die tatsächlich mitgeschickten Felder anfassen. Alle anderen Werte bleiben in der DB unangetastet.
+### 5) Buchhaltungs-Export
+- `src/lib/time/buchhaltung-export.ts`: Stunden-Spalten (inkl. LG2 `stunden_gl/service/kueche`) folgen automatisch aus (3). Test `buchhaltung-export-columns.test.ts` um Doppel-Case (bezahlt/unbezahlt) erweitern; Alt-Monat mit Pause=0 byte-identisch (`buchhaltung-export-quarter.test.ts`).
 
-## Änderungen (nur Personaldaten-Pfad)
+### 6) Weitere Stundenbildner (Pfad-Korrektur, Auflage 1)
+- `src/lib/time/my-period-hours.ts` (Selbstansicht) und **`src/lib/statistics/personnel-stats.functions.ts`** (Personalquote — korrigierter Pfad) heute hart netto → auf `paidHours` umstellen; SFN-freie Struktur bleibt. Tests entsprechend erweitern.
+- §104-Meldepflicht: falls eine weitere Stundenbildner-Stelle auftaucht (Telegram-Report, Frag-COCO, TRMNL …), melden und listen, nicht still mit umstellen.
 
-1. **`src/lib/admin/personal-details.schema.ts`**
-   - Neues Export: `personalDetailsPatchSchema = personalDetailsSchema.partial().strict()` — validiert Sparse-Patches feldweise (Format, Länge, IBAN-Regex, PLZ-Regex, Datum), lässt aber ausgelassene Felder **weg** statt sie mit `null` zu belegen.
-   - Bestehendes `personalDetailsSchema` bleibt für Voll-Reads/Formstate erhalten.
+### 7) PB1-Dialog: Vorschau nachziehen
+- Neue reine Server-Function (lesend), die Σ `break_minutes` der geschlossenen Einträge der laufenden Periode je Mitarbeiter summiert; Bestätigungsdialog in `ArbeitszeitSection.tsx` zeigt „Σ ⟨X⟩ h über ⟨N⟩ Mitarbeiter".
 
-2. **`src/lib/admin/personal-details.functions.ts` → `upsertStaffPersonalDetails`**
-   - `inputValidator` nutzt `personalDetailsPatchSchema` statt `personalDetailsSchema`.
-   - Zusätzliche Sicherung: nach dem Parse `Object.keys(parsed)` gegen die Input-Keys schneiden, damit selbst bei Schema-Regressionen keine Fremd-Nulls durchrutschen (Defense in Depth).
-   - Der No-Op-Check (`length === 0 → early return`) bleibt.
+### 8) Nicht anfassen
+`applyBreakProration`, `berechneSfnGeld`, `pap-2026/**`, Golden-Master; `staff_compensation_rates`/LG3a; PB1-Schalter/Audit außer Dialog-Vorschau.
 
-3. **`src/components/admin/PersonalDetailsTab.tsx`**
-   - Client-Vorvalidierung (`personalDetailsSchema.parse(patch)` in `mutation`/`vacMutation`) auf `personalDetailsPatchSchema.parse(patch)` umstellen, damit dieselbe Sparse-Semantik gilt und keine irreführenden Zod-Errors kommen.
+### 9) Info-Text neutralisieren (Auflage 2)
+- `src/components/settings/ArbeitszeitSection.tsx`: die Formulierung „sauber: „Pausen bezahlt = Nein". „Ja" ist zulässig, aber freiwillig günstiger …" entfernen. Ersatz: neutrale Beschreibung beider Wirkungen (wie in der PB1-Auftragsvorlage), ohne Empfehlung. Beide Stellungen legitim; der Text erklärt, was passiert — er empfiehlt nichts.
+- Im Bericht nennen (Fundstelle + neuer Wortlaut). Volltext beim Bau nochmals auf weitere Default/Empfehlungs-Suggestionen prüfen; Funde ebenfalls neutralisieren.
 
-4. **Datenrettung**
-   - Wiederherstellen der zuletzt bekannten Werte für Narisara Asa-sa-na (`93e44abe-…`) aus dem Audit-Log-Verlauf (Adresse, Mail, Telefon, Konto, SV, Steuer, Urlaub) — analog zum Restore vom 27.07. vormittags, nachdem der Fix live ist.
+### Erfolgs-Gate
+- `prettier --write` + `eslint --fix`, `tsc 0 · eslint 0/0 · prettier clean`.
+- `npx vitest run` grün; Vorzustand nur gemessen behaupten (Anker ≥ `32f73b21`, Ausgang 1910 Tests + neue).
+- Blockierende Tests: `paidHours` (beide Stellungen + 0-Kappung); Schalter-Invarianz SFN-Töpfe; Konsistenz Buchhaltung/Export/Grundlohn; Bestandsverhalten `break_minutes = 0` bit-identisch.
 
-## Bewusst NICHT im Scope
-
-- Kein Umbau der UI-Sektionen, keine weiteren Feld-Änderungen.
-- Kein Anfassen von `getStaffPersonalDetails` oder Compensation.
-- Keine Migration — Fix ist rein anwendungslogisch.
-
-## Verifikation
-
-- `bunx tsgo` gegen die geänderten Dateien.
-- Unit-Test (neu): `personalDetailsPatchSchema.parse({ tax_class: "III" })` liefert genau `{ tax_class: "III" }`, nicht 28 Felder.
-- Manuell im Preview: eine einzelne Zeile ändern, speichern, Seite neu laden → alle anderen Felder bleiben stehen; Audit-Log meldet nur das eine Feld als geändert.
+### Klicktest (Bauherr)
+1. LAM laufende Periode: Buchhaltung = Brutto (Schalter „bezahlt"), Lohn-Grundlohn identisch, SFN unverändert.
+2. Schalter → „unbezahlt": Dialog zeigt Σ-Delta → bestätigen → Stunden sinken um Pausensumme, SFN gleich → zurückschalten.
+3. Alt-Monat-Export vor/nach PB2: byte-identisch.

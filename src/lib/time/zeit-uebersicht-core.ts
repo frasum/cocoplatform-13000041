@@ -145,6 +145,7 @@ export function buildWeekColumns(fromIso: string, toIso: string): WeekCol[] {
 import { berlinLocalToIso } from "@/lib/time/shift-hours";
 import { entryRowDepartment } from "@/lib/time/primary-department";
 import { computeShiftHours } from "@/lib/time/shift-hours";
+import { paidHours } from "@/lib/time/paid-hours";
 // (computeShiftHours wird in aggregateStaffDeptRows weiter unten benutzt.)
 
 export const DEPT_LABEL: Record<Department, string> = {

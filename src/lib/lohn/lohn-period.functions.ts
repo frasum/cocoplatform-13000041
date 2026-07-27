@@ -311,14 +311,25 @@ export async function aggregateSfnPeriod(
   const totalHours = Math.round(enriched.reduce((s, e) => s + e.paidHrs, 0) * 100) / 100;
   const workdayCount = countDistinctWorkdays(enriched.map((e) => e.row.shiftDate));
 
-  // Legacy-Skalar `hourlyRateCents`: Rate des Primär-Bereichs (WZ1) unter den
-  // tatsächlich benutzten Bereichen am `toDate`. Für Ein-Bereichs-Personen ist
-  // das exakt der Alt-Wert (rate am toDate). Für Mehrsatz-Personen ist es der
-  // gl-priorisierte Anzeigewert; die tatsächliche U/K-Gewichtung übernimmt
-  // 2a-iii über `uk-rate-weighted`.
-  const primaryDept =
-    orderedDepts.length > 0 ? primaryDepartment(orderedDepts) : primaryDepartment(staffDepts);
-  const hourlyRateCents = resolveRateCents(rates, primaryDept, toDate) ?? 0;
+  // LG3b A2 — Legacy-Skalar: Bereichssatz nur bei genau EINEM benutzten
+  // Bereich (bit-identisch zum Alt-Wert). Bei Mehrsatz `null` — der falsche
+  // Primär-Satz wäre für den Rest der Stunden schlicht die falsche Angabe;
+  // die Bereichszeilen (deptSlices) tragen ab 2b die Wahrheit.
+  // Leere Periode: Bereichs-Fallback über staff_locations, damit Detail-
+  // Ansicht/Exporte einen sinnvollen Anzeigewert bekommen.
+  let hourlyRateCents: number | null;
+  if (orderedDepts.length === 1) {
+    hourlyRateCents = resolveRateCents(rates, orderedDepts[0], toDate);
+  } else if (orderedDepts.length === 0) {
+    const fallbackDept = primaryDepartment(staffDepts);
+    hourlyRateCents = resolveRateCents(rates, fallbackDept, toDate) ?? 0;
+  } else {
+    hourlyRateCents = null;
+  }
+
+  const unresolvedHoursUnrounded = enriched
+    .filter((e) => e.unresolved)
+    .reduce((s, e) => s + e.paidHrs, 0);
 
   return {
     hourlyRateCents,
@@ -335,6 +346,7 @@ export async function aggregateSfnPeriod(
       paidHours: e.paidHrs,
       unresolved: e.unresolved,
     })),
+    unresolvedHoursUnrounded,
   };
 }
 

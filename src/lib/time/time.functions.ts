@@ -162,6 +162,17 @@ export const getMyPeriodEntries = createServerFn({ method: "GET" })
       }),
     );
 
+    // PB2 — Vergütungsminuten in der Selbstansicht folgen dem Org-Schalter
+    // `pausen_bezahlt` (Default TRUE). Kein manager+ nötig: nur der eine
+    // Boolean der eigenen Organisation wird geliefert.
+    const { data: orgSet, error: orgSetErr } = await supabaseAdmin
+      .from("organization_settings")
+      .select("pausen_bezahlt")
+      .eq("organization_id", caller.organizationId)
+      .maybeSingle();
+    if (orgSetErr) throw orgSetErr;
+    const pausenBezahlt = orgSet?.pausen_bezahlt ?? true;
+
     return {
       period: {
         id: period.id as string,
@@ -170,6 +181,7 @@ export const getMyPeriodEntries = createServerFn({ method: "GET" })
         endDate: period.end_date as string,
         isCurrent: offset === 0,
       },
+      pausenBezahlt,
       entries: (rows ?? []).map((r) => ({
         id: r.id as string,
         businessDate: r.business_date as string,

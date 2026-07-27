@@ -92,7 +92,7 @@ describe("aggregateHoursByStaffAndDept", () => {
     const entries = shifts.map((s) => ({
       staffId: "s5",
       businessDate: s.businessDate,
-      hoursWorked: computeShiftHours(s.startedAt, s.endedAt, s.businessDate).totalHours,
+      hoursWorked: computeShiftHours(s.startedAt, s.endedAt, s.businessDate, 0, true).totalHours,
       rawDepartment: null as Department | null,
     }));
     const totalExpected = entries.reduce((a, e) => a + e.hoursWorked, 0);

@@ -35,7 +35,10 @@ export { zeitlohnKategorie };
  * Wirft bei fehlenden `staff_personal_details` (gewollt — die Einzelansicht
  * soll klar fehlschlagen; die Übersicht fängt es pro Zeile ab).
  */
-async function computeLohnForStaff(
+// LG3b Etappe 2a-0: additiv exportiert, damit die Baseline-Fixtures
+// (`src/lib/lohn/lg3b-baseline-2a0.test.ts`) den unveränderten Alt-Pfad
+// aufrufen können. KEINE Verhaltensänderung — reine Sichtbarkeit.
+export async function computeLohnForStaff(
   supabaseAdmin: SupabaseClient<Database>,
   args: {
     staffId: string;

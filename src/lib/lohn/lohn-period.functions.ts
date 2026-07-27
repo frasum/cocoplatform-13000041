@@ -135,9 +135,7 @@ export async function aggregateSfnPeriod(
     .select("department")
     .eq("staff_id", staffId);
   if (locErr) throw locErr;
-  const staffDepts = Array.from(
-    new Set((locRows ?? []).map((r) => r.department as Department)),
-  );
+  const staffDepts = Array.from(new Set((locRows ?? []).map((r) => r.department as Department)));
 
   const { data: entries, error: entriesErr } = await supabaseAdmin
     .from("time_entries")

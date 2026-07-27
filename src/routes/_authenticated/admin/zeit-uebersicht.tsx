@@ -147,12 +147,19 @@ function ZeitUebersichtPage() {
   const fetchRecurring = useServerFn(listRecurringNotes);
   const callCreateRecurring = useServerFn(createRecurringNote);
   const callCancelRecurring = useServerFn(cancelRecurringNote);
+  const fetchOrgSettings = useServerFn(getOrgSettings);
 
   const locationsQ = useQuery({
     queryKey: ["admin-locations"],
     queryFn: () => fetchLocations(),
   });
   const locations = useMemo(() => locationsQ.data ?? [], [locationsQ.data]);
+  const orgSettingsQ = useQuery({
+    queryKey: ["org-settings"],
+    queryFn: () => fetchOrgSettings(),
+  });
+  // PB2 — Default true (PB1-Migration setzt Spalte NOT NULL DEFAULT TRUE).
+  const pausenBezahlt = orgSettingsQ.data?.pausenBezahlt ?? true;
   // WZ3 — Vollständige aktive Mitarbeiterliste (mit locationDepartments), damit
   // Zusammenfassung + Buchhaltung auch Personen ohne Zeit-Einträge zeigen.
   const staffAllQ = useQuery({

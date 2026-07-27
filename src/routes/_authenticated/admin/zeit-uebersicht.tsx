@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { listLocations } from "@/lib/admin/locations.functions";
 import { listStaff } from "@/lib/admin/staff.functions";
+import { getOrgSettings } from "@/lib/admin/org-settings.functions";
 import { LocationPills } from "@/components/shared/LocationPills";
 import {
   createPeriod,

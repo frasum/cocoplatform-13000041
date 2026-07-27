@@ -1,46 +1,46 @@
-## PB2 — Pausen-Einstellung verdrahten (paidHours überall)
+## PB2 Runde 2 — Abschluss (Freigabe mit drei Auflagen eingearbeitet)
 
-Vorgänger PB1 abgeschlossen (Spalte `organization_settings.pausen_bezahlt boolean NOT NULL DEFAULT TRUE`, aktuell `true`, kein Leser). LG3b wartet bis PB2 abgenommen ist.
+Ziel: Zwischenstand schließen, damit Buchhaltung, Export, Lohn-Grundlohn und Selbstansicht wieder auf **einer** Vergütungsstunden-Regel (`paidHours`) sitzen. Kein Publish vor Abnahme. Ausgangsmessung: 1918 Tests, Anker `f506d576`, ESLint-Warnung als bekannter roter Start.
 
-### 1) Spec-Ablage
-- `docs/PB2-pausen-verdrahtung.md` anlegen mit der vom Bauherrn gelieferten PB2-Spec (wortgleich).
+### Reihenfolge (bindend, weil CI rot ist)
 
-### 2) Reines Modul
-- Neu `src/lib/time/paid-hours.ts` mit `paidHours(grossHours, breakMinutes, pausenBezahlt) → number` (bei `false`: `max(0, grossHours − breakMinutes/60)`; bei `true`: `grossHours`).
-- Tests `paid-hours.test.ts`: beide Schalterstellungen, 0-Kappung, `breakMinutes = 0` ⇒ identisch zu Alt.
+**0) Sofort: `useMemo`-Deps reparieren** — `src/routes/_authenticated/admin/zeit-uebersicht.tsx`, useMemo endend ~Zeile 1059: `pausenBezahlt` (verwendet Zeile 1004) ins Dependency-Array aufnehmen. Ohne diesen Fix bleibt `--max-warnings=0` rot; alle weiteren Schritte scheitern am Gate.
 
-### 3) Buchhaltungs-Pfad (`computeShiftHours`)
-- `src/lib/time/shift-hours.ts`: Signatur um `breakMinutes: number` und `pausenBezahlt: boolean` erweitern; `totalHours = paidHours(...)`; SFN-Töpfe weiterhin über `applyBreakProration` (Import aus `lohn/time-entry-sfn.ts`, nicht nachbauen) — **unabhängig vom Schalter**.
-- Aufrufer durchreichen: `src/lib/time/zeit-uebersicht-core.ts` (LG2-Aggregation) und `src/routes/_authenticated/admin/zeit-uebersicht.tsx` (×2). `pausenBezahlt` einmal pro Request aus `getOrgSettings` laden, nicht je Eintrag.
-- Tests: Konsistenz Buchhaltung ↔ Export ↔ Lohn-Grundlohn für einen Fixture-Mitarbeiter unter beiden Schalterstellungen; Schalter-Invarianz der SFN-Töpfe.
+**1) Info-Text neutralisieren (Auflage 2 aus Runde 1)** — `src/components/settings/ArbeitszeitSection.tsx` Zeile 83 + Volltext-Scan auf weitere Default-/Empfehlungs-Formulierungen: Empfehlungssatz zu „Pausen bezahlt = Nein" entfernen, ersetzen durch neutrale Beschreibung beider Wirkungen ohne Bewertung. Fundstellen + alter/neuer Wortlaut in den Bericht.
 
-### 4) Lohn-Engine
-- `src/lib/lohn/compute-staff-sfn.ts` und `src/lib/lohn/lohn-period.functions.ts`: **Grundlohn-Stundenbasis** wird `paidHours(...)`. SFN-Geld-Berechnung bleibt unverändert (netto via `applyBreakProration`). Konsequenz bei `true`: Grundlohn brutto, Zuschläge netto — Lohnbüro-Auskunft 27.07.
-- **Vorab-Verifikation (Auflage 3):** vor Änderung ein `rg -n "break" src/lib/lohn/pap-2026 src/lib/lohn/golden-master` laufen lassen. Bestätigt sich Pause=0 überall in den Fixtures: ein Satz im Bericht. Findet sich ein Fixture mit `break_minutes > 0`: §104-Halt, weil Schritt 4 dann Golden-Master-Ergebnisse verändert und die Nullmessung neu zu schneiden ist.
+**2) Golden-Master-Beleg (Auflage 3 aus Runde 1, Pfade korrigiert — Auflage 1 dieser Runde)** — Pfade zuerst mit `ls` belegen, dann grep, beide Ausgaben wörtlich in den Bericht:
 
-### 5) Buchhaltungs-Export
-- `src/lib/time/buchhaltung-export.ts`: Stunden-Spalten (inkl. LG2 `stunden_gl/service/kueche`) folgen automatisch aus (3). Test `buchhaltung-export-columns.test.ts` um Doppel-Case (bezahlt/unbezahlt) erweitern; Alt-Monat mit Pause=0 byte-identisch (`buchhaltung-export-quarter.test.ts`).
+```
+ls -d pap-2026 src/lib/lohn/golden-master
+rg -n "break" pap-2026 src/lib/lohn/golden-master
+```
 
-### 6) Weitere Stundenbildner (Pfad-Korrektur, Auflage 1)
-- `src/lib/time/my-period-hours.ts` (Selbstansicht) und **`src/lib/statistics/personnel-stats.functions.ts`** (Personalquote — korrigierter Pfad) heute hart netto → auf `paidHours` umstellen; SFN-freie Struktur bleibt. Tests entsprechend erweitern.
-- §104-Meldepflicht: falls eine weitere Stundenbildner-Stelle auftaucht (Telegram-Report, Frag-COCO, TRMNL …), melden und listen, nicht still mit umstellen.
+Ein leeres `rg`-Ergebnis zählt nur, wenn `ls` beide Pfade als vorhanden gemeldet hat — sonst wäre der Beleg ein falsch-positives „kein Fund". Bei Fund von `break_minutes > 0` in Fixtures: sofort §104-Meldung, Schritt 3 anhalten.
 
-### 7) PB1-Dialog: Vorschau nachziehen
-- Neue reine Server-Function (lesend), die Σ `break_minutes` der geschlossenen Einträge der laufenden Periode je Mitarbeiter summiert; Bestätigungsdialog in `ArbeitszeitSection.tsx` zeigt „Σ ⟨X⟩ h über ⟨N⟩ Mitarbeiter".
+**3) Lohn-Engine — Grundlohnbasis (Planschritt 4, Auflage 2 dieser Runde)** — IO-Rand ausschließlich in `src/lib/lohn/lohn-period.functions.ts`: `pausen_bezahlt` einmal aus `organization_settings` laden (Org-ID via `staff.organization_id`) und `totalHours` der Grundlohnbasis über `paidHours(...)` bilden. `src/lib/lohn/compute-staff-sfn.ts` **bleibt rein** — nimmt `pausenBezahlt` bei Bedarf als Parameter, lädt selbst nichts. `applyBreakProration` / `berechneSfnGeld` unverändert (SFN weiter netto). Konsequenz bei `true`: Grundlohn brutto, Zuschläge netto — Lohnbüro-Auskunft 27.07.
 
-### 8) Nicht anfassen
-`applyBreakProration`, `berechneSfnGeld`, `pap-2026/**`, Golden-Master; `staff_compensation_rates`/LG3a; PB1-Schalter/Audit außer Dialog-Vorschau.
+**4) Selbstansicht (Planschritt 6, Teil A)** — `src/lib/time/my-period-hours.ts` + Test: reine Funktionen nehmen `pausenBezahlt` als Parameter und rufen `paidMinutes(gross, break, pausenBezahlt)`. Aufrufer (`src/routes/_authenticated/zeit/stunden.tsx`, ggf. `time.functions.ts`) reichen das Flag durch, geladen einmalig per `getOrgSettings`. Tests: beide Stellungen, 0-Kappung, `break = 0` bit-identisch zu Alt.
 
-### 9) Info-Text neutralisieren (Auflage 2)
-- `src/components/settings/ArbeitszeitSection.tsx`: die Formulierung „sauber: „Pausen bezahlt = Nein". „Ja" ist zulässig, aber freiwillig günstiger …" entfernen. Ersatz: neutrale Beschreibung beider Wirkungen (wie in der PB1-Auftragsvorlage), ohne Empfehlung. Beide Stellungen legitim; der Text erklärt, was passiert — er empfiehlt nichts.
-- Im Bericht nennen (Fundstelle + neuer Wortlaut). Volltext beim Bau nochmals auf weitere Default/Empfehlungs-Suggestionen prüfen; Funde ebenfalls neutralisieren.
+**5) Personalquote (Planschritt 6, Teil B, korrigierter Pfad)** — `src/lib/statistics/personnel-stats.functions.ts`: `loadWindow` verwendet `paidMinutes(...)` statt hartem `max(0, gross - break)`. `pausenBezahlt` einmal je Request laden. Tests entsprechend erweitern. Weitere Stundenbildner (Telegram-Report, Frag-COCO, TRMNL): melden statt still umstellen (§104).
+
+**6) Provision — Verhaltens-Einfrierung (Auflage 3 dieser Runde)** — `src/lib/lohn/provision.functions.ts`: `paidMinutes(..., false)` explizit setzen, mit ehrlichem Kommentar:
+
+> Eingefroren auf Bestandsverhalten: Provision rechnet unabhängig vom `pausen_bezahlt`-Schalter mit Netto-Minuten. Ob Provisions-/Trinkgeldstunden dem Pausen-Schalter folgen sollen, ist eine offene Bauherren-Frage — keine steuerliche Notwendigkeit.
+
+**7) Buchhaltungs-Export Doppel-Case-Tests (Planschritt 5)** — `src/lib/time/buchhaltung-export.ts` folgt automatisch aus Runde 1. Test `buchhaltung-export-columns.test.ts` um Fixture-Paar (bezahlt/unbezahlt) erweitern; `buchhaltung-export-quarter.test.ts` Alt-Monat mit Pause=0 bit-identisch prüfen.
+
+**8) Dialog-Vorschau (Planschritt 7)** — Neue lesende Server-Function: Σ `break_minutes` der geschlossenen Einträge der laufenden Periode je Mitarbeiter. `ArbeitszeitSection.tsx` Bestätigungsdialog zeigt „Σ ⟨X⟩ h über ⟨N⟩ Mitarbeiter" beim Umschalten.
 
 ### Erfolgs-Gate
-- `prettier --write` + `eslint --fix`, `tsc 0 · eslint 0/0 · prettier clean`.
-- `npx vitest run` grün; Vorzustand nur gemessen behaupten (Anker ≥ `32f73b21`, Ausgang 1910 Tests + neue).
-- Blockierende Tests: `paidHours` (beide Stellungen + 0-Kappung); Schalter-Invarianz SFN-Töpfe; Konsistenz Buchhaltung/Export/Grundlohn; Bestandsverhalten `break_minutes = 0` bit-identisch.
 
-### Klicktest (Bauherr)
-1. LAM laufende Periode: Buchhaltung = Brutto (Schalter „bezahlt"), Lohn-Grundlohn identisch, SFN unverändert.
-2. Schalter → „unbezahlt": Dialog zeigt Σ-Delta → bestätigen → Stunden sinken um Pausensumme, SFN gleich → zurückschalten.
-3. Alt-Monat-Export vor/nach PB2: byte-identisch.
+- `prettier --write` + `eslint --fix`; `tsc 0 · eslint 0/0 · prettier clean` (max-warnings=0).
+- `npx vitest run` grün; Ausgangs-Anker `f506d576` mit 1918 Tests + neue.
+- Blockierende Tests: `paidHours`/`paidMinutes` beide Stellungen + 0-Kappung; SFN-Schalter-Invarianz; Konsistenz Buchhaltung ↔ Export ↔ Grundlohn; Bestand `break_minutes = 0` bit-identisch (Export-Quarter).
+- Nicht anfassen: `applyBreakProration`, `berechneSfnGeld`, `pap-2026/**`, Golden-Master, `staff_compensation_rates`/LG3a, PB1-Schalter/Audit (außer Dialog-Vorschau).
+- **Kein Publish.** Bericht mit: Info-Text alt/neu, `ls`+`rg`-Ausgabe wörtlich, tsc/eslint/vitest-Zählern, Klicktest-Vorschlag.
+
+### Klicktest (nach Abnahme)
+
+1. LAM laufende Periode: Buchhaltung brutto (Schalter Ja), Lohn-Grundlohn identisch, SFN unverändert.
+2. Schalter → Nein: Dialog zeigt Σ-Delta → bestätigen → Stunden sinken um Pausensumme, SFN gleich → zurückschalten.
+3. Alt-Monat-Export vor/nach PB2: bit-identisch.

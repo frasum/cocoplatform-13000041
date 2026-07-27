@@ -22,6 +22,15 @@ type Props = {
   err: string | null;
   isPending: boolean;
   onChange: (next: boolean) => void;
+  /** PB2 — Vorschau der aktuellen Periode: Σ Pausenstunden + Anzahl
+   *  Mitarbeiter mit erfassten Pausen. Erscheint als Delta-Hinweis im
+   *  Bestätigungsdialog beim Umschalten. Optional — bei `null` wird die
+   *  Zeile nicht gerendert. */
+  breakSummary?: {
+    totalBreakHours: number;
+    staffCount: number;
+    periodLabel: string | null;
+  } | null;
 };
 
 export function ArbeitszeitSection({
@@ -31,6 +40,7 @@ export function ArbeitszeitSection({
   err,
   isPending,
   onChange,
+  breakSummary,
 }: Props) {
   const [pending, setPending] = useState<boolean | null>(null);
   const open = pending !== null;
@@ -236,6 +246,21 @@ export function ArbeitszeitSection({
                   Die Änderung gilt organisationsweit und wirkt rückwirkend auf alle Perioden, auch
                   auf bereits abgeschlossene.
                 </p>
+                {breakSummary && breakSummary.totalBreakHours > 0 && (
+                  <p className="rounded-md bg-muted/50 p-2 text-xs text-foreground">
+                    Δ laufende Periode
+                    {breakSummary.periodLabel ? ` (${breakSummary.periodLabel})` : ""}:{" "}
+                    <strong>
+                      Σ {breakSummary.totalBreakHours.toString().replace(".", ",")} h
+                    </strong>{" "}
+                    über <strong>{breakSummary.staffCount}</strong> Mitarbeiter
+                    {pausenBezahlt && !pending
+                      ? " würden bei „Nein" von den Vergütungsstunden abgezogen."
+                      : !pausenBezahlt && pending
+                        ? " würden bei „Ja" zusätzlich in die Vergütungsstunden fließen."
+                        : "."}
+                  </p>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>

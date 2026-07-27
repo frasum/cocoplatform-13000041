@@ -202,32 +202,22 @@ export async function computeLohnForStaff(
   const usedUrlaubTage = override?.urlaub_tage ?? 0;
   const usedKrankTage = override?.krank_tage ?? 0;
 
-  // LG3b 2a-iii — U/K-Satz: Ein-Bereich → Bereichssatz (identisch zum
-  // Alt-Wert); Mehr-Bereich → gewichteter 91-Tage-Durchschnitt.
-  // U/K wird nur ausgewertet, wenn Urlaubs-/Krank-Tage anfallen — sonst
-  // darf ein leeres 91-Tage-Fenster keinen §104-Halt auslösen.
+  // LG3b 2a-iii — U/K-Satz: Ein-Bereich → Bereichssatz; Mehr-Bereich →
+  // gewichteter 91-Tage-Durchschnitt. U/K wird nur ausgewertet, wenn
+  // U/K-Tage anfallen — sonst darf ein leeres 91-Tage-Fenster keinen
+  // §104-Halt auslösen.
   const braucheUkSatz = usedUrlaubTage > 0 || usedKrankTage > 0;
   const usedDepts = sfn.deptSlices.map((s) => s.department);
-  const ukResolution = braucheUkSatz
+  const ukResolution: UkRateResolution = braucheUkSatz
     ? await resolveUkHourlyRateCents(supabaseAdmin, {
         staffId: args.staffId,
         fromDate: args.fromDate,
         usedDepts,
         fallbackRateCents: sfn.hourlyRateCents,
       })
-    : { rateCents: sfn.hourlyRateCents ?? 0, missingDepartments: [] as Department[] };
+    : { rateCents: sfn.hourlyRateCents ?? 0, missingDepartments: [] };
   const ukHourlyRateCents = ukResolution.rateCents;
   const ukMissingDepartments = ukResolution.missingDepartments;
-  // Nicht mehr benötigt (durch die Auswertung oben ersetzt) — bewusst ohne
-  // Aufruf, damit der Fallback nicht doppelt läuft.
-  void ({} as unknown);
-  const _dead = async () => resolveUkHourlyRateCents(supabaseAdmin, {
-    staffId: args.staffId,
-    fromDate: args.fromDate,
-    usedDepts,
-    fallbackRateCents: sfn.hourlyRateCents,
-  });
-  void _dead;
 
   const ukZeilen = buildUrlaubKrankZeilen({
     urlaubTage: usedUrlaubTage,
@@ -252,16 +242,21 @@ export async function computeLohnForStaff(
 
   // LG3b 2a-iii — Zeitlohn und SFN je Bereich (Lohnart-Split). Bei
   // Ein-Bereichs-Personen entsteht wie im Alt-Pfad genau eine Zeitlohn-Zeile
-  // und genau eine SFN-Zeile — die Baseline-Nullmessung bleibt bit-identisch.
-  const kat = zeitlohnKategorie(person.beschaeftigung);
+  // und genau eine SFN-Zeile — die Baseline-Nullmessung bleibt bit-identisch
+  // (service → `zeitlohn`).
+  const fallbackKat = zeitlohnKategorie(person.beschaeftigung);
   const zeitlohnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
     const rate = slice.rateCents ?? 0;
-    const label =
-      person.beschaeftigung === "minijob"
-        ? AUSHILFE_LABEL[slice.department]
-        : ZEITLOHN_LABEL[slice.department];
+    const isMinijob = person.beschaeftigung === "minijob";
+    const label = isMinijob
+      ? AUSHILFE_LABEL[slice.department]
+      : ZEITLOHN_LABEL[slice.department];
+    // A3 — Kategorie je Bereich (Nicht-Minijob). Minijob bleibt bereichs-
+    // unabhängig `aushilfe_paust`; die Bereichsunterscheidung tragen die
+    // Labels. Etappe-1-Kategorien werden hierüber tatsächlich erzeugt.
+    const kategorie: Kategorie = isMinijob ? "aushilfe_paust" : ZEITLOHN_KATEGORIE[slice.department];
     return {
-      kategorie: kat,
+      kategorie,
       bezeichnung: label,
       betragCent: Math.round(slice.paidHours * rate),
       stunden: slice.paidHours,
@@ -283,14 +278,14 @@ export async function computeLohnForStaff(
   // Downstream-Anzeigen keine leere Zeilen-Liste sehen.
   if (zeitlohnZeilen.length === 0) {
     zeitlohnZeilen.push({
-      kategorie: kat,
+      kategorie: fallbackKat,
       bezeichnung:
         person.beschaeftigung === "minijob"
           ? "Aushilfe-Zeitlohn (pauschal)"
           : "Zeitlohn (Stunden × Satz)",
       betragCent: 0,
       stunden: 0,
-      satzCent: sfn.hourlyRateCents,
+      satzCent: sfn.hourlyRateCents ?? undefined,
     });
     sfnZeilen.push({
       kategorie: "zuschlag_frei",
@@ -299,9 +294,24 @@ export async function computeLohnForStaff(
     });
   }
 
+  // LG3b A5 — „Bereich nicht zuordenbar": Stunden aus Einträgen, deren
+  // Bereich WZ2 nicht klären konnte, sichtbar machen (0 € — der Betrag
+  // steckt in den Bereichszeilen 0). Zeile erscheint nur bei > 0 h.
+  const unresolvedZeilen: Entgeltzeile[] = [];
+  if (sfn.unresolvedHoursUnrounded > 0) {
+    const h = Math.round(sfn.unresolvedHoursUnrounded * 100) / 100;
+    unresolvedZeilen.push({
+      kategorie: fallbackKat,
+      bezeichnung: `Bereich nicht zuordenbar — ${h.toLocaleString("de-DE")} h, 0 €`,
+      betragCent: 0,
+      stunden: h,
+    });
+  }
+
   const zeilen: Entgeltzeile[] = [
     ...zeitlohnZeilen,
     ...sfnZeilen,
+    ...unresolvedZeilen,
     ...fixedZeilen,
     ...ukZeilen,
     ...recurringZeilen,
@@ -324,6 +334,14 @@ export async function computeLohnForStaff(
     diagnose,
     usedUrlaubTage,
     usedKrankTage,
+    // LG3b — Blocker-Rohdaten für den Export-Gate (Etappe 2b: CSV/XLSX).
+    unresolvedHoursUnrounded: sfn.unresolvedHoursUnrounded,
+    deptBuckets: sfn.deptSlices.map((s) => ({
+      department: s.department,
+      paidHoursUnrounded: s.paidHours,
+      rateCents: s.rateCents,
+    })),
+    ukMissingDepartments,
   };
 }
 

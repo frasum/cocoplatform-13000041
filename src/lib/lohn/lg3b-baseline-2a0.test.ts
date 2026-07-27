@@ -30,6 +30,8 @@ type Row = Record<string, unknown>;
 type Table =
   | "staff"
   | "staff_compensation"
+  | "staff_compensation_rates"
+  | "staff_locations"
   | "staff_personal_details"
   | "organization_settings"
   | "time_entries"
@@ -40,6 +42,8 @@ type Table =
 interface StubTables {
   staff: Row[];
   staff_compensation: Row[];
+  staff_compensation_rates: Row[];
+  staff_locations: Row[];
   staff_personal_details: Row[];
   organization_settings: Row[];
   time_entries: Row[];
@@ -149,6 +153,13 @@ function entry(businessDate: string, start: string, end: string, endDate?: strin
 const FIXTURE_A: StubTables = {
   staff: [{ id: "S", organization_id: ORG }],
   staff_compensation: [{ staff_id: "S", hourly_rate: 14.0 }],
+  // LG3b 2a-ii: Bereichs-Satz-Tabelle ist ab jetzt Rate-Quelle (Variante B —
+  // kein Fallback). Fall A ist Service-only → ein Satz reicht, um die
+  // Alt-Baseline bit-identisch zu treffen.
+  staff_compensation_rates: [
+    { staff_id: "S", department: "service", valid_from: "2025-01-01", hourly_rate: 14.0 },
+  ],
+  staff_locations: [],
   staff_personal_details: [{ staff_id: "S", ...personalDetails() }],
   organization_settings: [{ organization_id: ORG, pausen_bezahlt: true }],
   lohn_absence_days: [],
@@ -172,6 +183,10 @@ const FIXTURE_A: StubTables = {
 const FIXTURE_B: StubTables = {
   staff: [{ id: "S", organization_id: ORG }],
   staff_compensation: [{ staff_id: "S", hourly_rate: 15.0 }],
+  staff_compensation_rates: [
+    { staff_id: "S", department: "service", valid_from: "2025-01-01", hourly_rate: 15.0 },
+  ],
+  staff_locations: [],
   staff_personal_details: [{ staff_id: "S", ...personalDetails() }],
   organization_settings: [{ organization_id: ORG, pausen_bezahlt: true }],
   lohn_absence_days: [],
@@ -198,6 +213,10 @@ const FIXTURE_B: StubTables = {
 const FIXTURE_C: StubTables = {
   staff: [{ id: "S", organization_id: ORG }],
   staff_compensation: [{ staff_id: "S", hourly_rate: 16.0 }],
+  staff_compensation_rates: [
+    { staff_id: "S", department: "service", valid_from: "2025-01-01", hourly_rate: 16.0 },
+  ],
+  staff_locations: [],
   staff_personal_details: [{ staff_id: "S", ...personalDetails() }],
   organization_settings: [{ organization_id: ORG, pausen_bezahlt: true }],
   lohn_absence_days: [],

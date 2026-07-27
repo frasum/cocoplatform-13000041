@@ -340,6 +340,8 @@ export async function computeLohnForStaff(
       department: s.department,
       paidHoursUnrounded: s.paidHours,
       rateCents: s.rateCents,
+      // LG3b 2b — SFN je Bereich für den Übersichts-Export (A7).
+      zuschlagCents: (args.mode === "extended" ? s.extended : s.simple).zuschlagCents,
     })),
     ukMissingDepartments,
   };

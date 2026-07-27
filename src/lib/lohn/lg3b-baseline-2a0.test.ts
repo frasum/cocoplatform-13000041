@@ -37,7 +37,9 @@ type Table =
   | "time_entries"
   | "lohn_absence_days"
   | "lohn_recurring_zeilen"
-  | "roster_absence";
+  | "roster_absence"
+  | "roster_shifts"
+  | "skills";
 
 interface StubTables {
   staff: Row[];
@@ -50,6 +52,8 @@ interface StubTables {
   lohn_absence_days: Row[];
   lohn_recurring_zeilen: Row[];
   roster_absence: Row[];
+  roster_shifts: Row[];
+  skills: Row[];
 }
 
 /**

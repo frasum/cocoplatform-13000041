@@ -252,16 +252,91 @@ async function runBaseline(tables: StubTables) {
 describe("LG3b 2a-0 — Alt-Baseline (eingefroren gegen den Anker-Stand)", () => {
   it("Fall A — Service-only nach JOY-Muster (Fr/Sa/So 17:00-23:15, 50 h, 14 €)", async () => {
     const out = await runBaseline(FIXTURE_A);
-    expect(out).toMatchInlineSnapshot();
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "auszahlungCents": 0,
+        "avCent": 0,
+        "bruttoCents": 0,
+        "buckets": {
+          "holidayHours": 0,
+          "night25Hours": 26,
+          "night40Hours": 0,
+          "sundayHours": 12.5,
+        },
+        "entryCount": 8,
+        "hourlyRateCents": 0,
+        "kistCent": 0,
+        "kvCent": 0,
+        "lstCent": 0,
+        "nettoCents": 0,
+        "pvCent": 0,
+        "rvCent": 0,
+        "soliCent": 0,
+        "stBruttoAusweisCent": 0,
+        "totalHours": 50,
+        "workdayCount": 8,
+        "zuschlagCents": 0,
+      }
+    `);
   });
 
   it("Fall B — Küche-only nach GLAU-Muster (Mo-Fr 10:00-14:00, 32 h, 15 €)", async () => {
     const out = await runBaseline(FIXTURE_B);
-    expect(out).toMatchInlineSnapshot();
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "auszahlungCents": 0,
+        "avCent": 0,
+        "bruttoCents": 0,
+        "buckets": {
+          "holidayHours": 0,
+          "night25Hours": 0,
+          "night40Hours": 0,
+          "sundayHours": 0,
+        },
+        "entryCount": 8,
+        "hourlyRateCents": 0,
+        "kistCent": 0,
+        "kvCent": 0,
+        "lstCent": 0,
+        "nettoCents": 0,
+        "pvCent": 0,
+        "rvCent": 0,
+        "soliCent": 0,
+        "stBruttoAusweisCent": 0,
+        "totalHours": 32,
+        "workdayCount": 8,
+        "zuschlagCents": 0,
+      }
+    `);
   });
 
   it("Fall C — Volles SFN-Spektrum nach NET-Muster (Nacht + Sonntag, 28 h, 16 €)", async () => {
     const out = await runBaseline(FIXTURE_C);
-    expect(out).toMatchInlineSnapshot();
+    expect(out).toMatchInlineSnapshot(`
+      {
+        "auszahlungCents": 0,
+        "avCent": 0,
+        "bruttoCents": 0,
+        "buckets": {
+          "holidayHours": 0,
+          "night25Hours": 16,
+          "night40Hours": 8,
+          "sundayHours": 0,
+        },
+        "entryCount": 4,
+        "hourlyRateCents": 0,
+        "kistCent": 0,
+        "kvCent": 0,
+        "lstCent": 0,
+        "nettoCents": 0,
+        "pvCent": 0,
+        "rvCent": 0,
+        "soliCent": 0,
+        "stBruttoAusweisCent": 0,
+        "totalHours": 28,
+        "workdayCount": 4,
+        "zuschlagCents": 0,
+      }
+    `);
   });
 });

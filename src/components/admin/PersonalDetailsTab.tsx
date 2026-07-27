@@ -260,7 +260,19 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
         {
           title: "Steuer & Sozialversicherung",
           rows: [
-            { key: "tax_class", label: "Steuerklasse", type: "text" },
+            {
+              key: "tax_class",
+              label: "Steuerklasse",
+              type: "select",
+              options: [
+                { value: "I", label: "I – ledig" },
+                { value: "II", label: "II – alleinerziehend" },
+                { value: "III", label: "III – verheiratet (Haupt)" },
+                { value: "IV", label: "IV – verheiratet (gleich)" },
+                { value: "V", label: "V – verheiratet (Neben)" },
+                { value: "VI", label: "VI – Nebenjob" },
+              ],
+            },
             { key: "tax_id", label: "Steuer-ID", type: "text", sensitive: true },
             {
               key: "social_security_number",
@@ -387,6 +399,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
                     type={row.type}
                     value={rawVal}
                     onChange={(v) => setForm({ ...form, [k]: v })}
+                    options={"options" in row ? row.options : undefined}
                   />
                 );
               }
@@ -521,11 +534,13 @@ function FieldEditor({
   type,
   value,
   onChange,
+  options,
 }: {
   label: string;
   type: string;
   value: string | boolean | null;
   onChange: (v: string | boolean | null) => void;
+  options?: ReadonlyArray<{ value: string; label: string }>;
 }) {
   if (type === "bool") {
     return (
@@ -539,6 +554,25 @@ function FieldEditor({
           <option value="">—</option>
           <option value="true">ja</option>
           <option value="false">nein</option>
+        </select>
+      </label>
+    );
+  }
+  if (type === "select" && options) {
+    return (
+      <label className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <select
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+          className="w-56 rounded-md border border-input bg-background px-2 py-1 text-sm"
+        >
+          <option value="">—</option>
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
         </select>
       </label>
     );

@@ -13,6 +13,7 @@
 // werden aber Sentry-sichtbar mitgeschrieben (§106 PZ1-Standard).
 
 import { buildRosterPoolSnapshot } from "./roster-pool-snapshot";
+import { resolvePoolDefaults, type DepartmentDefaultRow } from "./pool-defaults";
 import type { StaffDepartment } from "@/lib/staff-domain";
 
 export async function applyRosterPoolSnapshot(input: {
@@ -32,7 +33,9 @@ export async function applyRosterPoolSnapshot(input: {
       .in("status", ["planned", "confirmed"]),
     supabaseAdmin
       .from("location_department_defaults")
-      .select("department, default_checkin, default_checkout")
+      .select(
+        "department, default_checkin, default_checkout, default_checkin_sunday_holiday, default_checkout_sunday_holiday",
+      )
       .eq("location_id", input.locationId),
   ]);
   if (shiftsRes.error) throw shiftsRes.error;
@@ -40,10 +43,15 @@ export async function applyRosterPoolSnapshot(input: {
 
   const defaultsByArea: Record<string, { checkin: string | null; checkout: string | null }> = {};
   for (const d of defaultsRes.data ?? []) {
-    defaultsByArea[d.department as string] = {
-      checkin: (d.default_checkin as string | null) ?? null,
-      checkout: (d.default_checkout as string | null) ?? null,
+    const row: DepartmentDefaultRow = {
+      default_checkin: (d.default_checkin as string | null) ?? null,
+      default_checkout: (d.default_checkout as string | null) ?? null,
+      default_checkin_sunday_holiday:
+        (d.default_checkin_sunday_holiday as string | null) ?? null,
+      default_checkout_sunday_holiday:
+        (d.default_checkout_sunday_holiday as string | null) ?? null,
     };
+    defaultsByArea[d.department as string] = resolvePoolDefaults(row, input.businessDate);
   }
   const snapshot = buildRosterPoolSnapshot({
     rosterShifts: (shiftsRes.data ?? []).map((r) => ({

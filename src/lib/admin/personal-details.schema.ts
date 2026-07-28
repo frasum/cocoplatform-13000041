@@ -15,13 +15,16 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * einen Freitext in die DB zu schreiben.
  */
 const TAX_CLASSES = ["I", "II", "III", "IV", "V", "VI"] as const;
+type TaxClass = (typeof TAX_CLASSES)[number];
 const taxClassField = z
   .union([z.string(), z.number(), z.null()])
   .optional()
-  .transform((v): "I" | "II" | "III" | "IV" | "V" | "VI" | null | typeof z.NEVER => {
+  .transform((v, ctx): TaxClass | null => {
     if (v === undefined || v === null) return null;
     if (typeof v === "number") {
-      return Number.isInteger(v) && v >= 1 && v <= 6 ? TAX_CLASSES[v - 1] : (undefined as never);
+      if (Number.isInteger(v) && v >= 1 && v <= 6) return TAX_CLASSES[v - 1];
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Steuerklasse muss I–VI sein" });
+      return z.NEVER;
     }
     const t = v.trim().toUpperCase();
     if (t === "") return null;
@@ -29,9 +32,9 @@ const taxClassField = z
     if (idx >= 0) return TAX_CLASSES[idx];
     const n = Number(t);
     if (Number.isInteger(n) && n >= 1 && n <= 6) return TAX_CLASSES[n - 1];
-    return undefined as never;
-  })
-  .pipe(z.enum(TAX_CLASSES).nullable());
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Steuerklasse muss I–VI sein" });
+    return z.NEVER;
+  });
 
 /** Trim + leere Strings zu null normalisieren. */
 const nullableText = (max: number) =>

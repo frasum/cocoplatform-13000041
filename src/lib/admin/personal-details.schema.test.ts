@@ -46,7 +46,7 @@ describe("personalDetailsSchema", () => {
         expect(personalDetailsSchema.parse({ tax_class: String(i) }).tax_class).toBe(roman);
       }
     });
-    it("„" + "" + "" + "" + "" + "" + "" + "" + "" + "" + "→ null (leer, whitespace, null)", () => {
+    it("leer / whitespace / null → null", () => {
       expect(personalDetailsSchema.parse({ tax_class: "" }).tax_class).toBeNull();
       expect(personalDetailsSchema.parse({ tax_class: "   " }).tax_class).toBeNull();
       expect(personalDetailsSchema.parse({ tax_class: null }).tax_class).toBeNull();

@@ -795,9 +795,14 @@ function RestUrlaubRow({
       </div>
     );
   }
-  const rest = base + (p ?? 0) - t;
+  const pv = p ?? 0;
+  const rest = base + pv - t;
   const fmt = (n: number) =>
     Number.isInteger(n) ? String(n) : n.toLocaleString("de-DE", { maximumFractionDigits: 1 });
+  // KR1 ③ — Vorzeichen der Vorjahres-Rate sauber ins Zeichen ziehen,
+  // damit „24 + -11 − 0" nicht mehr auftaucht.
+  const pSign = pv < 0 ? "−" : "+";
+  const pAbs = fmt(Math.abs(pv));
   return (
     <div className="mt-1 space-y-0.5 border-t border-dashed border-border/60 pt-2">
       <div className="flex items-baseline justify-between gap-3 text-sm">
@@ -811,7 +816,7 @@ function RestUrlaubRow({
       <div className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
         <span>{fallback ? "(Basis: Vertragswert)" : ""}</span>
         <span className="tabular-nums">
-          {fmt(base)} + {fmt(p ?? 0)} − {fmt(t)}
+          {fmt(base)} {pSign} {pAbs} − {fmt(t)}
         </span>
       </div>
     </div>

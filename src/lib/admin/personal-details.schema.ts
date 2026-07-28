@@ -8,6 +8,34 @@ import { SENSITIVE_FIELDS } from "./import-details";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * KR1 ② — tax_class am Parse-Rand härten (COCO-9-Nachwehe).
+ * Erlaubt: I–VI (Groß/Klein/whitespace-tolerant), 1–6 (Zahl oder Ziffer),
+ * "" → null, null/undefined → null. Alles andere schlägt fehl statt still
+ * einen Freitext in die DB zu schreiben.
+ */
+const TAX_CLASSES = ["I", "II", "III", "IV", "V", "VI"] as const;
+type TaxClass = (typeof TAX_CLASSES)[number];
+const taxClassField = z
+  .union([z.string(), z.number(), z.null()])
+  .optional()
+  .transform((v, ctx): TaxClass | null => {
+    if (v === undefined || v === null) return null;
+    if (typeof v === "number") {
+      if (Number.isInteger(v) && v >= 1 && v <= 6) return TAX_CLASSES[v - 1];
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Steuerklasse muss I–VI sein" });
+      return z.NEVER;
+    }
+    const t = v.trim().toUpperCase();
+    if (t === "") return null;
+    const idx = (TAX_CLASSES as readonly string[]).indexOf(t);
+    if (idx >= 0) return TAX_CLASSES[idx];
+    const n = Number(t);
+    if (Number.isInteger(n) && n >= 1 && n <= 6) return TAX_CLASSES[n - 1];
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Steuerklasse muss I–VI sein" });
+    return z.NEVER;
+  });
+
 /** Trim + leere Strings zu null normalisieren. */
 const nullableText = (max: number) =>
   z
@@ -91,7 +119,7 @@ export const personalDetailsSchema = z.object({
   date_of_birth: nullableDate,
   place_of_birth: nullableText(120),
   nationality: nullableText(60),
-  tax_class: nullableText(8),
+  tax_class: taxClassField,
   tax_id: nullableText(20),
   social_security_number: nullableText(20),
   is_minijob: nullableBool,

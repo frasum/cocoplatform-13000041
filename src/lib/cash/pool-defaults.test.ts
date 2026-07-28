@@ -44,7 +44,7 @@ describe("resolvePoolDefaults", () => {
       checkout: "02:00",
     });
   });
-  it("Sonntag ohne gepflegte So/Feiertag-Werte → null/null (kein Fallback auf Werktag)", () => {
+  it("Sonntag ohne gepflegte So/Feiertag-Werte → Werktagswerte (Fallback je Feld)", () => {
     expect(
       resolvePoolDefaults(
         {
@@ -55,7 +55,20 @@ describe("resolvePoolDefaults", () => {
         },
         "2026-07-26",
       ),
-    ).toEqual({ checkin: null, checkout: null });
+    ).toEqual({ checkin: "17:00", checkout: "01:00" });
+  });
+  it("Sonntag mit nur Sonder-checkin → checkin Sonder, checkout Werktag", () => {
+    expect(
+      resolvePoolDefaults(
+        {
+          default_checkin: "17:00",
+          default_checkout: "01:00",
+          default_checkin_sunday_holiday: "15:00",
+          default_checkout_sunday_holiday: null,
+        },
+        "2026-07-26",
+      ),
+    ).toEqual({ checkin: "15:00", checkout: "01:00" });
   });
   it("null-Row → null/null", () => {
     expect(resolvePoolDefaults(null, "2026-07-27")).toEqual({

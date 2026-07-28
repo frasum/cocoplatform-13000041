@@ -4,8 +4,13 @@
 // zusätzlich `default_checkin_sunday_holiday` und
 // `default_checkout_sunday_holiday` pflegen. An Sonntagen und bayerischen
 // Feiertagen gelten dann diese abweichenden Zeiten (Franks Hausregel: GL
-// Mo–Sa 17:00–01:00, So/Feiertag 15:00–02:00). Ohne Sonderwert bleibt es
-// beim regulären Default.
+// Mo–Sa 17:00–01:00, So/Feiertag 15:00–02:00).
+//
+// Fallback pro Feld: ist an So/Feiertag ein Sonderwert nicht gepflegt,
+// fällt genau DIESES Feld auf den Werktags-Wert zurück (`sunHol ?? regulär`).
+// Auch gemischt gepflegte Zeilen (nur Sonder-checkin) funktionieren so:
+// checkout fällt dann auf den Werktagswert zurück. Der DB-Spaltenkommentar
+// dokumentiert dieselbe Regel.
 //
 // Reines Modul: nur ISO-Datum + `getHolidayName` — kein DB-Zugriff.
 
@@ -36,10 +41,7 @@ export function isSundayOrHoliday(dateIso: string): boolean {
 }
 
 /**
- * Wählt zwischen regulären Werten und Sonntag/Feiertag-Werten. Ist der
- * Sonderwert nicht gepflegt, fällt die Auflösung bewusst NICHT auf den
- * Werktags-Default zurück (an So/Feiertag soll GL/Küche/Service dann keine
- * Zeit als „gearbeitet" mitschleifen).
+ * An So/Feiertag: pro Feld `sunHol ?? regulär`. Sonst reguläre Werte.
  */
 export function resolvePoolDefaults(
   row: DepartmentDefaultRow | null | undefined,
@@ -48,8 +50,8 @@ export function resolvePoolDefaults(
   if (!row) return { checkin: null, checkout: null };
   if (isSundayOrHoliday(dateIso)) {
     return {
-      checkin: row.default_checkin_sunday_holiday,
-      checkout: row.default_checkout_sunday_holiday,
+      checkin: row.default_checkin_sunday_holiday ?? row.default_checkin,
+      checkout: row.default_checkout_sunday_holiday ?? row.default_checkout,
     };
   }
   return {

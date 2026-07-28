@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 27.07.2026 abends (§111: LG3b-Serie abgenommen — Bereichs-Sätze lohnwirksam, Parallellauf gestrichen)
+Stand: 28.07.2026 (§112: Kellner-Endzeiten-Fix, GLD1, Repo-Umzug auf cocoplatform-13000041)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 

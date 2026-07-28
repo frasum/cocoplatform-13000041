@@ -34,7 +34,7 @@ export type RosterShiftInput = {
 };
 
 export type DefaultsByArea = Partial<
-  Record<"kitchen" | "service", { checkin: string | null; checkout: string | null }>
+  Record<"kitchen" | "service" | "gl", { checkin: string | null; checkout: string | null }>
 >;
 
 export type SnapshotEntry = {
@@ -68,12 +68,36 @@ export function buildRosterPoolSnapshot(input: {
   const out: SnapshotEntry[] = [];
   for (const [staffId, dept] of winner) {
     if (dept === "gl") {
+      // GLD1: GL bekommt Zeiten aus location_department_defaults (falls
+      // gepflegt); Tagestyp-Auswahl passiert bereits im Aufrufer via
+      // resolvePoolDefaults, das das Ergebnis in `defaultsByArea.gl` ablegt.
+      const glDef = input.defaultsByArea.gl;
+      const glIn = glDef?.checkin ?? null;
+      const glOut = glDef?.checkout ?? null;
+      if (!glIn || !glOut) {
+        out.push({
+          staffId,
+          department: "gl",
+          shiftStart: null,
+          shiftEnd: null,
+          hoursMinutes: 0,
+        });
+        continue;
+      }
+      const s = glIn.slice(0, 5);
+      const e = glOut.slice(0, 5);
+      let minutes = 0;
+      try {
+        minutes = kitchenShiftMinutes(s, e);
+      } catch {
+        minutes = 0;
+      }
       out.push({
         staffId,
         department: "gl",
-        shiftStart: null,
-        shiftEnd: null,
-        hoursMinutes: 0,
+        shiftStart: s,
+        shiftEnd: e,
+        hoursMinutes: minutes,
       });
       continue;
     }

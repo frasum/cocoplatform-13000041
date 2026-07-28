@@ -28,6 +28,37 @@ describe("personalDetailsSchema", () => {
     expect(() => personalDetailsSchema.parse({ vacation_days_taken: 400 })).toThrow();
   });
 
+  // KR1 ② — tax_class Härtung (COCO-9-Nachwehe).
+  describe("tax_class Härtung", () => {
+    it("akzeptiert I–VI (case/whitespace-tolerant)", () => {
+      for (const roman of ["I", "II", "III", "IV", "V", "VI"]) {
+        expect(personalDetailsSchema.parse({ tax_class: roman }).tax_class).toBe(roman);
+        expect(personalDetailsSchema.parse({ tax_class: roman.toLowerCase() }).tax_class).toBe(
+          roman,
+        );
+        expect(personalDetailsSchema.parse({ tax_class: `  ${roman}  ` }).tax_class).toBe(roman);
+      }
+    });
+    it("akzeptiert 1–6 (Zahl und Ziffernstring) und mappt auf I–VI", () => {
+      for (let i = 1; i <= 6; i++) {
+        const roman = ["I", "II", "III", "IV", "V", "VI"][i - 1];
+        expect(personalDetailsSchema.parse({ tax_class: i }).tax_class).toBe(roman);
+        expect(personalDetailsSchema.parse({ tax_class: String(i) }).tax_class).toBe(roman);
+      }
+    });
+    it("„" + "" + "" + "" + "" + "" + "" + "" + "" + "" + "→ null (leer, whitespace, null)", () => {
+      expect(personalDetailsSchema.parse({ tax_class: "" }).tax_class).toBeNull();
+      expect(personalDetailsSchema.parse({ tax_class: "   " }).tax_class).toBeNull();
+      expect(personalDetailsSchema.parse({ tax_class: null }).tax_class).toBeNull();
+    });
+    it("lehnt Freitext und außerhalb 1–6 ab", () => {
+      expect(() => personalDetailsSchema.parse({ tax_class: "VII" })).toThrow();
+      expect(() => personalDetailsSchema.parse({ tax_class: "0" })).toThrow();
+      expect(() => personalDetailsSchema.parse({ tax_class: 7 })).toThrow();
+      expect(() => personalDetailsSchema.parse({ tax_class: "abc" })).toThrow();
+    });
+  });
+
   // AV1a Stufe 1 — Adress-Aufspaltung.
   it("PLZ akzeptiert 4 und 5 Ziffern, lehnt 3 und Buchstaben ab, leer → null", () => {
     expect(personalDetailsSchema.parse({ postal_code: "12345" }).postal_code).toBe("12345");

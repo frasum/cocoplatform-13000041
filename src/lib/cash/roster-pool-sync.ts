@@ -46,10 +46,8 @@ export async function applyRosterPoolSnapshot(input: {
     const row: DepartmentDefaultRow = {
       default_checkin: (d.default_checkin as string | null) ?? null,
       default_checkout: (d.default_checkout as string | null) ?? null,
-      default_checkin_sunday_holiday:
-        (d.default_checkin_sunday_holiday as string | null) ?? null,
-      default_checkout_sunday_holiday:
-        (d.default_checkout_sunday_holiday as string | null) ?? null,
+      default_checkin_sunday_holiday: (d.default_checkin_sunday_holiday as string | null) ?? null,
+      default_checkout_sunday_holiday: (d.default_checkout_sunday_holiday as string | null) ?? null,
     };
     defaultsByArea[d.department as string] = resolvePoolDefaults(row, input.businessDate);
   }

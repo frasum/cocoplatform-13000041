@@ -1690,7 +1690,9 @@ export type Database = {
         Row: {
           created_at: string
           default_checkin: string
+          default_checkin_sunday_holiday: string | null
           default_checkout: string | null
+          default_checkout_sunday_holiday: string | null
           department: Database["public"]["Enums"]["staff_department"]
           id: string
           location_id: string
@@ -1700,7 +1702,9 @@ export type Database = {
         Insert: {
           created_at?: string
           default_checkin: string
+          default_checkin_sunday_holiday?: string | null
           default_checkout?: string | null
+          default_checkout_sunday_holiday?: string | null
           department: Database["public"]["Enums"]["staff_department"]
           id?: string
           location_id: string
@@ -1710,7 +1714,9 @@ export type Database = {
         Update: {
           created_at?: string
           default_checkin?: string
+          default_checkin_sunday_holiday?: string | null
           default_checkout?: string | null
+          default_checkout_sunday_holiday?: string | null
           department?: Database["public"]["Enums"]["staff_department"]
           id?: string
           location_id?: string

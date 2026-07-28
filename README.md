@@ -75,4 +75,3 @@ formatiert und sind deshalb nicht gelistet.
 
 `scripts/check-rls-inventory.sql` listet öffentliche und bedingungslose
 Policies. Wird in CI gegen die Migrationen geprüft.
-

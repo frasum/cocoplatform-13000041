@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 27.07.2026 (§110: AT1-Sentry-Fix, PB2, LG3a/b, Juli-Lohnabgleich, Security-Runde)
+Stand: 27.07.2026 abends (§111: LG3b-Serie abgenommen — Bereichs-Sätze lohnwirksam, Parallellauf gestrichen)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 

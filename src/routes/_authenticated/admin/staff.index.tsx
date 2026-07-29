@@ -34,11 +34,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Users } from "lucide-react";
+import { Search, Users, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/admin/role-guard";
 import { computeAgeYears } from "@/lib/profile/age";
 import { SkillAssignPopover } from "@/components/admin/SkillAssignPopover";
+import {
+  listOrphanAuthAccounts,
+  type OrphanAuthAccount,
+} from "@/lib/admin/orphan-accounts.functions";
 
 function formatTenure(startDate: string | null | undefined): string | null {
   if (!startDate) return null;
@@ -187,6 +191,15 @@ function StaffListPage() {
         .length,
     [sofortQ.data],
   );
+
+  // AC2 — Verwaiste Auth-Konten (nur Admin).
+  const orphansQ = useQuery({
+    queryKey: ["admin", "orphan-accounts"],
+    queryFn: () => listOrphanAuthAccounts(),
+    enabled: isAdmin,
+    staleTime: 60_000,
+  });
+  const orphans = orphansQ.data ?? [];
 
   const [activeGroup, setActiveGroup] = useState<"active" | "inactive">("active");
   const [search, setSearch] = useState("");
@@ -399,6 +412,8 @@ function StaffListPage() {
             nicht in sv.net gemeldet).
           </div>
         )}
+
+        {isAdmin && orphans.length > 0 && <OrphanAccountsCard orphans={orphans} />}
 
         {/* Matrix */}
         {!staffQ.isLoading && !staffQ.error && (

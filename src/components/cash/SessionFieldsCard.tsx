@@ -30,6 +30,7 @@ type UpdatePayload = {
 export function SessionFieldsCard({
   overview,
   channels,
+  channelsLoaded = true,
   terminals,
   writable,
   onSave,
@@ -50,6 +51,13 @@ export function SessionFieldsCard({
   sessionId: string;
   overview: Overview;
   channels: { id: string; label: string; kind: string; isActive: boolean }[];
+  /**
+   * KA1: `false`, solange der Kanal-Katalog noch nicht geladen ist. In dem
+   * Fall wird die Haus-Umsatz-Berechnung NICHT ausgeführt (kein Rechnen auf
+   * leerer Map), sondern als „–" angezeigt. Bei echtem Lookup-Miss (Katalog
+   * geladen, ID unbekannt) wirft `resolveChannelKind` weiterhin mit ID.
+   */
+  channelsLoaded?: boolean;
   terminals: { id: string; label: string; isActive: boolean; isGl: boolean }[];
   writable: boolean;
   onSave: (data: UpdatePayload) => Promise<unknown>;
@@ -293,15 +301,20 @@ export function SessionFieldsCard({
   // Nenner (Gäste) zählt nur Im-Haus-Gäste, also gehört Wolt/SoUse/eigener
   // Außer-Haus-Verkauf raus. Gemeinsamer Helfer mit PDF + Druckansicht,
   // damit Bildschirm, PDF und Druck garantiert dieselbe Zahl zeigen.
-  const houseCentsForAvg = sessionHouseCentsFromKasse({
-    vectronCents: parseEuroToCents(misc.vectron) ?? 0,
-    channels: chRows.map((r) => ({
-      kind: resolveChannelKind(channelKindById, r.id),
-      amountCents: parseEuroToCents(r.euro) ?? 0,
-    })),
-  });
+  // KA1: Nur rechnen, wenn der Kanal-Katalog geladen ist. Sonst würde die
+  // Auflösung gegen eine leere Map laufen und für jede bestehende
+  // channelAmount-Zeile werfen (Lade-Rennen).
+  const houseCentsForAvg = channelsLoaded
+    ? sessionHouseCentsFromKasse({
+        vectronCents: parseEuroToCents(misc.vectron) ?? 0,
+        channels: chRows.map((r) => ({
+          kind: resolveChannelKind(channelKindById, r.id),
+          amountCents: parseEuroToCents(r.euro) ?? 0,
+        })),
+      })
+    : null;
   const avgPerGuest =
-    guestNum > 0 && houseCentsForAvg > 0
+    channelsLoaded && houseCentsForAvg != null && guestNum > 0 && houseCentsForAvg > 0
       ? fmtCents(Math.round(houseCentsForAvg / guestNum)) + " €"
       : null;
 

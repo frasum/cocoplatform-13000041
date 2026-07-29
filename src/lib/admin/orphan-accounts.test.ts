@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { pickOrphanAccounts, type AuthUserLike } from "./orphan-accounts";
+import {
+  pickOrphanAccounts,
+  readProviderName,
+  readStaffIdHint,
+  type AuthUserLike,
+} from "./orphan-accounts";
 
 describe("pickOrphanAccounts", () => {
   it("filtert verknüpfte Nutzer heraus", () => {
@@ -56,9 +61,64 @@ describe("pickOrphanAccounts", () => {
   it("fehlende Felder werden zu null, nicht undefined", () => {
     const users: AuthUserLike[] = [{ id: "x" }];
     const [row] = pickOrphanAccounts(users, new Set());
-    expect(row).toEqual({ userId: "x", email: null, createdAt: null, lastSignInAt: null });
+    expect(row).toEqual({
+      userId: "x",
+      email: null,
+      createdAt: null,
+      lastSignInAt: null,
+      providerName: null,
+      linkedStaffId: null,
+      kind: "foreign",
+    });
     expect(row.email).toBeNull();
     expect(row.createdAt).toBeNull();
     expect(row.lastSignInAt).toBeNull();
+  });
+});
+
+describe("readProviderName (SP1)", () => {
+  it("liest full_name; name nur wenn full_name fehlt; preferred_username als letzte Stufe", () => {
+    expect(
+      readProviderName({ id: "x", user_metadata: { full_name: "A", name: "B", preferred_username: "C" } }),
+    ).toBe("A");
+    expect(readProviderName({ id: "x", user_metadata: { name: "B", preferred_username: "C" } })).toBe("B");
+    expect(readProviderName({ id: "x", user_metadata: { preferred_username: "C" } })).toBe("C");
+    expect(readProviderName({ id: "x", user_metadata: null })).toBeNull();
+    expect(readProviderName({ id: "x" })).toBeNull();
+  });
+  it("Nicht-String-Werte werden zu null (kein Absturz)", () => {
+    expect(readProviderName({ id: "x", user_metadata: { full_name: 42 } })).toBeNull();
+    expect(readProviderName({ id: "x", user_metadata: { full_name: { nested: "x" } } })).toBeNull();
+    expect(readProviderName({ id: "x", user_metadata: { full_name: null } })).toBeNull();
+  });
+});
+
+describe("readStaffIdHint & kind (SP1)", () => {
+  const STAFF_ID = "11111111-2222-3333-4444-555555555555";
+  it("app_metadata.staff_id → linkedStaffId gesetzt, kind = broken_link", () => {
+    const [row] = pickOrphanAccounts(
+      [{ id: "u1", app_metadata: { staff_id: STAFF_ID } }],
+      new Set(),
+    );
+    expect(row.linkedStaffId).toBe(STAFF_ID);
+    expect(row.kind).toBe("broken_link");
+  });
+  it("staff-<uuid>@internal.invalid ohne app_metadata → aus E-Mail, broken_link", () => {
+    const [row] = pickOrphanAccounts(
+      [{ id: "u1", email: `staff-${STAFF_ID}@internal.invalid` }],
+      new Set(),
+    );
+    expect(row.linkedStaffId).toBe(STAFF_ID);
+    expect(row.kind).toBe("broken_link");
+  });
+  it("weder noch → linkedStaffId null, kind = foreign", () => {
+    const [row] = pickOrphanAccounts([{ id: "u1", email: "someone@example.com" }], new Set());
+    expect(row.linkedStaffId).toBeNull();
+    expect(row.kind).toBe("foreign");
+  });
+  it("normale staff-…@example.com wird NICHT als Schatten-Muster erkannt", () => {
+    expect(readStaffIdHint({ id: "u1", email: "staff-hans@example.com" })).toBeNull();
+    const [row] = pickOrphanAccounts([{ id: "u1", email: "staff-hans@example.com" }], new Set());
+    expect(row.kind).toBe("foreign");
   });
 });

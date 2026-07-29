@@ -19,6 +19,7 @@ import { randomBytes, createHash } from "node:crypto";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { assertRealIdentity, resolveActiveImpersonation } from "@/lib/admin/impersonation";
+import { deriveTelegramLinkState } from "./link-status";
 
 const LINK_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 min
 
@@ -91,27 +92,28 @@ export const getMyTelegramLink = createServerFn({ method: "GET" })
     const botUsername = (settingsRes.data?.telegram_bot_username as string | null) ?? null;
     const row = linkRes.data;
 
-    if (!row) return { status: "none", botUsername };
-
-    if (row.linked_at && row.telegram_chat_id) {
+    // SP1 — Statusregel liegt zentral in @/lib/telegram/link-status; die
+    // Antwortform bleibt unverändert (Banner darf nicht anfassen müssen).
+    const state = deriveTelegramLinkState(row);
+    if (state === "none") return { status: "none", botUsername };
+    if (state === "linked") {
       return {
         status: "linked",
         botUsername,
-        telegramUsername: (row.telegram_username as string | null) ?? null,
-        linkedAt: row.linked_at as string,
+        telegramUsername: (row!.telegram_username as string | null) ?? null,
+        linkedAt: row!.linked_at as string,
       };
-    }
-
-    // Pending: prüfen, ob Token noch gültig.
-    const expiresAt = row.token_expires_at as string | null;
-    if (!expiresAt || new Date(expiresAt).getTime() < Date.now()) {
-      return { status: "none", botUsername };
     }
     // Deep-Link ist nach dem Erzeugen (startTelegramLink) einmalig sichtbar
     // und wird nicht wieder aus der DB rekonstruiert — der Klartext-Token
     // wird als Hash gespeichert. Für pending-Zustände nach Reload muss der
     // Mitarbeiter „Neu starten" wählen.
-    return { status: "pending", botUsername, deepLink: null, expiresAt };
+    return {
+      status: "pending",
+      botUsername,
+      deepLink: null,
+      expiresAt: row!.token_expires_at as string,
+    };
   });
 
 export const startTelegramLink = createServerFn({ method: "POST" })

@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Users, UserCheck, UserX } from "lucide-react";
+import { Search, Send, Users, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/admin/role-guard";
 import { computeAgeYears } from "@/lib/profile/age";
@@ -543,6 +543,32 @@ function StaffMatrixRow({
               </p>
             </TooltipContent>
           </Tooltip>
+          {staff.telegramState !== "none" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  aria-label={
+                    staff.telegramState === "linked"
+                      ? "Telegram verbunden"
+                      : "Telegram-Einladung offen"
+                  }
+                  className={cn(
+                    "inline-flex h-4 w-4 items-center justify-center",
+                    staff.telegramState === "linked" ? "text-blue-600" : "text-amber-500",
+                  )}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">
+                  {staff.telegramState === "linked"
+                    ? "Telegram verbunden"
+                    : "Telegram-Einladung offen"}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Link
             to="/admin/staff/$staffId"
             params={{ staffId: staff.id }}
@@ -731,7 +757,12 @@ function RoleCell({ staffId, role }: { staffId: string; role: AppRole | null }) 
 // AC2 — Panel: Auth-Konten, die nicht als Mitarbeiter dieser Organisation
 // verknüpft sind. Rein informativ; keine Aktionen (Verknüpfen/Löschen läuft
 // über Einladung im Stammblatt bzw. das Supabase-Dashboard).
-function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
+type OrphanRow = OrphanAuthAccount & {
+  linkedStaffName?: string | null;
+  linkedStaffPersoNr?: number | null;
+};
+
+function OrphanAccountsCard({ orphans }: { orphans: OrphanRow[] }) {
   const [open, setOpen] = useState(false);
   return (
     <Card className="border-amber-300/60">
@@ -755,28 +786,62 @@ function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="min-w-[180px]">Name</TableHead>
                 <TableHead>E-Mail</TableHead>
+                <TableHead className="min-w-[160px]">Herkunft</TableHead>
                 <TableHead className="min-w-[140px]">Angelegt</TableHead>
                 <TableHead className="min-w-[160px]">Letzte Anmeldung</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orphans.map((o) => (
-                <TableRow key={o.userId}>
-                  <TableCell className="font-mono text-xs">{o.email ?? "—"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {o.createdAt ? new Date(o.createdAt).toLocaleString("de-DE") : "—"}
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {o.lastSignInAt ? new Date(o.lastSignInAt).toLocaleString("de-DE") : "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {orphans.map((o) => {
+                const isBroken = o.kind === "broken_link";
+                const name = isBroken
+                  ? o.linkedStaffName
+                    ? o.linkedStaffPersoNr != null
+                      ? `${o.linkedStaffName} (${o.linkedStaffPersoNr})`
+                      : o.linkedStaffName
+                    : (o.providerName ?? "—")
+                  : (o.providerName ?? "—");
+                return (
+                  <TableRow key={o.userId}>
+                    <TableCell className="text-sm">{name}</TableCell>
+                    <TableCell className="font-mono text-xs">{o.email ?? "—"}</TableCell>
+                    <TableCell className="text-xs">
+                      {isBroken ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge
+                            variant="outline"
+                            className="w-fit border-amber-400 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+                          >
+                            Verknüpfung fehlt
+                          </Badge>
+                          <span className="text-[11px] text-muted-foreground">
+                            COCO-Konto ohne user_links-Eintrag
+                          </span>
+                        </div>
+                      ) : (
+                        <Badge variant="outline" className="w-fit">
+                          Fremdanmeldung
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {o.createdAt ? new Date(o.createdAt).toLocaleString("de-DE") : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {o.lastSignInAt ? new Date(o.lastSignInAt).toLocaleString("de-DE") : "—"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
           <p className="px-4 py-2 text-xs text-muted-foreground">
-            Diese Konten existieren in der Anmeldung, sind aber keinem Mitarbeiter zugeordnet. Über
-            „Neuer Mitarbeiter" oder die Einladung im Stammblatt lässt sich das Konto zuordnen.
+            Diese Konten existieren in der Anmeldung, sind aber keinem Mitarbeiter zugeordnet.{" "}
+            <strong>Verknüpfung fehlt</strong> heißt: COCO hat das Konto selbst angelegt, die
+            Zuordnung ist verlorengegangen — hier ist der Mitarbeiter bekannt.{" "}
+            <strong>Fremdanmeldung</strong> heißt: das Konto gehört zu niemandem im Betrieb.
           </p>
         </div>
       )}

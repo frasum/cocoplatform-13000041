@@ -59,5 +59,35 @@ export const listOrphanAuthAccounts = createServerFn({ method: "GET" })
       );
     }
 
-    return pickOrphanAccounts(allUsers, linked);
+    const orphans = pickOrphanAccounts(allUsers, linked);
+
+    // SP1 — Herkunft auflösen: für „broken_link"-Einträge den echten
+    // COCO-Anzeigenamen aus staff nachladen. Eine Abfrage, nicht pro Zeile.
+    // Findet sich zur staff_id keine Zeile mehr (gelöscht), bleibt der
+    // Name null — kind bleibt broken_link (nicht als Fremdanmeldung
+    // fehldeuten).
+    const staffIds = Array.from(
+      new Set(orphans.map((o) => o.linkedStaffId).filter((id): id is string => !!id)),
+    );
+    const staffMap = new Map<string, { displayName: string; persoNr: number | null }>();
+    if (staffIds.length > 0) {
+      const rows = expectOk<{ id: string; display_name: string; perso_nr: number | null }[]>(
+        await supabaseAdmin
+          .from("staff")
+          .select("id, display_name, perso_nr")
+          .in("id", staffIds),
+        "listOrphanAuthAccounts.staff",
+      );
+      for (const r of rows ?? []) {
+        staffMap.set(r.id, { displayName: r.display_name, persoNr: r.perso_nr });
+      }
+    }
+    return orphans.map((o) => {
+      const s = o.linkedStaffId ? staffMap.get(o.linkedStaffId) : null;
+      return {
+        ...o,
+        linkedStaffName: s?.displayName ?? null,
+        linkedStaffPersoNr: s?.persoNr ?? null,
+      };
+    });
   });

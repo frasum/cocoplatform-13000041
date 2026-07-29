@@ -34,11 +34,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Users } from "lucide-react";
+import { Search, Users, UserCheck, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/lib/admin/role-guard";
 import { computeAgeYears } from "@/lib/profile/age";
 import { SkillAssignPopover } from "@/components/admin/SkillAssignPopover";
+import {
+  listOrphanAuthAccounts,
+  type OrphanAuthAccount,
+} from "@/lib/admin/orphan-accounts.functions";
 
 function formatTenure(startDate: string | null | undefined): string | null {
   if (!startDate) return null;
@@ -187,6 +191,15 @@ function StaffListPage() {
         .length,
     [sofortQ.data],
   );
+
+  // AC2 — Verwaiste Auth-Konten (nur Admin).
+  const orphansQ = useQuery({
+    queryKey: ["admin", "orphan-accounts"],
+    queryFn: () => listOrphanAuthAccounts(),
+    enabled: isAdmin,
+    staleTime: 60_000,
+  });
+  const orphans = orphansQ.data ?? [];
 
   const [activeGroup, setActiveGroup] = useState<"active" | "inactive">("active");
   const [search, setSearch] = useState("");
@@ -400,6 +413,8 @@ function StaffListPage() {
           </div>
         )}
 
+        {isAdmin && orphans.length > 0 && <OrphanAccountsCard orphans={orphans} />}
+
         {/* Matrix */}
         {!staffQ.isLoading && !staffQ.error && (
           <Card className="overflow-hidden">
@@ -506,6 +521,28 @@ function StaffMatrixRow({
       <TableCell className="sticky left-0 z-10 bg-background group-hover:bg-muted/50">
         <div className="flex items-center gap-1.5">
           {isAdmin && sofortStatus && <SofortmeldungDot staffId={staff.id} status={sofortStatus} />}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                aria-label={staff.hasAccount ? "Online-Konto vorhanden" : "Kein Online-Konto"}
+                className={cn(
+                  "inline-flex h-4 w-4 items-center justify-center rounded-full",
+                  staff.hasAccount ? "text-emerald-600" : "text-muted-foreground/50",
+                )}
+              >
+                {staff.hasAccount ? (
+                  <UserCheck className="h-3.5 w-3.5" />
+                ) : (
+                  <UserX className="h-3.5 w-3.5" />
+                )}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">
+                {staff.hasAccount ? "Online-Konto eingerichtet" : "Noch kein Online-Konto"}
+              </p>
+            </TooltipContent>
+          </Tooltip>
           <Link
             to="/admin/staff/$staffId"
             params={{ staffId: staff.id }}
@@ -688,5 +725,68 @@ function RoleCell({ staffId, role }: { staffId: string; role: AppRole | null }) 
         </option>
       ))}
     </select>
+  );
+}
+
+// AC2 — Panel: Auth-Konten, die nicht als Mitarbeiter dieser Organisation
+// verknüpft sind. Rein informativ; keine Aktionen (Verknüpfen/Löschen läuft
+// über Einladung im Stammblatt bzw. das Supabase-Dashboard).
+function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="border-amber-300/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-2">
+          <UserX className="h-4 w-4 text-amber-600" />
+          <span className="text-sm font-medium">
+            Anmeldungen ohne Mitarbeiter
+          </span>
+          <Badge variant="outline" className="text-xs">
+            {orphans.length}
+          </Badge>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {open ? "Ausblenden" : "Anzeigen"}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>E-Mail</TableHead>
+                <TableHead className="min-w-[140px]">Angelegt</TableHead>
+                <TableHead className="min-w-[160px]">Letzte Anmeldung</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orphans.map((o) => (
+                <TableRow key={o.userId}>
+                  <TableCell className="font-mono text-xs">{o.email ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {o.createdAt ? new Date(o.createdAt).toLocaleString("de-DE") : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {o.lastSignInAt
+                      ? new Date(o.lastSignInAt).toLocaleString("de-DE")
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="px-4 py-2 text-xs text-muted-foreground">
+            Diese Konten haben sich angemeldet, sind aber nicht als Mitarbeiter dieser Organisation
+            verknüpft. Über „Neuer Mitarbeiter" oder die Einladung im Stammblatt lässt sich das
+            Konto zuordnen.
+          </p>
+        </div>
+      )}
+    </Card>
   );
 }

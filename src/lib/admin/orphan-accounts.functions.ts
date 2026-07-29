@@ -1,63 +1,63 @@
 // AC2 — Verwaiste Auth-Konten: Auth-User ohne user_links-Eintrag in dieser
-// Organisation. Reine Anzeige (admin-only), keine Aktionen. Dient als
+// Anmeldung. Reine Anzeige (admin-only), keine Aktionen. Dient als
 // Auffang-Sichtbarkeit, wenn sich jemand anmeldet, den es nicht als
 // Mitarbeiter gibt (oder dessen Verknüpfung fehlt).
 //
 // Sicherheit: admin-only via loadAdminCaller("admin"). Kein Audit-Eintrag —
 // pures Lesen, kein State-Change.
+//
+// AC2-F: Die Auswahl-Logik liegt in `./orphan-accounts.ts`; hier bleibt nur
+// Datenbeschaffung. `user_links` wird projektweit gelesen (kein Org-Filter),
+// weil „verwaist" heißt „nirgendwo verknüpft" — die Begründung steht dort im
+// Kopfkommentar.
 
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAdminCaller } from "./admin-context";
 import { expectOk } from "@/lib/supabase/expect-ok";
-
-export type OrphanAuthAccount = {
-  userId: string;
-  email: string | null;
-  createdAt: string | null;
-  lastSignInAt: string | null;
-};
+import { pickOrphanAccounts, type AuthUserLike } from "./orphan-accounts";
+export type { OrphanAuthAccount } from "./orphan-accounts";
 
 export const listOrphanAuthAccounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<OrphanAuthAccount[]> => {
-    const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+  .handler(async ({ context }) => {
+    // Rollen-Gate; das Ergebnis wird nicht gebunden, weil die Abfrage
+    // organisationsübergreifend läuft (siehe Kopfkommentar).
+    await loadAdminCaller(context.supabase, context.userId, "admin");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // 1) Alle user_ids der aktuellen Organisation aus user_links.
+    // 1) Alle user_ids aus user_links — projektweit, kein Org-Filter.
+    //    Ein Konto, das in irgendeiner Organisation verknüpft ist, ist kein
+    //    Waisenkind und darf hier nicht mit E-Mail/Login erscheinen.
     const linkRows = expectOk<{ user_id: string }[]>(
-      await supabaseAdmin
-        .from("user_links")
-        .select("user_id")
-        .eq("organization_id", caller.organizationId),
+      await supabaseAdmin.from("user_links").select("user_id"),
       "listOrphanAuthAccounts.user_links",
     );
     const linked = new Set((linkRows ?? []).map((r) => r.user_id));
 
-    // 2) Alle Auth-User seitenweise abrufen und diejenigen behalten, die
-    //    in dieser Organisation nicht verknüpft sind.
-    const orphans: OrphanAuthAccount[] = [];
+    // 2) Alle Auth-User seitenweise einsammeln; die Auswahl-/Sortier-Regel
+    //    lebt im reinen Modul.
+    const allUsers: AuthUserLike[] = [];
     const perPage = 200;
-    for (let page = 1; page <= 50; page++) {
+    const MAX_PAGES = 50;
+    let lastPageWasShort = false;
+    for (let page = 1; page <= MAX_PAGES; page++) {
       const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
       if (error) throw new Error(error.message);
       const users = data?.users ?? [];
-      for (const u of users) {
-        if (linked.has(u.id)) continue;
-        orphans.push({
-          userId: u.id,
-          email: u.email ?? null,
-          createdAt: u.created_at ?? null,
-          lastSignInAt: u.last_sign_in_at ?? null,
-        });
+      for (const u of users) allUsers.push(u as AuthUserLike);
+      if (users.length < perPage) {
+        lastPageWasShort = true;
+        break;
       }
-      if (users.length < perPage) break;
+    }
+    if (!lastPageWasShort) {
+      // Kein stiller Abbruch: lieber hörbar scheitern als eine gekürzte
+      // Liste anzeigen.
+      throw new Error(
+        "listOrphanAuthAccounts: Seitenlimit erreicht (>10000 Auth-Konten) — Liste wäre unvollständig",
+      );
     }
 
-    orphans.sort((a, b) => {
-      const av = a.lastSignInAt ?? a.createdAt ?? "";
-      const bv = b.lastSignInAt ?? b.createdAt ?? "";
-      return bv.localeCompare(av);
-    });
-    return orphans;
+    return pickOrphanAccounts(allUsers, linked);
   });

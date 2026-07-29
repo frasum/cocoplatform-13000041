@@ -252,8 +252,8 @@ function ConfigCheckPage() {
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold text-foreground">Sentry-Diagnose</h2>
           <p className="text-xs text-muted-foreground">
-            Löst bewusst je einen Testfehler im Browser bzw. auf dem Server aus, um zu prüfen,
-            dass Sentry Meldungen samt Source-Maps und Tags empfängt. Die Fehler sind mit
+            Löst bewusst je einen Testfehler im Browser bzw. auf dem Server aus, um zu prüfen, dass
+            Sentry Meldungen samt Source-Maps und Tags empfängt. Die Fehler sind mit
             <code className="mx-1 font-mono">test=true</code>markiert und tauchen im Sentry-Projekt
             unter <em>Issues</em> auf.
           </p>
@@ -276,9 +276,7 @@ function ConfigCheckPage() {
             Server-Testfehler senden
           </button>
           <div className="text-xs">
-            {testStatus.kind === "idle" && (
-              <span className="text-muted-foreground">Bereit.</span>
-            )}
+            {testStatus.kind === "idle" && <span className="text-muted-foreground">Bereit.</span>}
             {testStatus.kind === "sending" && (
               <span className="text-muted-foreground">
                 Sende {testStatus.scope === "client" ? "Client" : "Server"}-Testfehler …

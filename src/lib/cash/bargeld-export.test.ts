@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { buildBargeldXlsx } from "./bargeld-export";
 import type { CashDailyRow } from "./cash.functions";
 
@@ -22,6 +22,18 @@ const row: CashDailyRow = {
 };
 
 describe("buildBargeldXlsx", () => {
+  // XL1 — `buildBargeldXlsx` lädt exceljs per dynamischem Import erst beim
+  // Aufruf. Das erstmalige Auflösen des Pakets dauert in langsamen Sandboxes
+  // länger als das 5-s-Testlimit und hat den Test dreimal fälschlich rot
+  // gemeldet (§109). Das Paket wird deshalb einmal vorgeladen — mit eigenem,
+  // großzügigem Limit. Der Testkörper behält seine 5 s, damit eine echte
+  // Verlangsamung der Export-Logik weiterhin auffällt.
+  // Der dynamische Import im Produktionsmodul bleibt bewusst bestehen:
+  // exceljs gehört nicht ins Haupt-Bundle.
+  beforeAll(async () => {
+    await import("exceljs");
+  }, 30_000);
+
   it("erzeugt einen nicht-leeren Blob", async () => {
     const blob = await buildBargeldXlsx([row, { ...row, businessDate: "2026-06-03" }], "Juni 2026");
     expect(blob).toBeInstanceOf(Blob);

@@ -392,10 +392,17 @@ function KassePage() {
       toast.error("Bitte zuerst die Gästeanzahl eintragen und speichern.");
       return null;
     }
+    // KA1: Kein Rechnen auf leerer Kanal-/Terminal-Map. Bricht bei
+    // ungeladenem Katalog ab statt in `resolveChannelKind` zu werfen —
+    // der Nutzer bekommt eine klare Meldung.
+    if (!channelsQ.data || !terminalsQ.data) {
+      toast.error("Kanal-/Terminal-Katalog wird noch geladen — bitte kurz warten.");
+      return null;
+    }
     return buildDailySummaryData({
       overview: ov,
-      channels: (channelsQ.data ?? []).map((c) => ({ id: c.id, label: c.label, kind: c.kind })),
-      terminals: (terminalsQ.data ?? []).map((t) => ({
+      channels: channelsQ.data.map((c) => ({ id: c.id, label: c.label, kind: c.kind })),
+      terminals: terminalsQ.data.map((t) => ({
         id: t.id,
         label: t.label,
         isGl: t.isGl,
@@ -627,6 +634,7 @@ function KassePage() {
             sessionId={sessionId!}
             overview={ovQ.data}
             channels={channelsQ.data ?? []}
+            channelsLoaded={channelsQ.data != null}
             terminals={terminalsQ.data ?? []}
             writable={writable}
             cashBalanceTargetCents={cashBalanceTargetResolvedCents}
@@ -637,6 +645,10 @@ function KassePage() {
             kpiSlot={(() => {
               const sess = ovQ.data.session;
               if (!sess) return null;
+              // KA1: Erst rechnen, wenn der Kanal-Katalog geladen ist —
+              // sonst würde die Auflösung gegen eine leere Map laufen und
+              // in `resolveChannelKind` werfen (Lade-Rennen).
+              const channelsLoaded = channelsQ.data != null;
               const vectronTotal = Number(sess.vectron_daily_total_cents ?? 0);
               // KA1: Map aus dem ungefilterten Kanalbestand (inkl. inaktiver);
               // Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
@@ -645,13 +657,15 @@ function KassePage() {
               );
               // N14b: gemeinsame Haus-Umsatz-Definition (Kasse-Modell) —
               // dieselbe Größe wie Inline (SessionFieldsCard), PDF und Druck.
-              const inHouseCents = sessionHouseCentsFromKasse({
-                vectronCents: vectronTotal,
-                channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
-                  kind: resolveChannelKind(channelKindById, c.channelId),
-                  amountCents: c.amountCents,
-                })),
-              });
+              const inHouseCents = channelsLoaded
+                ? sessionHouseCentsFromKasse({
+                    vectronCents: vectronTotal,
+                    channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
+                      kind: resolveChannelKind(channelKindById, c.channelId),
+                      amountCents: c.amountCents,
+                    })),
+                  })
+                : null;
               // Quote = nur aktive Abrechnungen; Liste zeigt superseded bewusst weiter.
               const tipCents = computeTipTotalCents(
                 activeSettlements(ovQ.data.settlements).map((s) => ({
@@ -667,12 +681,14 @@ function KassePage() {
                 })),
               );
               const tipPct =
-                inHouseCents > 0
+                inHouseCents != null && inHouseCents > 0
                   ? ((tipCents / inHouseCents) * 100).toFixed(1).replace(".", ",")
                   : null;
               const guests = sess.guest_count ?? 0;
               const perGuestCents =
-                guests > 0 && inHouseCents > 0 ? Math.round(inHouseCents / guests) : null;
+                inHouseCents != null && guests > 0 && inHouseCents > 0
+                  ? Math.round(inHouseCents / guests)
+                  : null;
               return (
                 <div className="space-y-3">
                   <Card className="p-4">
@@ -683,7 +699,8 @@ function KassePage() {
                       {tipPct == null ? "–" : `${tipPct} %`}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Pool {fmtCents(tipCents)} / In-House-Umsatz {fmtCents(inHouseCents)}
+                      Pool {fmtCents(tipCents)} / In-House-Umsatz{" "}
+                      {inHouseCents == null ? "–" : fmtCents(inHouseCents)}
                     </div>
                   </Card>
                   <Card className="p-4">

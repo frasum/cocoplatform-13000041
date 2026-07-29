@@ -1,42 +1,30 @@
 ## Ziel
+Auf `/admin/staff` auf einen Blick sehen, welcher Mitarbeiter ein Online-Konto hat, und daneben eine Auffangliste für Personen, die sich per Auth angemeldet haben, aber keinem Mitarbeiter zugeordnet sind.
 
-`SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` so hinterlegen, dass `@sentry/vite-plugin` beim Publish-Build Source-Maps hochlädt.
+## Änderungen
 
-## Situation laut Screenshot
+### 1. `listStaff` um Kontostatus erweitern
+`src/lib/admin/staff.functions.ts`: Select um `user_links(user_id)` erweitern (bereits FK vorhanden) und im Rückgabe-Objekt `hasAccount: boolean` mitliefern. Keine E-Mail, keine user_id – nur das Bit, damit die Listen-DTO-Regel (SD1: keine Personaldaten in listStaff) erhalten bleibt.
 
-Workspace-Settings → **Build & deploy** enthält bei dir NUR „Git" (GitHub-Sync). Ein eigener „Build Secrets"-Bereich (siehe Lovable-Doku) ist in eurem Plan/Workspace nicht sichtbar. Damit fällt der „Workspace Build Secrets"-Weg aus.
+### 2. Anzeige in der Matrix
+`src/routes/_authenticated/admin/staff.index.tsx`: In der Namens-Zelle ein kleines Konto-Icon/Badge neben Display-Name rendern (mit Tooltip „Online-Konto vorhanden" bzw. „Kein Konto"). Kein neuer Spalten-Header, damit die Matrix nicht schmaler wird. Farbe: `text-emerald-600` (hat Konto) vs. gedämpftes Grau (kein Konto). Optional in Hero-Zeile Zählwert „X mit Konto" ergänzen.
 
-## Vorschlag: Projekt-Secrets via Lovable
+### 3. Neue Server-Function `listOrphanAuthAccounts`
+Neue Datei `src/lib/admin/orphan-accounts.functions.ts`, admin-only via `runGuarded`:
+- `supabaseAdmin.auth.admin.listUsers()` seitenweise abrufen
+- Alle `user_links.user_id` der Organisation laden
+- Differenz bilden → für jeden verwaisten Auth-User: `{ userId, email, createdAt, lastSignInAt }`
+- Rückgabe sortiert nach `lastSignInAt` desc
 
-Lovable-Projekt-Secrets (`secrets--add_secret`) werden beim Publish-Build als `process.env.*` bereitgestellt — genau das, was `vite.config.ts` schon liest:
+Hinweis zur Semantik: auth.users ist nicht org-gebunden. „Verwaist" heißt hier: existiert in Auth, aber es gibt keinen `user_links`-Eintrag in dieser Organisation. Da in diesem Projekt aktuell nur eine Organisation existiert (Bestand), deckt das den Bedarf ab; Mehr-Org-Feinschliff kann später folgen.
 
-```ts
-const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
-const sentryOrg       = process.env.SENTRY_ORG;
-const sentryProject   = process.env.SENTRY_PROJECT;
-const sentryEnabled   = Boolean(sentryAuthToken && sentryOrg && sentryProject);
-```
+### 4. Auffang-Karte auf der Staff-Seite
+Unter dem Sofort­meldung-Alert eine ausklappbare Karte „Anmeldungen ohne Mitarbeiter (N)" rendern, nur wenn `N > 0` und `isAdmin`. Tabelle mit E-Mail, Erstellt-am, Zuletzt angemeldet, plus Hinweis „Bitte Mitarbeiter anlegen und Konto verknüpfen oder Konto entfernen." Keine Löschen-Aktion in diesem Schritt — nur Sichtbarmachung.
 
-Schritte:
+## Nicht enthalten
+- Keine Schema-Änderung, keine Migration, keine RLS-Änderung.
+- Keine Aktion „verwaistes Konto löschen/zuordnen" — bewusst nur Anzeige, damit der Schritt klein und rückrollbar bleibt.
+- Kein Umbau von `getStaffAccountStatus` / Konto-Tab.
 
-1. Über `secrets--add_secret` die drei Namen anlegen (öffnet dein sicheres Formular — Werte gibst du selbst ein, ich sehe sie nie):
-   - `SENTRY_AUTH_TOKEN` (Format-Hint `sntrys_...` / `<64-hex>`)
-   - `SENTRY_ORG` (Slug, z. B. `cocoplatform`)
-   - `SENTRY_PROJECT` (Slug, z. B. `cocoplatform-web`)
-2. Danach ein normales **Publish**. Der Vite-Plugin sieht die drei Werte und lädt die Maps zu Sentry hoch (Release = Commit-SHA).
-
-## Verifikation nach dem nächsten Publish
-
-- Sentry → **Releases**: neuer Release-Eintrag mit Commit-SHA + hochgeladenen Artifacts.
-- In Sentry-Issues: Stackframes zeigen echte `src/…`-Zeilennummern statt Bundle-Positionen.
-
-## Falls Projekt-Secrets im Vite-Build doch nicht greifen
-
-(Unwahrscheinlich, aber sauber:) Fallback ist ein CI-Build via GitHub-Actions-Secrets — dafür würde ich `.github/workflows/ci.yml` um einen `build`-Job erweitern. Erst machen, wenn Weg 1 nachweislich keine Maps hochlädt.
-
-## Was ich vorbereite, sobald du zustimmst
-
-- Aufruf `secrets--add_secret` für die drei Namen (mit Format-Hints).
-- Kurze Post-Publish-Checkliste als Antwort, damit du den Upload in Sentry gegenprüfen kannst.
-
-Keine Code-Änderung nötig — der Vite-Plugin ist bereits verdrahtet.
+## Gates
+`tsgo`, `eslint --max-warnings=0`, `prettier --check`, `vitest run`. Keine neuen Tests nötig (reine Anzeige-Ergänzung); bestehende Tests für `listStaff` bleiben grün, weil das neue Feld additiv ist.

@@ -4,14 +4,15 @@
 
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getProductionConfigStatus,
-  triggerSentryTestErrorServer,
+  triggerSentryServerProbe,
   type ConfigVarStatus,
 } from "@/lib/admin/config-check.functions";
 import { captureClientError } from "@/lib/monitoring/sentry-client";
+import { SentryTestError, SENTRY_PROBE_TAG } from "@/lib/monitoring/sentry-selftest";
 
 export const Route = createFileRoute("/_authenticated/admin/config-check")({
   beforeLoad: ({ context }) => {
@@ -71,49 +72,69 @@ function StatusDot({ ok, critical }: { ok: boolean; critical: boolean }) {
 
 function ConfigCheckPage() {
   const fetchStatus = useServerFn(getProductionConfigStatus);
-  const callServerThrow = useServerFn(triggerSentryTestErrorServer);
+  const callServerProbe = useServerFn(triggerSentryServerProbe);
   const q = useQuery({
     queryKey: ["admin", "config-check"],
     queryFn: () => fetchStatus(),
     refetchOnWindowFocus: false,
   });
 
-  const [testStatus, setTestStatus] = useState<
+  type ProbeStatus =
     | { kind: "idle" }
     | { kind: "sending"; scope: "client" | "server" }
     | { kind: "ok"; scope: "client" | "server"; at: string }
-    | { kind: "error"; scope: "client" | "server"; message: string }
-  >({ kind: "idle" });
+    | { kind: "error"; scope: "client" | "server"; message: string };
+  const [clientProbe, setClientProbe] = useState<ProbeStatus>({ kind: "idle" });
+  const [serverProbe, setServerProbe] = useState<ProbeStatus>({ kind: "idle" });
+  // Doppelklick-Bremse: 5 s pro Knopf.
+  const [clientCooldownUntil, setClientCooldownUntil] = useState<number>(0);
+  const [serverCooldownUntil, setServerCooldownUntil] = useState<number>(0);
+  const [now, setNow] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (clientCooldownUntil <= now && serverCooldownUntil <= now) return;
+    const id = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(id);
+  }, [clientCooldownUntil, serverCooldownUntil, now]);
 
-  async function fireClientTest() {
-    const marker = new Date().toISOString();
-    setTestStatus({ kind: "sending", scope: "client" });
+  const sentryDsnVar = q.data?.vars.find(
+    (v) => v.name === "SENTRY_DSN" && v.group === "monitoring",
+  );
+  const dsnPresent = sentryDsnVar?.present ?? false;
+  const clientBusy = clientProbe.kind === "sending" || clientCooldownUntil > now;
+  const serverBusy = serverProbe.kind === "sending" || serverCooldownUntil > now;
+
+  async function fireClientProbe() {
+    const triggeredAt = new Date().toISOString();
+    setClientProbe({ kind: "sending", scope: "client" });
     try {
-      const err = new Error(`Sentry-Testfehler (Client) — ausgelöst ${marker}`);
-      await captureClientError(err, { test: "true", scope: "manual-admin-test" });
-      setTestStatus({ kind: "ok", scope: "client", at: marker });
+      await captureClientError(new SentryTestError("client", triggeredAt), {
+        probe: SENTRY_PROBE_TAG,
+      });
+      setClientProbe({ kind: "ok", scope: "client", at: triggeredAt });
     } catch (e) {
-      setTestStatus({
+      setClientProbe({
         kind: "error",
         scope: "client",
         message: e instanceof Error ? e.message : String(e),
       });
+    } finally {
+      setClientCooldownUntil(Date.now() + 5000);
     }
   }
 
-  async function fireServerTest() {
-    const marker = new Date().toISOString();
-    setTestStatus({ kind: "sending", scope: "server" });
+  async function fireServerProbe() {
+    setServerProbe({ kind: "sending", scope: "server" });
     try {
-      const res = await callServerThrow();
-      setTestStatus({ kind: "ok", scope: "server", at: res.at });
+      const res = await callServerProbe();
+      setServerProbe({ kind: "ok", scope: "server", at: res.triggeredAt });
     } catch (e) {
-      setTestStatus({
+      setServerProbe({
         kind: "error",
         scope: "server",
         message: e instanceof Error ? e.message : String(e),
       });
-      void marker;
+    } finally {
+      setServerCooldownUntil(Date.now() + 5000);
     }
   }
 
@@ -243,55 +264,72 @@ function ConfigCheckPage() {
         zurückgegeben.
       </p>
 
-      {/* Sentry-Diagnose: Test-Fehler auslösen (nur Admin) */}
+      {/* SE1 — Monitoring-Selbsttest (nur Admin) */}
       <section className="rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
-          <h2 className="text-sm font-semibold text-foreground">Sentry-Diagnose</h2>
+          <h2 className="text-sm font-semibold text-foreground">Monitoring-Selbsttest</h2>
           <p className="text-xs text-muted-foreground">
-            Löst bewusst je einen Testfehler im Browser bzw. auf dem Server aus, um zu prüfen, dass
-            Sentry Meldungen samt Source-Maps und Tags empfängt. Die Fehler sind mit
-            <code className="mx-1 font-mono">test=true</code>markiert und tauchen im Sentry-Projekt
-            unter <em>Issues</em> auf.
+            Löst absichtlich je einen Fehler im Browser und auf dem Server aus und schickt ihn an
+            Sentry. Beweist nach jedem Deploy, dass die Fehlermeldung wirklich ankommt. Erzeugt zwei
+            Einträge im Sentry-Dashboard — beide mit dem Tag{" "}
+            <code className="font-mono">probe: {SENTRY_PROBE_TAG}</code>.
           </p>
         </div>
-        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
-          <button
-            type="button"
-            onClick={() => void fireClientTest()}
-            disabled={testStatus.kind === "sending"}
-            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-          >
-            Client-Testfehler senden
-          </button>
-          <button
-            type="button"
-            onClick={() => void fireServerTest()}
-            disabled={testStatus.kind === "sending"}
-            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
-          >
-            Server-Testfehler senden
-          </button>
-          <div className="text-xs">
-            {testStatus.kind === "idle" && <span className="text-muted-foreground">Bereit.</span>}
-            {testStatus.kind === "sending" && (
-              <span className="text-muted-foreground">
-                Sende {testStatus.scope === "client" ? "Client" : "Server"}-Testfehler …
-              </span>
-            )}
-            {testStatus.kind === "ok" && (
-              <span className="text-emerald-600">
-                {testStatus.scope === "client" ? "Client" : "Server"}-Testfehler ausgelöst um{" "}
-                {new Date(testStatus.at).toLocaleTimeString("de-DE")}. In Sentry prüfen.
-              </span>
-            )}
-            {testStatus.kind === "error" && (
-              <span className="text-destructive">
-                Fehler ({testStatus.scope}): {testStatus.message}
-              </span>
-            )}
+        {q.data && !dsnPresent && (
+          <div className="border-b border-border bg-amber-50 px-4 py-2 text-xs text-amber-800">
+            SENTRY_DSN ist nicht gesetzt — die Probe würde ins Leere laufen.
+          </div>
+        )}
+        <div className="flex flex-col gap-3 px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => void fireClientProbe()}
+                disabled={!dsnPresent || clientBusy}
+                className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                Client-Probe auslösen
+              </button>
+              <ProbeLine status={clientProbe} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => void fireServerProbe()}
+                disabled={!dsnPresent || serverBusy}
+                className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+              >
+                Server-Probe auslösen
+              </button>
+              <ProbeLine status={serverProbe} />
+            </div>
           </div>
         </div>
       </section>
     </div>
   );
+}
+
+function ProbeLine({
+  status,
+}: {
+  status:
+    | { kind: "idle" }
+    | { kind: "sending"; scope: "client" | "server" }
+    | { kind: "ok"; scope: "client" | "server"; at: string }
+    | { kind: "error"; scope: "client" | "server"; message: string };
+}) {
+  if (status.kind === "idle") return <span className="text-xs text-muted-foreground">Bereit.</span>;
+  if (status.kind === "sending")
+    return <span className="text-xs text-muted-foreground">Sende Probe …</span>;
+  if (status.kind === "ok") {
+    const local = new Date(status.at).toLocaleString("de-DE");
+    return (
+      <span className="text-xs text-emerald-600">
+        Abgesetzt: <code className="font-mono">{status.at}</code> ({local})
+      </span>
+    );
+  }
+  return <span className="text-xs text-destructive">Fehler: {status.message}</span>;
 }

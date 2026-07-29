@@ -35,19 +35,32 @@ export type GuardedCallContext = {
   tags?: Record<string, string | number | boolean | null | undefined>;
 };
 
+/**
+ * SE1 — Reiner Filter: Welche Fehler sind erwartetes Fachverhalten und
+ * gehören NICHT in den kritischen Monitoring-Kanal?
+ *
+ * Herausgezogen aus reportGuardedFailure, damit die Regel testbar ist.
+ * Wer eine neue Fachfehler-Klasse einführt, ergänzt sie HIER — und nur hier.
+ *
+ * - ForbiddenError: erwartetes Fachverhalten (401/403), kein Monitoring-Fall.
+ * - PoolHoursWarningError: erwarteter Bestätigungs-Ablauf beim Kassen-
+ *   Finalize (Warn-Dialog → Bestätigung). Jeder legitime Warn-Dialog würde
+ *   sonst einen Alarm im kritischen Kanal auslösen — genau dort, wo Stille
+ *   Alarmwert hat. Namensbasierter Check, um zyklische Imports (admin ↔
+ *   cash) zu vermeiden.
+ */
+export function isMonitoringSuppressed(err: unknown): boolean {
+  if (err instanceof ForbiddenError) return true;
+  if (err instanceof Error && err.name === "PoolHoursWarningError") return true;
+  return false;
+}
+
 async function reportGuardedFailure(
   err: unknown,
   callerRole: AppRole | null,
   ctx: GuardedCallContext | undefined,
 ): Promise<void> {
-  // ForbiddenError ist erwartetes Fachverhalten (401/403), kein Monitoring-Fall.
-  if (err instanceof ForbiddenError) return;
-  // PoolHoursWarningError ist der erwartete Bestätigungs-Ablauf beim Kassen-
-  // Finalize (Warn-Dialog → Bestätigung). Jeder legitime Warn-Dialog würde
-  // sonst einen Alarm im kritischen Kanal auslösen — genau dort, wo Stille
-  // Alarmwert hat. Namensbasierter Check, um zyklische Imports (admin ↔ cash)
-  // zu vermeiden.
-  if (err instanceof Error && err.name === "PoolHoursWarningError") return;
+  if (isMonitoringSuppressed(err)) return;
   try {
     const { captureServerError } = await import("@/lib/monitoring/sentry.server");
     await captureServerError(err, {

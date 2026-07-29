@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   dbTestsEnabled,
+  expectData,
   seedOrg,
   signInAsUser,
   type SeededOrg,
@@ -99,48 +100,58 @@ describe.skipIf(!dbTestsEnabled)("cash read endpoints (DB) — B3c-1a", () => {
         .eq("kind", "pos");
       if (upd3.error) throw new Error(`rename other pos failed: ${upd3.error.message}`);
     }
-    const { data: posCh, error: posErr } = await org.service
-      .from("revenue_channels")
-      .select("id")
-      .eq("organization_id", org.orgId)
-      .eq("location_id", org.defaultLocationId)
-      .eq("kind", "pos")
-      .single();
-    if (posErr || !posCh) throw new Error(`pos channel lookup failed: ${posErr?.message}`);
+    const posCh = expectData(
+      await org.service
+        .from("revenue_channels")
+        .select("id")
+        .eq("organization_id", org.orgId)
+        .eq("location_id", org.defaultLocationId)
+        .eq("kind", "pos")
+        .single(),
+      "revenue_channels lookup pos (cash-read setup)",
+    );
     channelId = posCh.id;
 
-    const { data: t1 } = await org.service
-      .from("payment_terminals")
-      .insert({
-        organization_id: org.orgId,
-        location_id: org.defaultLocationId,
-        label: "Terminal A",
-        sort_order: 1,
-      })
-      .select("id")
-      .single();
+    const t1 = expectData(
+      await org.service
+        .from("payment_terminals")
+        .insert({
+          organization_id: org.orgId,
+          location_id: org.defaultLocationId,
+          label: "Terminal A",
+          sort_order: 1,
+        })
+        .select("id")
+        .single(),
+      "payment_terminals insert (cash-read setup)",
+    );
     await otherOrg.service.from("payment_terminals").insert({
       organization_id: otherOrg.orgId,
       location_id: otherOrg.defaultLocationId,
       label: "FREMD-T",
       sort_order: 1,
     });
-    terminalId = t1!.id;
+    terminalId = t1.id;
 
     // Offene Session für heute + Satelliten in unserer Org.
-    const { data: bd } = await org.service.rpc("current_business_date");
-    businessDate = bd as unknown as string;
-    const { data: s } = await org.service
-      .from("sessions")
-      .insert({
-        organization_id: org.orgId,
-        location_id: org.defaultLocationId,
-        business_date: businessDate,
-        status: "open",
-      })
-      .select("id")
-      .single();
-    sessionId = s!.id;
+    businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-read setup)",
+    );
+    const session = expectData(
+      await org.service
+        .from("sessions")
+        .insert({
+          organization_id: org.orgId,
+          location_id: org.defaultLocationId,
+          business_date: businessDate,
+          status: "open",
+        })
+        .select("id")
+        .single(),
+      "sessions insert (cash-read setup)",
+    );
+    sessionId = session.id;
 
     await org.service.from("session_channel_amounts").insert({
       organization_id: org.orgId,
@@ -187,16 +198,19 @@ describe.skipIf(!dbTestsEnabled)("cash read endpoints (DB) — B3c-1a", () => {
     });
 
     // Fremde Org: identische Session/Satellit, darf NIE auftauchen.
-    const { data: s2 } = await otherOrg.service
-      .from("sessions")
-      .insert({
-        organization_id: otherOrg.orgId,
-        location_id: otherOrg.defaultLocationId,
-        business_date: businessDate,
-        status: "open",
-      })
-      .select("id")
-      .single();
+    const s2 = expectData(
+      await otherOrg.service
+        .from("sessions")
+        .insert({
+          organization_id: otherOrg.orgId,
+          location_id: otherOrg.defaultLocationId,
+          business_date: businessDate,
+          status: "open",
+        })
+        .select("id")
+        .single(),
+      "sessions insert (cash-read setup, other org)",
+    );
     await otherOrg.service.from("session_expenses").insert({
       organization_id: otherOrg.orgId,
       session_id: s2!.id,

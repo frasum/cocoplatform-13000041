@@ -39,17 +39,20 @@ export const getProductionConfigStatus = createServerFn({ method: "GET" })
     };
   });
 
-// Sentry-Diagnose: löst bewusst einen Fehler in einer Server-Fn aus,
-// damit Admins den Server-Reporting-Pfad (inkl. Source-Maps, Tags) live
-// verifizieren können. Admin-only. Der Fehler wird explizit an Sentry
-// gemeldet und dann weitergeworfen, damit der Client die Rückmeldung
-// „Fehler ausgelöst" bekommt.
+// Sentry-Diagnose: erzeugt bewusst einen Fehler auf dem Server und meldet
+// ihn explizit an Sentry, damit Admins den Server-Reporting-Pfad
+// (Source-Maps, Tags) live verifizieren können. Wir werfen den Fehler
+// bewusst NICHT weiter — sonst zeigt der Vite-Dev-Overlay einen
+// „Runtime Error"/Blank-Screen für jeden Klick, und der Server-Fn-Error-
+// Logger stempelt ein Fehler-Event, das nichts mit einem echten Bug zu tun
+// hat. Rückgabe: Marker-Zeitstempel + generierter Fehlername für die UI.
 export const triggerSentryTestErrorServer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<never> => {
+  .handler(async ({ context }): Promise<{ ok: true; at: string; name: string }> => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
     const marker = new Date().toISOString();
     const err = new Error(`Sentry-Testfehler (Server) — ausgelöst ${marker}`);
+    err.name = "SentryTestError";
     try {
       const { captureServerError } = await import(
         /* @vite-ignore */ "@/lib/monitoring/sentry.server"
@@ -65,5 +68,5 @@ export const triggerSentryTestErrorServer = createServerFn({ method: "POST" })
     } catch {
       /* Monitoring darf nichts brechen. */
     }
-    throw err;
+    return { ok: true, at: marker, name: err.name };
   });

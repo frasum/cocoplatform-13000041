@@ -8,6 +8,11 @@
  * verlor die _2/_3-Beträge bei Mehr-Bereichs-Personen.
  */
 import { describe, it, expect } from "vitest";
+// XL1 — Dieser statische Import wird für die Zusicherungen gebraucht UND wirkt
+// zugleich als Vorwärmung: `buildLohnXlsx` lädt exceljs sonst dynamisch im
+// Testkörper und liefe in langsamen Sandboxes ins Zeitlimit (vgl.
+// bargeld-export.test.ts). Nicht entfernen, ohne ein `beforeAll`-Vorwärmen
+// zu ergänzen.
 import ExcelJS from "exceljs";
 import { buildLohnXlsx, type LohnExportInput } from "./lohn-excel-export";
 import type { Entgeltzeile, LohnErgebnis, PersonenParameter } from "./types";

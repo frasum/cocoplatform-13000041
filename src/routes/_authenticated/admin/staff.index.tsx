@@ -521,6 +521,28 @@ function StaffMatrixRow({
       <TableCell className="sticky left-0 z-10 bg-background group-hover:bg-muted/50">
         <div className="flex items-center gap-1.5">
           {isAdmin && sofortStatus && <SofortmeldungDot staffId={staff.id} status={sofortStatus} />}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                aria-label={staff.hasAccount ? "Online-Konto vorhanden" : "Kein Online-Konto"}
+                className={cn(
+                  "inline-flex h-4 w-4 items-center justify-center rounded-full",
+                  staff.hasAccount ? "text-emerald-600" : "text-muted-foreground/50",
+                )}
+              >
+                {staff.hasAccount ? (
+                  <UserCheck className="h-3.5 w-3.5" />
+                ) : (
+                  <UserX className="h-3.5 w-3.5" />
+                )}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="text-xs">
+                {staff.hasAccount ? "Online-Konto eingerichtet" : "Noch kein Online-Konto"}
+              </p>
+            </TooltipContent>
+          </Tooltip>
           <Link
             to="/admin/staff/$staffId"
             params={{ staffId: staff.id }}

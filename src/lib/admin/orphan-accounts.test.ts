@@ -21,7 +21,15 @@ describe("pickOrphanAccounts", () => {
       { id: "b", email: "b@x", created_at: "2026-01-02", last_sign_in_at: "2026-05-01" },
     ];
     expect(pickOrphanAccounts(users, new Set())).toEqual([
-      { userId: "b", email: "b@x", createdAt: "2026-01-02", lastSignInAt: "2026-05-01" },
+      {
+        userId: "b",
+        email: "b@x",
+        createdAt: "2026-01-02",
+        lastSignInAt: "2026-05-01",
+        providerName: null,
+        linkedStaffId: null,
+        kind: "foreign",
+      },
     ]);
   });
 

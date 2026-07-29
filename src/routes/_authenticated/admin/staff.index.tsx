@@ -743,16 +743,12 @@ function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
       >
         <div className="flex items-center gap-2">
           <UserX className="h-4 w-4 text-amber-600" />
-          <span className="text-sm font-medium">
-            Anmeldungen ohne Mitarbeiter
-          </span>
+          <span className="text-sm font-medium">Anmeldungen ohne Mitarbeiter</span>
           <Badge variant="outline" className="text-xs">
             {orphans.length}
           </Badge>
         </div>
-        <span className="text-xs text-muted-foreground">
-          {open ? "Ausblenden" : "Anzeigen"}
-        </span>
+        <span className="text-xs text-muted-foreground">{open ? "Ausblenden" : "Anzeigen"}</span>
       </button>
       {open && (
         <div className="border-t border-border">
@@ -772,9 +768,7 @@ function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
                     {o.createdAt ? new Date(o.createdAt).toLocaleString("de-DE") : "—"}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {o.lastSignInAt
-                      ? new Date(o.lastSignInAt).toLocaleString("de-DE")
-                      : "—"}
+                    {o.lastSignInAt ? new Date(o.lastSignInAt).toLocaleString("de-DE") : "—"}
                   </TableCell>
                 </TableRow>
               ))}

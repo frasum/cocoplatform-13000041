@@ -392,10 +392,17 @@ function KassePage() {
       toast.error("Bitte zuerst die Gästeanzahl eintragen und speichern.");
       return null;
     }
+    // KA1: Kein Rechnen auf leerer Kanal-/Terminal-Map. Bricht bei
+    // ungeladenem Katalog ab statt in `resolveChannelKind` zu werfen —
+    // der Nutzer bekommt eine klare Meldung.
+    if (!channelsQ.data || !terminalsQ.data) {
+      toast.error("Kanal-/Terminal-Katalog wird noch geladen — bitte kurz warten.");
+      return null;
+    }
     return buildDailySummaryData({
       overview: ov,
-      channels: (channelsQ.data ?? []).map((c) => ({ id: c.id, label: c.label, kind: c.kind })),
-      terminals: (terminalsQ.data ?? []).map((t) => ({
+      channels: channelsQ.data.map((c) => ({ id: c.id, label: c.label, kind: c.kind })),
+      terminals: terminalsQ.data.map((t) => ({
         id: t.id,
         label: t.label,
         isGl: t.isGl,

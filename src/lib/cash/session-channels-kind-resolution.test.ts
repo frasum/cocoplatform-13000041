@@ -16,9 +16,7 @@ describe("resolveChannelKind (KA1)", () => {
 
   it("wirft mit Kanal-ID, wenn die ID unbekannt ist", () => {
     const map = new Map<string, string>([["known", "pos"]]);
-    expect(() => resolveChannelKind(map, "ghost-42")).toThrowError(
-      /unbekannter Kanal ghost-42/,
-    );
+    expect(() => resolveChannelKind(map, "ghost-42")).toThrowError(/unbekannter Kanal ghost-42/);
   });
 });
 

@@ -13,7 +13,7 @@
 import { computeDailyCashWithTipRemainder, type DayInput } from "@/lib/cash/cash-ledger";
 import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
-import { sumNonGlTerminalCents } from "@/lib/cash/session-channels";
+import { sumNonGlTerminalCents, resolveChannelKind } from "@/lib/cash/session-channels";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
 import { computeTipTotalCents } from "@/lib/cash/tip-pool";
 import type { PdfExportData } from "@/lib/cash/pdfExport";
@@ -88,10 +88,14 @@ function totalsByKind(data: PdfExportData): Record<ChannelKindKey, number> {
     einladung: 0,
     sonstige: 0,
   };
-  const idToKind = new Map(data.channels.map((c) => [c.id, c.kind as ChannelKindKey]));
+  // KA1: Map aus dem ungefilterten Kanalbestand; Lookup-Miss wirft mit ID.
+  const idToKind = new Map(data.channels.map((c) => [c.id, c.kind]));
   for (const a of data.channelAmounts) {
-    const k = idToKind.get(a.channelId);
-    if (k && k in out) out[k] += a.amountCents;
+    const k = resolveChannelKind(idToKind, a.channelId) as ChannelKindKey;
+    if (!(k in out)) {
+      throw new Error(`unbekannter Kanal-kind "${k}" (Kanal ${a.channelId})`);
+    }
+    out[k] += a.amountCents;
   }
   return out;
 }
@@ -168,7 +172,7 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
   const houseCentsForAvg = sessionHouseCentsFromKasse({
     vectronCents: posTotal,
     channels: data.channelAmounts.map((a) => ({
-      kind: kindById.get(a.channelId) ?? "",
+      kind: resolveChannelKind(kindById, a.channelId),
       amountCents: a.amountCents,
     })),
   });

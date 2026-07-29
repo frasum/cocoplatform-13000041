@@ -727,3 +727,66 @@ function RoleCell({ staffId, role }: { staffId: string; role: AppRole | null }) 
     </select>
   );
 }
+
+// AC2 — Panel: Auth-Konten, die nicht als Mitarbeiter dieser Organisation
+// verknüpft sind. Rein informativ; keine Aktionen (Verknüpfen/Löschen läuft
+// über Einladung im Stammblatt bzw. das Supabase-Dashboard).
+function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card className="border-amber-300/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+        aria-expanded={open}
+      >
+        <div className="flex items-center gap-2">
+          <UserX className="h-4 w-4 text-amber-600" />
+          <span className="text-sm font-medium">
+            Anmeldungen ohne Mitarbeiter
+          </span>
+          <Badge variant="outline" className="text-xs">
+            {orphans.length}
+          </Badge>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          {open ? "Ausblenden" : "Anzeigen"}
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>E-Mail</TableHead>
+                <TableHead className="min-w-[140px]">Angelegt</TableHead>
+                <TableHead className="min-w-[160px]">Letzte Anmeldung</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {orphans.map((o) => (
+                <TableRow key={o.userId}>
+                  <TableCell className="font-mono text-xs">{o.email ?? "—"}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {o.createdAt ? new Date(o.createdAt).toLocaleString("de-DE") : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {o.lastSignInAt
+                      ? new Date(o.lastSignInAt).toLocaleString("de-DE")
+                      : "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <p className="px-4 py-2 text-xs text-muted-foreground">
+            Diese Konten haben sich angemeldet, sind aber nicht als Mitarbeiter dieser Organisation
+            verknüpft. Über „Neuer Mitarbeiter" oder die Einladung im Stammblatt lässt sich das
+            Konto zuordnen.
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}

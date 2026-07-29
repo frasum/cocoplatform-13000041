@@ -7,17 +7,22 @@
 // diesem Zeitpunkt bereits verworfen. Dieser Helfer prüft `error`, hängt
 // Code/Details an und wirft mit einem sprechenden Label.
 
-export type PostgrestLike<T> = {
-  data: T | null;
-  error: {
-    message: string;
-    code?: string;
-    details?: string | null;
-    hint?: string | null;
-  } | null;
+type PostgrestErrorLike = {
+  message: string;
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
 };
 
-export function expectData<T>(res: PostgrestLike<T>, label: string): T {
+export type PostgrestLike<T> = {
+  data: T;
+  error: PostgrestErrorLike | null;
+};
+
+// Der Rückgabetyp ist `NonNullable<T>`, weil Supabase-Antworten typischerweise
+// ein diskriminiertes `{ data: Row | null; error: Err | null }` liefern —
+// nach der Fehlerprüfung ist `data` garantiert nicht null.
+export function expectData<T>(res: PostgrestLike<T>, label: string): NonNullable<T> {
   if (res.error) {
     const parts = [res.error.message];
     if (res.error.code) parts.push(`code=${res.error.code}`);
@@ -28,5 +33,5 @@ export function expectData<T>(res: PostgrestLike<T>, label: string): T {
   if (res.data === null || res.data === undefined) {
     throw new Error(`[db-test] ${label} lieferte keine Zeile (data=null, error=null)`);
   }
-  return res.data;
+  return res.data as NonNullable<T>;
 }

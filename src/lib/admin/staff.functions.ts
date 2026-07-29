@@ -21,6 +21,11 @@ import {
   type SkillCategory,
 } from "./skill-eligibility";
 import { expectMaybe, expectOk, expectVoid } from "@/lib/supabase/expect-ok";
+import {
+  deriveTelegramLinkState,
+  type TelegramLinkRowLike,
+  type TelegramLinkState,
+} from "@/lib/telegram/link-status";
 
 async function assertLocationInOrg(locationId: string, organizationId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -87,12 +92,13 @@ export const listStaff = createServerFn({ method: "GET" })
         staff_skills: unknown;
         staff_pins: unknown;
         user_links: unknown;
+        staff_telegram_links: unknown;
       }[]
     >(
       await supabaseAdmin
         .from("staff")
         .select(
-          "id, first_name, last_name, display_name, perso_nr, is_active, role_assignments(role), staff_locations(location_id, department), staff_skills(skill_id, skills(category)), staff_pins(id), user_links(user_id)",
+          "id, first_name, last_name, display_name, perso_nr, is_active, role_assignments(role), staff_locations(location_id, department), staff_skills(skill_id, skills(category)), staff_pins(id), user_links(user_id), staff_telegram_links(telegram_chat_id, linked_at, token_expires_at)",
         )
         .eq("organization_id", caller.organizationId)
         .order("display_name"),
@@ -127,6 +133,17 @@ export const listStaff = createServerFn({ method: "GET" })
             .filter((c): c is string => typeof c === "string" && c.length > 0),
         ),
       );
+      // SP1 — Telegram-Verknüpfungs-Zustand aus der zentralen Regel; nur der
+      // abgeleitete Zustand geht ins Listen-DTO. Handle (telegram_username)
+      // und Chat-ID bleiben draußen — sie sind personenbezogen und haben in
+      // der manager/planer/payroll-lesbaren Liste nichts verloren (SD1).
+      // PostgREST kann bei 1:1-Beziehungen Objekt ODER Array liefern;
+      // beides defensiv behandeln wie bei staff_pins/user_links.
+      const tRaw = s.staff_telegram_links;
+      const tRow = (
+        Array.isArray(tRaw) ? ((tRaw as TelegramLinkRowLike[])[0] ?? null) : (tRaw ?? null)
+      ) as TelegramLinkRowLike | null;
+      const telegramState: TelegramLinkState = deriveTelegramLinkState(tRow);
       return {
         id: s.id,
         firstName: s.first_name,
@@ -146,6 +163,7 @@ export const listStaff = createServerFn({ method: "GET" })
         hasAccount: Array.isArray(s.user_links)
           ? (s.user_links as { user_id: string | null }[]).some((l) => !!l.user_id)
           : !!(s.user_links as { user_id: string | null } | null)?.user_id,
+        telegramState,
       };
     });
   });

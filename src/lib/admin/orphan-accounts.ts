@@ -18,6 +18,8 @@ export type AuthUserLike = {
   email?: string | null;
   created_at?: string | null;
   last_sign_in_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
 };
 
 export type OrphanAuthAccount = {
@@ -25,7 +27,41 @@ export type OrphanAuthAccount = {
   email: string | null;
   createdAt: string | null;
   lastSignInAt: string | null;
+  // SP1 — Herkunfts-Signale (rein aus Auth-Metadaten abgeleitet).
+  providerName: string | null;
+  linkedStaffId: string | null;
+  kind: "broken_link" | "foreign";
 };
+
+// COCO legt Schattenkonten für PIN-Logins nach diesem E-Mail-Muster an
+// (src/lib/auth/auth-flows.server.ts). Wenn das Konto verwaist ist, lässt
+// sich aus der E-Mail die staff_id ableiten — auch ohne app_metadata.
+const STAFF_EMAIL_RE =
+  /^staff-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@internal\.invalid$/i;
+
+function readString(
+  source: Record<string, unknown> | null | undefined,
+  key: string,
+): string | null {
+  if (!source) return null;
+  const v = source[key];
+  return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+export function readProviderName(user: AuthUserLike): string | null {
+  const md = user.user_metadata ?? null;
+  return (
+    readString(md, "full_name") ?? readString(md, "name") ?? readString(md, "preferred_username")
+  );
+}
+
+export function readStaffIdHint(user: AuthUserLike): string | null {
+  const fromApp = readString(user.app_metadata ?? null, "staff_id");
+  if (fromApp) return fromApp;
+  const email = user.email ?? "";
+  const m = STAFF_EMAIL_RE.exec(email);
+  return m ? m[1] : null;
+}
 
 export function pickOrphanAccounts(
   users: readonly AuthUserLike[],
@@ -34,11 +70,15 @@ export function pickOrphanAccounts(
   const orphans: OrphanAuthAccount[] = [];
   for (const u of users) {
     if (linkedUserIds.has(u.id)) continue;
+    const linkedStaffId = readStaffIdHint(u);
     orphans.push({
       userId: u.id,
       email: u.email ?? null,
       createdAt: u.created_at ?? null,
       lastSignInAt: u.last_sign_in_at ?? null,
+      providerName: readProviderName(u),
+      linkedStaffId,
+      kind: linkedStaffId !== null ? "broken_link" : "foreign",
     });
   }
   orphans.sort((a, b) => {

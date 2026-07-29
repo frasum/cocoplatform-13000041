@@ -213,7 +213,7 @@ describe.skipIf(!dbTestsEnabled)("cash read endpoints (DB) — B3c-1a", () => {
     );
     await otherOrg.service.from("session_expenses").insert({
       organization_id: otherOrg.orgId,
-      session_id: s2!.id,
+      session_id: s2.id,
       description: "FREMD",
       amount_cents: 99999,
     });

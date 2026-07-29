@@ -59,6 +59,7 @@ import { parseEuroToCents } from "@/lib/cash/kasse-helpers";
 import { SettlementWarningsBanner } from "@/components/cash/SettlementWarningsBanner";
 import type { OpenInvoiceEntry } from "@/lib/cash/open-invoices";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
+import { resolveChannelKind } from "@/lib/cash/session-channels";
 
 // Übersetzt die Roheingabe aus dem Korrektur-/Anlage-Dialog in
 // OpenInvoiceEntry[]. Regel (analog Kellner-UI, siehe open-invoices.ts):
@@ -637,6 +638,8 @@ function KassePage() {
               const sess = ovQ.data.session;
               if (!sess) return null;
               const vectronTotal = Number(sess.vectron_daily_total_cents ?? 0);
+              // KA1: Map aus dem ungefilterten Kanalbestand (inkl. inaktiver);
+              // Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
               const channelKindById = new Map(
                 (channelsQ.data ?? []).map((c) => [c.id, c.kind] as const),
               );
@@ -645,7 +648,7 @@ function KassePage() {
               const inHouseCents = sessionHouseCentsFromKasse({
                 vectronCents: vectronTotal,
                 channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
-                  kind: channelKindById.get(c.channelId) ?? "",
+                  kind: resolveChannelKind(channelKindById, c.channelId),
                   amountCents: c.amountCents,
                 })),
               });

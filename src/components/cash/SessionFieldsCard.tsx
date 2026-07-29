@@ -6,6 +6,7 @@ import { fmtCents } from "@/lib/format";
 import { parseEuroToCents, focusNextInput } from "@/lib/cash/kasse-helpers";
 import type { Overview } from "@/lib/cash/kasse-types";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
+import { resolveChannelKind } from "@/lib/cash/session-channels";
 import { AdvanceForm } from "./AdvanceForm";
 import { ExpenseForm } from "./ExpenseForm";
 import { CashSummaryBlock } from "./CashSummaryBlock";
@@ -268,7 +269,11 @@ export function SessionFieldsCard({
         ? `Automatisch gespeichert · ${lastSavedAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`
         : "Auto-Save aktiv";
 
+  // KA1: Map aus dem ungefilterten Kanalbestand (channels-Prop enthält
+  // aktive UND inaktive Kanäle — historische Beträge referenzieren sie
+  // legitim). Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
   const channelById = Object.fromEntries(channels.map((c) => [c.id, c]));
+  const channelKindById = new Map(channels.map((c) => [c.id, c.kind]));
   const terminalById = Object.fromEntries(terminals.map((t) => [t.id, t]));
   const posRows = chRows.filter((r) => channelById[r.id]?.kind === "pos");
   const delivRows = chRows.filter((r) => channelById[r.id]?.kind?.startsWith("delivery_"));
@@ -291,7 +296,7 @@ export function SessionFieldsCard({
   const houseCentsForAvg = sessionHouseCentsFromKasse({
     vectronCents: parseEuroToCents(misc.vectron) ?? 0,
     channels: chRows.map((r) => ({
-      kind: channelById[r.id]?.kind ?? "",
+      kind: resolveChannelKind(channelKindById, r.id),
       amountCents: parseEuroToCents(r.euro) ?? 0,
     })),
   });

@@ -8,7 +8,7 @@ import type { RowInput } from "jspdf-autotable";
 import { computeDailyCashWithTipRemainder, type DayInput } from "./cash-ledger";
 import { computeWechselgeld } from "./cash-summary";
 import { sessionToDayInput } from "./session-day-input";
-import { sumNonGlTerminalCents } from "./session-channels";
+import { sumNonGlTerminalCents, resolveChannelKind } from "./session-channels";
 import { computeTipTotalCents } from "./tip-pool";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
 
@@ -151,10 +151,14 @@ function totalsByKind(data: PdfExportData): Record<ChannelKindKey, number> {
     einladung: 0,
     sonstige: 0,
   };
-  const idToKind = new Map(data.channels.map((c) => [c.id, c.kind as ChannelKindKey]));
+  // KA1: Map aus dem ungefilterten Kanalbestand; Lookup-Miss wirft mit ID.
+  const idToKind = new Map(data.channels.map((c) => [c.id, c.kind]));
   for (const a of data.channelAmounts) {
-    const k = idToKind.get(a.channelId);
-    if (k && k in out) out[k] += a.amountCents;
+    const k = resolveChannelKind(idToKind, a.channelId) as ChannelKindKey;
+    if (!(k in out)) {
+      throw new Error(`unbekannter Kanal-kind "${k}" (Kanal ${a.channelId})`);
+    }
+    out[k] += a.amountCents;
   }
   return out;
 }
@@ -238,7 +242,7 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
   const houseCentsForAvg = sessionHouseCentsFromKasse({
     vectronCents: posTotal,
     channels: data.channelAmounts.map((a) => ({
-      kind: kindById.get(a.channelId) ?? "",
+      kind: resolveChannelKind(kindById, a.channelId),
       amountCents: a.amountCents,
     })),
   });

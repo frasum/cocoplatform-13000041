@@ -70,6 +70,26 @@ export function cardDeductionFromTerminalRows(
 
 export type ChannelTotalsByKind = Record<ChannelKind, number>;
 
+/**
+ * KA1 — kind-Auflösung für Session-Kanal-Beträge.
+ *
+ * Die Landkarte MUSS aus dem ungefilterten Kanalbestand entstehen
+ * (inkl. inaktiver — historische Sessions referenzieren sie legitim).
+ * Bei echtem Lookup-Miss (Kanal-ID gehört zu keinem bekannten Kanal)
+ * wird ein Fehler mit der ID geworfen — kein stilles `?? ""`, damit die
+ * Strenge von `sessionHouseCentsFromKasse` an der Quelle bleibt.
+ */
+export function resolveChannelKind(
+  kindById: ReadonlyMap<string, string>,
+  channelId: string,
+): string {
+  const k = kindById.get(channelId);
+  if (k === undefined) {
+    throw new Error(`unbekannter Kanal ${channelId}`);
+  }
+  return k;
+}
+
 export type AggregatedChannels = {
   byKind: ChannelTotalsByKind;
   cardTotalCents: number;

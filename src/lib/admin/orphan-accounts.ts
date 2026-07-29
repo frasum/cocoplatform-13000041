@@ -36,9 +36,13 @@ export type OrphanAuthAccount = {
 // COCO legt Schattenkonten für PIN-Logins nach diesem E-Mail-Muster an
 // (src/lib/auth/auth-flows.server.ts). Wenn das Konto verwaist ist, lässt
 // sich aus der E-Mail die staff_id ableiten — auch ohne app_metadata.
-const STAFF_EMAIL_RE = /^staff-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@internal\.invalid$/i;
+const STAFF_EMAIL_RE =
+  /^staff-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@internal\.invalid$/i;
 
-function readString(source: Record<string, unknown> | null | undefined, key: string): string | null {
+function readString(
+  source: Record<string, unknown> | null | undefined,
+  key: string,
+): string | null {
   if (!source) return null;
   const v = source[key];
   return typeof v === "string" && v.length > 0 ? v : null;
@@ -46,7 +50,9 @@ function readString(source: Record<string, unknown> | null | undefined, key: str
 
 export function readProviderName(user: AuthUserLike): string | null {
   const md = user.user_metadata ?? null;
-  return readString(md, "full_name") ?? readString(md, "name") ?? readString(md, "preferred_username");
+  return (
+    readString(md, "full_name") ?? readString(md, "name") ?? readString(md, "preferred_username")
+  );
 }
 
 export function readStaffIdHint(user: AuthUserLike): string | null {

@@ -79,9 +79,14 @@ describe("pickOrphanAccounts", () => {
 describe("readProviderName (SP1)", () => {
   it("liest full_name; name nur wenn full_name fehlt; preferred_username als letzte Stufe", () => {
     expect(
-      readProviderName({ id: "x", user_metadata: { full_name: "A", name: "B", preferred_username: "C" } }),
+      readProviderName({
+        id: "x",
+        user_metadata: { full_name: "A", name: "B", preferred_username: "C" },
+      }),
     ).toBe("A");
-    expect(readProviderName({ id: "x", user_metadata: { name: "B", preferred_username: "C" } })).toBe("B");
+    expect(
+      readProviderName({ id: "x", user_metadata: { name: "B", preferred_username: "C" } }),
+    ).toBe("B");
     expect(readProviderName({ id: "x", user_metadata: { preferred_username: "C" } })).toBe("C");
     expect(readProviderName({ id: "x", user_metadata: null })).toBeNull();
     expect(readProviderName({ id: "x" })).toBeNull();

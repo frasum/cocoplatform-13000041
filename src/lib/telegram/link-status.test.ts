@@ -47,8 +47,8 @@ describe("deriveTelegramLinkState", () => {
     // Der Bestand nutzt strict `<`; bei Gleichheit fällt die Prüfung durch
     // und liefert "pending". Diese Erwartung dokumentiert das Verhalten
     // bit-identisch — Änderung ist eine eigene Runde (SP1 A6).
-    expect(
-      deriveTelegramLinkState({ token_expires_at: FIXED_NOW.toISOString() }, FIXED_NOW),
-    ).toBe("pending");
+    expect(deriveTelegramLinkState({ token_expires_at: FIXED_NOW.toISOString() }, FIXED_NOW)).toBe(
+      "pending",
+    );
   });
 });

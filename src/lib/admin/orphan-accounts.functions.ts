@@ -72,10 +72,7 @@ export const listOrphanAuthAccounts = createServerFn({ method: "GET" })
     const staffMap = new Map<string, { displayName: string; persoNr: number | null }>();
     if (staffIds.length > 0) {
       const rows = expectOk<{ id: string; display_name: string; perso_nr: number | null }[]>(
-        await supabaseAdmin
-          .from("staff")
-          .select("id, display_name, perso_nr")
-          .in("id", staffIds),
+        await supabaseAdmin.from("staff").select("id, display_name, perso_nr").in("id", staffIds),
         "listOrphanAuthAccounts.staff",
       );
       for (const r of rows ?? []) {

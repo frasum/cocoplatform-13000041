@@ -38,3 +38,32 @@ export const getProductionConfigStatus = createServerFn({ method: "GET" })
       },
     };
   });
+
+// Sentry-Diagnose: löst bewusst einen Fehler in einer Server-Fn aus,
+// damit Admins den Server-Reporting-Pfad (inkl. Source-Maps, Tags) live
+// verifizieren können. Admin-only. Der Fehler wird explizit an Sentry
+// gemeldet und dann weitergeworfen, damit der Client die Rückmeldung
+// „Fehler ausgelöst" bekommt.
+export const triggerSentryTestErrorServer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<never> => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    const marker = new Date().toISOString();
+    const err = new Error(`Sentry-Testfehler (Server) — ausgelöst ${marker}`);
+    try {
+      const { captureServerError } = await import(
+        /* @vite-ignore */ "@/lib/monitoring/sentry.server"
+      );
+      await captureServerError(err, {
+        op: "admin.sentry.test",
+        orgId: caller.organizationId ?? null,
+        callerStaffId: caller.staffId ?? null,
+        role: caller.role,
+        critical: false,
+        tags: { test: "true" },
+      });
+    } catch {
+      /* Monitoring darf nichts brechen. */
+    }
+    throw err;
+  });

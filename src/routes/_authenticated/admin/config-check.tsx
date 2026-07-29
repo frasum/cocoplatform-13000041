@@ -4,11 +4,14 @@
 
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   getProductionConfigStatus,
+  triggerSentryTestErrorServer,
   type ConfigVarStatus,
 } from "@/lib/admin/config-check.functions";
+import { captureClientError } from "@/lib/monitoring/sentry-client";
 
 export const Route = createFileRoute("/_authenticated/admin/config-check")({
   beforeLoad: ({ context }) => {
@@ -68,11 +71,55 @@ function StatusDot({ ok, critical }: { ok: boolean; critical: boolean }) {
 
 function ConfigCheckPage() {
   const fetchStatus = useServerFn(getProductionConfigStatus);
+  const callServerThrow = useServerFn(triggerSentryTestErrorServer);
   const q = useQuery({
     queryKey: ["admin", "config-check"],
     queryFn: () => fetchStatus(),
     refetchOnWindowFocus: false,
   });
+
+  const [testStatus, setTestStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "sending"; scope: "client" | "server" }
+    | { kind: "ok"; scope: "client" | "server"; at: string }
+    | { kind: "error"; scope: "client" | "server"; message: string }
+  >({ kind: "idle" });
+
+  async function fireClientTest() {
+    const marker = new Date().toISOString();
+    setTestStatus({ kind: "sending", scope: "client" });
+    try {
+      const err = new Error(`Sentry-Testfehler (Client) — ausgelöst ${marker}`);
+      await captureClientError(err, { test: "true", scope: "manual-admin-test" });
+      setTestStatus({ kind: "ok", scope: "client", at: marker });
+    } catch (e) {
+      setTestStatus({
+        kind: "error",
+        scope: "client",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  async function fireServerTest() {
+    const marker = new Date().toISOString();
+    setTestStatus({ kind: "sending", scope: "server" });
+    try {
+      await callServerThrow();
+      // Sollte nie ankommen — der Handler wirft. Falls doch: als Fehler zeigen.
+      setTestStatus({
+        kind: "error",
+        scope: "server",
+        message: "Server hat keinen Fehler geworfen (unerwartet).",
+      });
+    } catch (e) {
+      // Erwartetes Verhalten: Server-Fn wirft, Fehler ist in Sentry gelandet.
+      setTestStatus({ kind: "ok", scope: "server", at: marker });
+      // Absichtlich nicht rethrown — Testauslösung ist erfolgreich, wenn der
+      // Server geworfen hat.
+      void e;
+    }
+  }
 
   const clientMissingCritical = CLIENT_VARS.filter(
     (v) => v.critical && !(v.value && v.value.length > 0),
@@ -199,6 +246,58 @@ function ConfigCheckPage() {
         ausschließlich <em>Anwesenheit</em> und ein formaler Hinweis (Länge, Host, Format)
         zurückgegeben.
       </p>
+
+      {/* Sentry-Diagnose: Test-Fehler auslösen (nur Admin) */}
+      <section className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Sentry-Diagnose</h2>
+          <p className="text-xs text-muted-foreground">
+            Löst bewusst je einen Testfehler im Browser bzw. auf dem Server aus, um zu prüfen,
+            dass Sentry Meldungen samt Source-Maps und Tags empfängt. Die Fehler sind mit
+            <code className="mx-1 font-mono">test=true</code>markiert und tauchen im Sentry-Projekt
+            unter <em>Issues</em> auf.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+          <button
+            type="button"
+            onClick={() => void fireClientTest()}
+            disabled={testStatus.kind === "sending"}
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+          >
+            Client-Testfehler senden
+          </button>
+          <button
+            type="button"
+            onClick={() => void fireServerTest()}
+            disabled={testStatus.kind === "sending"}
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+          >
+            Server-Testfehler senden
+          </button>
+          <div className="text-xs">
+            {testStatus.kind === "idle" && (
+              <span className="text-muted-foreground">Bereit.</span>
+            )}
+            {testStatus.kind === "sending" && (
+              <span className="text-muted-foreground">
+                Sende {testStatus.scope === "client" ? "Client" : "Server"}-Testfehler …
+              </span>
+            )}
+            {testStatus.kind === "ok" && (
+              <span className="text-emerald-600">
+                {testStatus.scope === "client" ? "Client" : "Server"}-Testfehler ausgelöst um{" "}
+                {new Date(testStatus.at).toLocaleTimeString("de-DE")}. In Sentry prüfen.
+              </span>
+            )}
+            {testStatus.kind === "error" && (
+              <span className="text-destructive">
+                Fehler ({testStatus.scope}): {testStatus.message}
+              </span>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

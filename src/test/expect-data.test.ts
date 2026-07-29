@@ -25,9 +25,9 @@ describe("expectData (DB1-A Helfer)", () => {
 
   it("das übergebene Label steht in beiden Fehlermeldungen", () => {
     const label = "payment_terminals insert (unit)";
-    expect(() =>
-      expectData({ data: null, error: { message: "boom" } }, label),
-    ).toThrow(new RegExp(label));
+    expect(() => expectData({ data: null, error: { message: "boom" } }, label)).toThrow(
+      new RegExp(label),
+    );
     expect(() => expectData({ data: null, error: null }, label)).toThrow(new RegExp(label));
   });
 
@@ -55,10 +55,7 @@ describe("expectData (DB1-A Helfer)", () => {
     }
 
     try {
-      expectData(
-        { data: null, error: { message: "plain" } },
-        "sessions insert (unit)",
-      );
+      expectData({ data: null, error: { message: "plain" } }, "sessions insert (unit)");
       throw new Error("should have thrown");
     } catch (e) {
       const msg = (e as Error).message;

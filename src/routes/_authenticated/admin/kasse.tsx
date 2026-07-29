@@ -637,6 +637,8 @@ function KassePage() {
               const sess = ovQ.data.session;
               if (!sess) return null;
               const vectronTotal = Number(sess.vectron_daily_total_cents ?? 0);
+              // KA1: Map aus dem ungefilterten Kanalbestand (inkl. inaktiver);
+              // Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
               const channelKindById = new Map(
                 (channelsQ.data ?? []).map((c) => [c.id, c.kind] as const),
               );
@@ -645,7 +647,7 @@ function KassePage() {
               const inHouseCents = sessionHouseCentsFromKasse({
                 vectronCents: vectronTotal,
                 channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
-                  kind: channelKindById.get(c.channelId) ?? "",
+                  kind: resolveChannelKind(channelKindById, c.channelId),
                   amountCents: c.amountCents,
                 })),
               });

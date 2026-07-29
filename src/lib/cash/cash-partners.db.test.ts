@@ -2,7 +2,13 @@
 // (settlement_partners). Läuft ausschließlich mit SUPABASE_DB_TESTS=1.
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import { submitWaiterSettlementCore } from "./cash.functions";
 import type { StaffCaller } from "@/lib/time/time.functions";
 
@@ -25,11 +31,14 @@ describe.skipIf(!dbTestsEnabled)("settlement_partners (DB)", () => {
   async function freshSession() {
     await org.service.from("sessions").delete().eq("organization_id", org.orgId);
     await org.service.from("time_entries").delete().eq("organization_id", org.orgId);
-    const { data: bd } = await org.service.rpc("current_business_date");
+    const bd = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-partners freshSession)",
+    );
     const { error } = await org.service.from("sessions").insert({
       organization_id: org.orgId,
       location_id: org.defaultLocationId,
-      business_date: bd as unknown as string,
+      business_date: bd,
       status: "open",
     });
     if (error) throw new Error(`session seed: ${error.message}`);
@@ -57,12 +66,15 @@ describe.skipIf(!dbTestsEnabled)("settlement_partners (DB)", () => {
       cashHandedInCents: 1000,
       partnerStaffIds: [partnerA.staffId, partnerB.staffId],
     });
-    const { data: parts } = await org.service
-      .from("settlement_partners")
-      .select("staff_id")
-      .eq("settlement_id", res.settlementId)
-      .order("staff_id");
-    expect((parts ?? []).map((p) => p.staff_id).sort()).toEqual(
+    const parts = expectData(
+      await org.service
+        .from("settlement_partners")
+        .select("staff_id")
+        .eq("settlement_id", res.settlementId)
+        .order("staff_id"),
+      "settlement_partners select (cash-partners)",
+    );
+    expect(parts.map((p) => p.staff_id).sort()).toEqual(
       [partnerA.staffId, partnerB.staffId].sort(),
     );
   });

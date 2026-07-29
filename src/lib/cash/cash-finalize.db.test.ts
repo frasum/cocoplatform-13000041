@@ -9,7 +9,13 @@
 //       sind blockiert.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import {
   submitWaiterSettlementCore,
   finalizeSessionCore,
@@ -77,18 +83,24 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
     waiter = await org.mkUser("staff");
     manager = await org.mkUser("manager");
     admin = await org.mkUser("admin");
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const { data: sess } = await org.service
-      .from("sessions")
-      .insert({
-        organization_id: org.orgId,
-        location_id: org.defaultLocationId,
-        business_date: bd as unknown as string,
-        status: "open",
-      })
-      .select("id")
-      .single();
-    sessionId = sess!.id;
+    const bd = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-finalize setup)",
+    );
+    const sess = expectData(
+      await org.service
+        .from("sessions")
+        .insert({
+          organization_id: org.orgId,
+          location_id: org.defaultLocationId,
+          business_date: bd,
+          status: "open",
+        })
+        .select("id")
+        .single(),
+      "sessions insert (cash-finalize setup)",
+    );
+    sessionId = sess.id;
     const r = await submitWaiterSettlementCore(s(), {
       posSalesCents: 100000,
       cardTotalCents: 20000,
@@ -112,24 +124,30 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
       PoolHoursWarningError,
     );
     // Status noch offen, nichts geschrieben.
-    const { data: pre } = await org.service
-      .from("sessions")
-      .select("status, finalized_at")
-      .eq("id", sessionId)
-      .single();
-    expect(pre?.status).toBe("open");
-    expect(pre?.finalized_at).toBeNull();
+    const pre = expectData(
+      await org.service
+        .from("sessions")
+        .select("status, finalized_at")
+        .eq("id", sessionId)
+        .single(),
+      "sessions select pre-finalize (cash-finalize)",
+    );
+    expect(pre.status).toBe("open");
+    expect(pre.finalized_at).toBeNull();
 
     // Zweiter Aufruf mit Bestätigung: geht durch.
     await finalizeSessionCore(mgr(), { sessionId, confirmPoolWarning: true });
-    const { data: sess } = await org.service
-      .from("sessions")
-      .select("status, finalized_at, finalized_by")
-      .eq("id", sessionId)
-      .single();
-    expect(sess?.status).toBe("finalized");
-    expect(sess?.finalized_at).not.toBeNull();
-    expect(sess?.finalized_by).toBe(manager.staffId);
+    const sess = expectData(
+      await org.service
+        .from("sessions")
+        .select("status, finalized_at, finalized_by")
+        .eq("id", sessionId)
+        .single(),
+      "sessions select post-finalize (cash-finalize)",
+    );
+    expect(sess.status).toBe("finalized");
+    expect(sess.finalized_at).not.toBeNull();
+    expect(sess.finalized_by).toBe(manager.staffId);
   });
 
   it("(2) Nach finalize → updateSession blockt (Reason 'session_finalized')", async () => {
@@ -142,13 +160,16 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
     }
 
     // DB unverändert (sanity).
-    const { data: sess } = await org.service
-      .from("sessions")
-      .select("notes, vouchers_sold_cents")
-      .eq("id", sessionId)
-      .single();
-    expect(sess?.notes).toBeNull();
-    expect(sess?.vouchers_sold_cents).toBe(0);
+    const sess = expectData(
+      await org.service
+        .from("sessions")
+        .select("notes, vouchers_sold_cents")
+        .eq("id", sessionId)
+        .single(),
+      "sessions select sanity after blocked update (cash-finalize)",
+    );
+    expect(sess.notes).toBeNull();
+    expect(sess.vouchers_sold_cents).toBe(0);
   });
 
   it("(3) Nach finalize → correctWaiterSettlement bleibt erlaubt", async () => {
@@ -162,13 +183,16 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
       reason: "nach finalize korrigiert",
     });
     expect(res.newId).not.toBe(settlementId);
-    const { data: neu } = await org.service
-      .from("waiter_settlements")
-      .select("status, pos_sales_cents")
-      .eq("id", res.newId)
-      .single();
-    expect(neu?.status).toBe("submitted");
-    expect(neu?.pos_sales_cents).toBe(110000);
+    const neu = expectData(
+      await org.service
+        .from("waiter_settlements")
+        .select("status, pos_sales_cents")
+        .eq("id", res.newId)
+        .single(),
+      "waiter_settlements select correction after finalize (cash-finalize)",
+    );
+    expect(neu.status).toBe("submitted");
+    expect(neu.pos_sales_cents).toBe(110000);
     settlementId = res.newId; // für Schritt 4
   });
 

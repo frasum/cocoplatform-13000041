@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   dbTestsEnabled,
+  expectData,
   seedOrg,
   signInAsUser,
   type SeededOrg,
@@ -36,8 +37,10 @@ describe.skipIf(!dbTestsEnabled)("cash RLS — DENY-ALL & Kellner-Sichtbarkeit",
     waiterB = await org.mkUser("staff");
 
     // Service-Role seedet eine offene Session am heutigen Geschäftstag.
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const businessDate = bd as unknown as string;
+    const businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-rls setup)",
+    );
     const { data: s, error: sErr } = await org.service
       .from("sessions")
       .insert({

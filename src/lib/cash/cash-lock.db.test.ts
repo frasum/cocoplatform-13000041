@@ -11,7 +11,13 @@
 //       kein Schreibvorgang in der DB).
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import {
   submitWaiterSettlementCore,
   updateSessionCore,
@@ -74,8 +80,10 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
   async function seedSession(
     status: "open" | "locked",
   ): Promise<{ sessionId: string; businessDate: string; settlementId: string }> {
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const businessDate = bd as unknown as string;
+    const businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-lock seedSession)",
+    );
     const insert: Record<string, unknown> = {
       organization_id: org.orgId,
       location_id: org.defaultLocationId,
@@ -86,12 +94,15 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
       insert.locked_at = new Date().toISOString();
       insert.locked_by = admin.staffId;
     }
-    const { data: sess } = await org.service
-      .from("sessions")
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .insert(insert as any)
-      .select("id")
-      .single();
+    const sess = expectData(
+      await org.service
+        .from("sessions")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert(insert as any)
+        .select("id")
+        .single(),
+      `sessions insert (cash-lock seedSession status=${status})`,
+    );
     let settlementId: string;
     if (status === "open") {
       const r = await submitWaiterSettlementCore(s(), {
@@ -103,22 +114,25 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
       });
       settlementId = r.settlementId;
     } else {
-      const { data: ws } = await org.service
-        .from("waiter_settlements")
-        .insert({
-          organization_id: org.orgId,
-          session_id: sess!.id,
-          staff_id: waiter.staffId,
-          kitchen_tip_rate: 0.02,
-          status: "submitted",
-          pos_sales_cents: 10000,
-          cash_handed_in_cents: 10000,
-        })
-        .select("id")
-        .single();
-      settlementId = ws!.id;
+      const ws = expectData(
+        await org.service
+          .from("waiter_settlements")
+          .insert({
+            organization_id: org.orgId,
+            session_id: sess.id,
+            staff_id: waiter.staffId,
+            kitchen_tip_rate: 0.02,
+            status: "submitted",
+            pos_sales_cents: 10000,
+            cash_handed_in_cents: 10000,
+          })
+          .select("id")
+          .single(),
+        "waiter_settlements insert (cash-lock seedSession locked)",
+      );
+      settlementId = ws.id;
     }
-    return { sessionId: sess!.id, businessDate, settlementId };
+    return { sessionId: sess.id, businessDate, settlementId };
   }
 
   function emptyUpdate(sessionId: string) {
@@ -278,13 +292,16 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
       throughDate: "2026-02-28",
       reason: "Februar abgeschlossen",
     });
-    const { data } = await org.service
-      .from("cash_locks")
-      .select("locked_through_date")
-      .eq("organization_id", org.orgId)
-      .eq("location_id", org.defaultLocationId)
-      .single();
-    expect(data?.locked_through_date).toBe("2026-02-28");
+    const data = expectData(
+      await org.service
+        .from("cash_locks")
+        .select("locked_through_date")
+        .eq("organization_id", org.orgId)
+        .eq("location_id", org.defaultLocationId)
+        .single(),
+      "cash_locks select forward-only (cash-lock)",
+    );
+    expect(data.locked_through_date).toBe("2026-02-28");
   });
 
   it("(5) lockSession + setCashLock admin-only — Manager → ForbiddenError, kein Schreibvorgang", async () => {

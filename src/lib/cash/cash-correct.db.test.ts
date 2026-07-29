@@ -9,7 +9,13 @@
 //       zweiter non-superseded für (session, staff) wird real (23505) abgelehnt.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import {
   submitWaiterSettlementCore,
   correctWaiterSettlementCore,
@@ -56,18 +62,24 @@ describe.skipIf(!dbTestsEnabled)("correctWaiterSettlementCore (DB)", () => {
         { onConflict: "organization_id" },
       );
 
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const { data: sess } = await org.service
-      .from("sessions")
-      .insert({
-        organization_id: org.orgId,
-        location_id: org.defaultLocationId,
-        business_date: bd as unknown as string,
-        status: "open",
-      })
-      .select("id")
-      .single();
-    sessionId = sess!.id;
+    const bd = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-correct setup)",
+    );
+    const sess = expectData(
+      await org.service
+        .from("sessions")
+        .insert({
+          organization_id: org.orgId,
+          location_id: org.defaultLocationId,
+          business_date: bd,
+          status: "open",
+        })
+        .select("id")
+        .single(),
+      "sessions insert (cash-correct setup)",
+    );
+    sessionId = sess.id;
 
     const r = await submitWaiterSettlementCore(s(), {
       posSalesCents: 100000,
@@ -103,28 +115,30 @@ describe.skipIf(!dbTestsEnabled)("correctWaiterSettlementCore (DB)", () => {
     expect(res.newId).not.toBe(settlementId);
     expect(res.originalId).toBe(settlementId);
 
-    const { data: orig } = await org.service
-      .from("waiter_settlements")
-      .select("status")
-      .eq("id", settlementId)
-      .single();
-    expect(orig?.status).toBe("superseded");
+    const orig = expectData(
+      await org.service.from("waiter_settlements").select("status").eq("id", settlementId).single(),
+      "waiter_settlements select original (cash-correct)",
+    );
+    expect(orig.status).toBe("superseded");
 
-    const { data: neu } = await org.service
-      .from("waiter_settlements")
-      .select("status, kitchen_tip_rate, corrected_from_id, pos_sales_cents")
-      .eq("id", res.newId)
-      .single();
-    expect(neu?.status).toBe("submitted");
-    expect(neu?.corrected_from_id).toBe(settlementId);
-    expect(Number(neu?.kitchen_tip_rate)).toBe(0.05); // geerbt, NICHT 0.10
-    expect(neu?.pos_sales_cents).toBe(110000);
+    const neu = expectData(
+      await org.service
+        .from("waiter_settlements")
+        .select("status, kitchen_tip_rate, corrected_from_id, pos_sales_cents")
+        .eq("id", res.newId)
+        .single(),
+      "waiter_settlements select new (cash-correct)",
+    );
+    expect(neu.status).toBe("submitted");
+    expect(neu.corrected_from_id).toBe(settlementId);
+    expect(Number(neu.kitchen_tip_rate)).toBe(0.05); // geerbt, NICHT 0.10
+    expect(neu.pos_sales_cents).toBe(110000);
 
-    const { data: audits } = await org.service
-      .from("audit_log")
-      .select("action, meta")
-      .eq("entity_id", res.newId);
-    const entry = (audits ?? []).find((a) => a.action === "cash.settlement.corrected");
+    const audits = expectData(
+      await org.service.from("audit_log").select("action, meta").eq("entity_id", res.newId),
+      "audit_log select correction (cash-correct)",
+    );
+    const entry = audits.find((a) => a.action === "cash.settlement.corrected");
     expect(entry).toBeDefined();
     const meta = entry!.meta as Record<string, unknown>;
     expect(meta.reason).toBe("Tippfehler bei pos_sales");

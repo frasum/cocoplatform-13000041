@@ -9,7 +9,13 @@
 //   (d) Wasserlinie überdeckt Geschäftstag → CashLockedError.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import {
   adminCreateWaiterSettlementCore,
   WaiterSettlementAlreadyExistsError,
@@ -55,18 +61,24 @@ describe.skipIf(!dbTestsEnabled)("adminCreateWaiterSettlementCore (DB)", () => {
         { onConflict: "organization_id" },
       );
 
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const { data: sess } = await org.service
-      .from("sessions")
-      .insert({
-        organization_id: org.orgId,
-        location_id: org.defaultLocationId,
-        business_date: bd as unknown as string,
-        status: "open",
-      })
-      .select("id")
-      .single();
-    sessionId = sess!.id;
+    const bd = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-admin-create-settlement setup)",
+    );
+    const sess = expectData(
+      await org.service
+        .from("sessions")
+        .insert({
+          organization_id: org.orgId,
+          location_id: org.defaultLocationId,
+          business_date: bd,
+          status: "open",
+        })
+        .select("id")
+        .single(),
+      "sessions insert (cash-admin-create-settlement setup)",
+    );
+    sessionId = sess.id;
   });
 
   afterAll(async () => {
@@ -86,19 +98,22 @@ describe.skipIf(!dbTestsEnabled)("adminCreateWaiterSettlementCore (DB)", () => {
     });
     expect(res.newId).toBeTruthy();
 
-    const { data: row } = await org.service
-      .from("waiter_settlements")
-      .select(
-        "status, kitchen_tip_rate, differenz_cents, kitchen_tip_cents, auto_clockout_time_entry_id, corrected_from_id",
-      )
-      .eq("id", res.newId)
-      .single();
-    expect(row?.status).toBe("submitted");
-    expect(Number(row?.kitchen_tip_rate)).toBe(0.05);
-    expect(row?.auto_clockout_time_entry_id).toBeNull();
-    expect(row?.corrected_from_id).toBeNull();
-    expect(row?.differenz_cents).toBe(res.differenzCents);
-    expect(row?.kitchen_tip_cents).toBe(res.kitchenTipCents);
+    const row = expectData(
+      await org.service
+        .from("waiter_settlements")
+        .select(
+          "status, kitchen_tip_rate, differenz_cents, kitchen_tip_cents, auto_clockout_time_entry_id, corrected_from_id",
+        )
+        .eq("id", res.newId)
+        .single(),
+      "waiter_settlements select happy-path (cash-admin-create-settlement)",
+    );
+    expect(row.status).toBe("submitted");
+    expect(Number(row.kitchen_tip_rate)).toBe(0.05);
+    expect(row.auto_clockout_time_entry_id).toBeNull();
+    expect(row.corrected_from_id).toBeNull();
+    expect(row.differenz_cents).toBe(res.differenzCents);
+    expect(row.kitchen_tip_cents).toBe(res.kitchenTipCents);
   });
 
   it("(b) Duplikat: zweiter Aufruf → WaiterSettlementAlreadyExistsError", async () => {
@@ -132,13 +147,16 @@ describe.skipIf(!dbTestsEnabled)("adminCreateWaiterSettlementCore (DB)", () => {
   });
 
   it("(d) Wasserlinie aktiv → CashLockedError", async () => {
-    const { data: bd } = await org.service.rpc("current_business_date");
+    const bd = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-admin-create-settlement Wasserlinie)",
+    );
     // Wasserlinie auf heute setzen (überdeckt den Geschäftstag der Session).
     await org.service.from("cash_locks").upsert(
       {
         organization_id: org.orgId,
         location_id: org.defaultLocationId,
-        locked_through_date: bd as unknown as string,
+        locked_through_date: bd,
       },
       { onConflict: "organization_id,location_id" },
     );

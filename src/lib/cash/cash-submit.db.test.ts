@@ -14,7 +14,13 @@
 //   (e) Keine offene Session am Geschäftstag: NoOpenSessionError.
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import { submitWaiterSettlementCore, NoOpenSessionError } from "./cash.functions";
 import type { StaffCaller } from "@/lib/time/time.functions";
 
@@ -38,8 +44,10 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
     // Pro Test: vorherige Session + time_entries entfernen (Audit-Log bleibt).
     await org.service.from("sessions").delete().eq("organization_id", org.orgId);
     await org.service.from("time_entries").delete().eq("organization_id", org.orgId);
-    const { data: bd } = await org.service.rpc("current_business_date");
-    businessDate = bd as unknown as string;
+    businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-submit freshSession)",
+    );
     const { data: s, error } = await org.service
       .from("sessions")
       .insert({
@@ -55,19 +63,24 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
   }
 
   async function openTimeEntry(startedAtIso: string): Promise<string> {
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const { data: te, error } = await org.service
-      .from("time_entries")
-      .insert({
-        organization_id: org.orgId,
-        staff_id: waiter.staffId,
-        started_at: startedAtIso,
-        business_date: bd as unknown as string,
-        source: "clock",
-      })
-      .select("id")
-      .single();
-    if (error || !te) throw new Error(`time_entry seed: ${error?.message}`);
+    const bd = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-submit openTimeEntry)",
+    );
+    const te = expectData(
+      await org.service
+        .from("time_entries")
+        .insert({
+          organization_id: org.orgId,
+          staff_id: waiter.staffId,
+          started_at: startedAtIso,
+          business_date: bd,
+          source: "clock",
+        })
+        .select("id")
+        .single(),
+      "time_entries insert (cash-submit openTimeEntry)",
+    );
     return te.id;
   }
 
@@ -95,27 +108,32 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
     expect(res.noOpenTimeEntry).toBe(false);
     expect(res.idempotent).toBe(false);
 
-    const { data: ws } = await org.service
-      .from("waiter_settlements")
-      .select("auto_clockout_time_entry_id, status")
-      .eq("id", res.settlementId)
-      .single();
-    expect(ws?.auto_clockout_time_entry_id).toBe(teId);
-    expect(ws?.status).toBe("submitted");
+    const ws = expectData(
+      await org.service
+        .from("waiter_settlements")
+        .select("auto_clockout_time_entry_id, status")
+        .eq("id", res.settlementId)
+        .single(),
+      "waiter_settlements select happy-path (cash-submit)",
+    );
+    expect(ws.auto_clockout_time_entry_id).toBe(teId);
+    expect(ws.status).toBe("submitted");
 
-    const { data: teRow } = await org.service
-      .from("time_entries")
-      .select("ended_at")
-      .eq("id", teId)
-      .single();
-    expect(teRow?.ended_at).not.toBeNull();
+    const teRow = expectData(
+      await org.service.from("time_entries").select("ended_at").eq("id", teId).single(),
+      "time_entries select ended_at (cash-submit happy-path)",
+    );
+    expect(teRow.ended_at).not.toBeNull();
 
-    const { data: audits } = await org.service
-      .from("audit_log")
-      .select("action, meta")
-      .eq("organization_id", org.orgId)
-      .eq("action", "time_entry.clock_out");
-    const matching = (audits ?? []).filter((a) => {
+    const audits = expectData(
+      await org.service
+        .from("audit_log")
+        .select("action, meta")
+        .eq("organization_id", org.orgId)
+        .eq("action", "time_entry.clock_out"),
+      "audit_log select clock_out (cash-submit happy-path)",
+    );
+    const matching = audits.filter((a) => {
       const m = a.meta as Record<string, unknown> | null;
       return m?.settlement_id === res.settlementId;
     });
@@ -157,21 +175,27 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       .eq("action", "time_entry.clock_out");
     expect(afterAudits.count).toBe(beforeAudits.count);
 
-    const { data: ws } = await org.service
-      .from("waiter_settlements")
-      .select("pos_sales_cents, cash_handed_in_cents")
-      .eq("id", first.settlementId)
-      .single();
-    expect(ws?.pos_sales_cents).toBe(50000);
-    expect(ws?.cash_handed_in_cents).toBe(40000);
+    const ws = expectData(
+      await org.service
+        .from("waiter_settlements")
+        .select("pos_sales_cents, cash_handed_in_cents")
+        .eq("id", first.settlementId)
+        .single(),
+      "waiter_settlements select idempotent (cash-submit)",
+    );
+    expect(ws.pos_sales_cents).toBe(50000);
+    expect(ws.cash_handed_in_cents).toBe(40000);
 
-    const { data: noop } = await org.service
-      .from("audit_log")
-      .select("action")
-      .eq("organization_id", org.orgId)
-      .eq("entity_id", first.settlementId)
-      .eq("action", "cash.settlement.resubmit_noop");
-    expect((noop ?? []).length).toBeGreaterThan(0);
+    const noop = expectData(
+      await org.service
+        .from("audit_log")
+        .select("action")
+        .eq("organization_id", org.orgId)
+        .eq("entity_id", first.settlementId)
+        .eq("action", "cash.settlement.resubmit_noop"),
+      "audit_log select resubmit_noop (cash-submit)",
+    );
+    expect(noop.length).toBeGreaterThan(0);
   });
 
   it("(c) kein offener Zeiteintrag: noOpenTimeEntry=true, KEIN clockOut", async () => {
@@ -206,12 +230,11 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       openInvoicesCents: 0,
       cashHandedInCents: 1,
     });
-    const { data: te7row } = await org.service
-      .from("time_entries")
-      .select("break_minutes")
-      .eq("id", te7)
-      .single();
-    expect(te7row?.break_minutes).toBe(30);
+    const te7row = expectData(
+      await org.service.from("time_entries").select("break_minutes").eq("id", te7).single(),
+      "time_entries select break_minutes 7h (cash-submit ArbZG)",
+    );
+    expect(te7row.break_minutes).toBe(30);
 
     await freshSession();
     const te10 = await openTimeEntry(new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString());
@@ -222,12 +245,11 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       openInvoicesCents: 0,
       cashHandedInCents: 1,
     });
-    const { data: te10row } = await org.service
-      .from("time_entries")
-      .select("break_minutes")
-      .eq("id", te10)
-      .single();
-    expect(te10row?.break_minutes).toBe(45);
+    const te10row = expectData(
+      await org.service.from("time_entries").select("break_minutes").eq("id", te10).single(),
+      "time_entries select break_minutes 10h (cash-submit ArbZG)",
+    );
+    expect(te10row.break_minutes).toBe(45);
   });
 
   it("(e) keine offene Session am Geschäftstag → NoOpenSessionError", async () => {

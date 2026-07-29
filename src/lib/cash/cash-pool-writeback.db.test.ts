@@ -6,7 +6,13 @@
 //     kein pool_time.writeback Audit-Eintrag.
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import { submitWaiterSettlementCore } from "./cash.functions";
 import type { StaffCaller } from "@/lib/time/time.functions";
 
@@ -34,8 +40,10 @@ describe.skipIf(!dbTestsEnabled)("Pool-Zeit-Rückschreibung (DB)", () => {
       .from("organization_settings")
       .update({ time_locked_through_date: null })
       .eq("organization_id", org.orgId);
-    const { data: bd } = await org.service.rpc("current_business_date");
-    businessDate = bd as unknown as string;
+    businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-pool-writeback freshSession)",
+    );
     const { data: s, error } = await org.service
       .from("sessions")
       .insert({
@@ -86,14 +94,17 @@ describe.skipIf(!dbTestsEnabled)("Pool-Zeit-Rückschreibung (DB)", () => {
     };
     await submitWaiterSettlementCore(caller(), input);
     await submitWaiterSettlementCore(caller(), input);
-    const { data: poolEntries } = await org.service
-      .from("time_entries")
-      .select("id, import_key")
-      .eq("organization_id", org.orgId)
-      .eq("staff_id", kitchen.staffId)
-      .eq("source", "pool");
-    expect(poolEntries ?? []).toHaveLength(1);
-    expect(poolEntries?.[0].import_key?.startsWith("pool:")).toBe(true);
+    const poolEntries = expectData(
+      await org.service
+        .from("time_entries")
+        .select("id, import_key")
+        .eq("organization_id", org.orgId)
+        .eq("staff_id", kitchen.staffId)
+        .eq("source", "pool"),
+      "time_entries select pool-idempotency (cash-pool-writeback)",
+    );
+    expect(poolEntries).toHaveLength(1);
+    expect(poolEntries[0].import_key?.startsWith("pool:")).toBe(true);
   });
 
   it("Kollision: Staff mit clock-Eintrag → kein pool-Insert", async () => {
@@ -117,13 +128,16 @@ describe.skipIf(!dbTestsEnabled)("Pool-Zeit-Rückschreibung (DB)", () => {
       cashHandedInCents: 1,
     });
 
-    const { data: poolEntries } = await org.service
-      .from("time_entries")
-      .select("id")
-      .eq("organization_id", org.orgId)
-      .eq("staff_id", kitchen.staffId)
-      .eq("source", "pool");
-    expect(poolEntries ?? []).toHaveLength(0);
+    const poolEntries = expectData(
+      await org.service
+        .from("time_entries")
+        .select("id")
+        .eq("organization_id", org.orgId)
+        .eq("staff_id", kitchen.staffId)
+        .eq("source", "pool"),
+      "time_entries select clock-collision (cash-pool-writeback)",
+    );
+    expect(poolEntries).toHaveLength(0);
   });
 
   it("Wasserlinie: gesperrter Tag → kein pool-Insert, kein writeback-Audit", async () => {
@@ -141,19 +155,25 @@ describe.skipIf(!dbTestsEnabled)("Pool-Zeit-Rückschreibung (DB)", () => {
       cashHandedInCents: 1,
     });
 
-    const { data: poolEntries } = await org.service
-      .from("time_entries")
-      .select("id")
-      .eq("organization_id", org.orgId)
-      .eq("source", "pool");
-    expect(poolEntries ?? []).toHaveLength(0);
+    const poolEntries = expectData(
+      await org.service
+        .from("time_entries")
+        .select("id")
+        .eq("organization_id", org.orgId)
+        .eq("source", "pool"),
+      "time_entries select waterline (cash-pool-writeback)",
+    );
+    expect(poolEntries).toHaveLength(0);
 
-    const { data: audits } = await org.service
-      .from("audit_log")
-      .select("id")
-      .eq("organization_id", org.orgId)
-      .eq("action", "pool_time.writeback")
-      .eq("entity_id", sessionId);
-    expect(audits ?? []).toHaveLength(0);
+    const audits = expectData(
+      await org.service
+        .from("audit_log")
+        .select("id")
+        .eq("organization_id", org.orgId)
+        .eq("action", "pool_time.writeback")
+        .eq("entity_id", sessionId),
+      "audit_log select waterline (cash-pool-writeback)",
+    );
+    expect(audits).toHaveLength(0);
   });
 });

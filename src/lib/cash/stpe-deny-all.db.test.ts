@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   dbTestsEnabled,
+  expectData,
   seedOrg,
   signInAsUser,
   type SeededOrg,
@@ -23,8 +24,10 @@ describe.skipIf(!dbTestsEnabled)("session_tip_pool_entries — DENY-ALL Client-W
     manager = await org.mkUser("manager");
     staff = await org.mkUser("staff");
 
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const businessDate = bd as unknown as string;
+    const businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (stpe-deny-all setup)",
+    );
     const { data: s, error: sErr } = await org.service
       .from("sessions")
       .insert({

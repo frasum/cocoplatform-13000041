@@ -8,7 +8,13 @@
 //  4) Geschlossene Session ⇒ Nach-Sync fügt NICHTS hinzu.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import { syncOpenSessionsPoolAfterRosterWrite } from "./roster-pool-sync";
 
 describe.skipIf(!dbTestsEnabled)("Roster-Pool Nach-Sync (RS1)", () => {
@@ -20,8 +26,10 @@ describe.skipIf(!dbTestsEnabled)("Roster-Pool Nach-Sync (RS1)", () => {
   async function freshOpenSession(): Promise<string> {
     await org.service.from("sessions").delete().eq("organization_id", org.orgId);
     await org.service.from("roster_shifts").delete().eq("organization_id", org.orgId);
-    const { data: bd } = await org.service.rpc("current_business_date");
-    businessDate = bd as unknown as string;
+    businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (roster-pool-sync freshOpenSession)",
+    );
     const { data: s, error } = await org.service
       .from("sessions")
       .insert({
@@ -77,14 +85,17 @@ describe.skipIf(!dbTestsEnabled)("Roster-Pool Nach-Sync (RS1)", () => {
       targets: [{ locationId: org.defaultLocationId, businessDate }],
       op: "test.new_shift",
     });
-    const { data: rows } = await org.service
-      .from("session_tip_pool_entries")
-      .select("staff_id, department, shift_start")
-      .eq("session_id", sessionId);
-    expect(rows ?? []).toHaveLength(1);
-    expect(rows?.[0].staff_id).toBe(staffA.staffId);
-    expect(rows?.[0].department).toBe("service");
-    expect(rows?.[0].shift_start).toBe("16:00:00");
+    const rows = expectData(
+      await org.service
+        .from("session_tip_pool_entries")
+        .select("staff_id, department, shift_start")
+        .eq("session_id", sessionId),
+      "session_tip_pool_entries select new-shift (roster-pool-sync)",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].staff_id).toBe(staffA.staffId);
+    expect(rows[0].department).toBe("service");
+    expect(rows[0].shift_start).toBe("16:00:00");
   });
 
   it("bestehender Eintrag bleibt bit-identisch, wenn andere Person dazukommt", async () => {
@@ -107,17 +118,20 @@ describe.skipIf(!dbTestsEnabled)("Roster-Pool Nach-Sync (RS1)", () => {
       targets: [{ locationId: org.defaultLocationId, businessDate }],
       op: "test.additive",
     });
-    const { data: rows } = await org.service
-      .from("session_tip_pool_entries")
-      .select("staff_id, shift_start, shift_end, hours_minutes")
-      .eq("session_id", sessionId)
-      .order("staff_id");
+    const rows = expectData(
+      await org.service
+        .from("session_tip_pool_entries")
+        .select("staff_id, shift_start, shift_end, hours_minutes")
+        .eq("session_id", sessionId)
+        .order("staff_id"),
+      "session_tip_pool_entries select additive (roster-pool-sync)",
+    );
     expect(rows).toHaveLength(2);
-    const a = rows!.find((r) => r.staff_id === staffA.staffId)!;
+    const a = rows.find((r) => r.staff_id === staffA.staffId)!;
     expect(a.shift_start).toBe("16:00:00");
     expect(a.shift_end).toBe("23:15:00");
     expect(a.hours_minutes).toBe(435);
-    const b = rows!.find((r) => r.staff_id === staffB.staffId)!;
+    const b = rows.find((r) => r.staff_id === staffB.staffId)!;
     expect(b.shift_start).toBe("16:00:00");
     expect(b.shift_end).toBeNull();
     expect(b.hours_minutes).toBe(0);
@@ -141,12 +155,15 @@ describe.skipIf(!dbTestsEnabled)("Roster-Pool Nach-Sync (RS1)", () => {
       targets: [{ locationId: org.defaultLocationId, businessDate }],
       op: "test.after_delete",
     });
-    const { data: rows } = await org.service
-      .from("session_tip_pool_entries")
-      .select("staff_id")
-      .eq("session_id", sessionId);
+    const rows = expectData(
+      await org.service
+        .from("session_tip_pool_entries")
+        .select("staff_id")
+        .eq("session_id", sessionId),
+      "session_tip_pool_entries select after-delete (roster-pool-sync)",
+    );
     expect(rows).toHaveLength(1);
-    expect(rows?.[0].staff_id).toBe(staffA.staffId);
+    expect(rows[0].staff_id).toBe(staffA.staffId);
   });
 
   it("geschlossene Session ⇒ kein Nach-Sync", async () => {
@@ -158,10 +175,13 @@ describe.skipIf(!dbTestsEnabled)("Roster-Pool Nach-Sync (RS1)", () => {
       targets: [{ locationId: org.defaultLocationId, businessDate }],
       op: "test.closed",
     });
-    const { data: rows } = await org.service
-      .from("session_tip_pool_entries")
-      .select("staff_id")
-      .eq("session_id", sessionId);
-    expect(rows ?? []).toHaveLength(0);
+    const rows = expectData(
+      await org.service
+        .from("session_tip_pool_entries")
+        .select("staff_id")
+        .eq("session_id", sessionId),
+      "session_tip_pool_entries select closed-session (roster-pool-sync)",
+    );
+    expect(rows).toHaveLength(0);
   });
 });

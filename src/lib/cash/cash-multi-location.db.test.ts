@@ -12,7 +12,13 @@
 //   (d) assertLocationInOrg: locationId einer FREMDEN Org → ForbiddenError.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import {
   submitWaiterSettlementCore,
   setCashLockCore,
@@ -66,8 +72,10 @@ describe.skipIf(!dbTestsEnabled)("cash multi-location (DB)", () => {
     // Checks blockieren (für admin nicht zwingend, aber konsistent).
     await org.bindStaffLocation(admin.staffId, locationB);
 
-    const { data: bd } = await org.service.rpc("current_business_date");
-    businessDate = bd as unknown as string;
+    businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (cash-multi-location setup)",
+    );
 
     const { data: sA, error: eA } = await org.service
       .from("sessions")
@@ -104,12 +112,15 @@ describe.skipIf(!dbTestsEnabled)("cash multi-location (DB)", () => {
   it("(a) Zwei Locations koexistieren am selben business_date; Unique greift pro Location", async () => {
     // Beide Sessions sind oben erfolgreich angelegt worden — coexistence ok.
     expect(sessionA).not.toBe(sessionB);
-    const { data: list } = await org.service
-      .from("sessions")
-      .select("id, location_id, business_date")
-      .eq("organization_id", org.orgId)
-      .eq("business_date", businessDate);
-    expect((list ?? []).length).toBe(2);
+    const list = expectData(
+      await org.service
+        .from("sessions")
+        .select("id, location_id, business_date")
+        .eq("organization_id", org.orgId)
+        .eq("business_date", businessDate),
+      "sessions select coexistence (cash-multi-location)",
+    );
+    expect(list.length).toBe(2);
 
     // Zweite Session derselben Location am gleichen Tag → 23505.
     const { error } = await org.service.from("sessions").insert({

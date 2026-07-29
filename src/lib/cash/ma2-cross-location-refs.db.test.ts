@@ -4,7 +4,13 @@
 // noch die session_channel_amounts/-terminal_amounts anfassen.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { dbTestsEnabled, seedOrg, type SeededOrg, type SeededUser } from "@/test/db-setup";
+import {
+  dbTestsEnabled,
+  expectData,
+  seedOrg,
+  type SeededOrg,
+  type SeededUser,
+} from "@/test/db-setup";
 import {
   updateSessionCore,
   CrossLocationRefError,
@@ -83,8 +89,10 @@ describe.skipIf(!dbTestsEnabled)("MA2 — cross-location channel/terminal refs (
     terminalA = await mkTerm(org.defaultLocationId, "TermA");
     terminalB = await mkTerm(locationB, "TermB");
 
-    const { data: bd } = await org.service.rpc("current_business_date");
-    const businessDate = bd as unknown as string;
+    const businessDate = expectData(
+      await org.service.rpc("current_business_date"),
+      "rpc current_business_date (ma2-cross-location setup)",
+    );
 
     const { data: s, error: sErr } = await org.service
       .from("sessions")
@@ -125,18 +133,20 @@ describe.skipIf(!dbTestsEnabled)("MA2 — cross-location channel/terminal refs (
     ).rejects.toBeInstanceOf(CrossLocationRefError);
 
     // Session-Zeile unverändert (guest_count noch INITIAL_GUEST_COUNT).
-    const { data: sess } = await org.service
-      .from("sessions")
-      .select("guest_count")
-      .eq("id", sessionA)
-      .single();
-    expect(sess?.guest_count).toBe(INITIAL_GUEST_COUNT);
+    const sess = expectData(
+      await org.service.from("sessions").select("guest_count").eq("id", sessionA).single(),
+      "sessions select unchanged after channel-ref throw (ma2-cross-location)",
+    );
+    expect(sess.guest_count).toBe(INITIAL_GUEST_COUNT);
 
     // Bestehende session_channel_amounts-Zeilen unverändert (DELETE nicht gelaufen).
-    const { data: rows } = await org.service
-      .from("session_channel_amounts")
-      .select("channel_id, amount_cents")
-      .eq("session_id", sessionA);
+    const rows = expectData(
+      await org.service
+        .from("session_channel_amounts")
+        .select("channel_id, amount_cents")
+        .eq("session_id", sessionA),
+      "session_channel_amounts select unchanged after channel-ref throw (ma2-cross-location)",
+    );
     expect(rows).toEqual([{ channel_id: channelA, amount_cents: SEEDED_CHANNEL_AMOUNT }]);
   });
 
@@ -150,17 +160,19 @@ describe.skipIf(!dbTestsEnabled)("MA2 — cross-location channel/terminal refs (
       ),
     ).rejects.toBeInstanceOf(CrossLocationRefError);
 
-    const { data: sess } = await org.service
-      .from("sessions")
-      .select("guest_count")
-      .eq("id", sessionA)
-      .single();
-    expect(sess?.guest_count).toBe(INITIAL_GUEST_COUNT);
+    const sess = expectData(
+      await org.service.from("sessions").select("guest_count").eq("id", sessionA).single(),
+      "sessions select unchanged after terminal-ref throw (ma2-cross-location)",
+    );
+    expect(sess.guest_count).toBe(INITIAL_GUEST_COUNT);
 
-    const { data: rows } = await org.service
-      .from("session_channel_amounts")
-      .select("channel_id, amount_cents")
-      .eq("session_id", sessionA);
+    const rows = expectData(
+      await org.service
+        .from("session_channel_amounts")
+        .select("channel_id, amount_cents")
+        .eq("session_id", sessionA),
+      "session_channel_amounts select unchanged after terminal-ref throw (ma2-cross-location)",
+    );
     expect(rows).toEqual([{ channel_id: channelA, amount_cents: SEEDED_CHANNEL_AMOUNT }]);
   });
 
@@ -180,23 +192,28 @@ describe.skipIf(!dbTestsEnabled)("MA2 — cross-location channel/terminal refs (
       ),
     ).resolves.toBeDefined();
 
-    const { data: sess } = await org.service
-      .from("sessions")
-      .select("guest_count")
-      .eq("id", sessionA)
-      .single();
-    expect(sess?.guest_count).toBe(NEW_GUEST_COUNT);
+    const sess = expectData(
+      await org.service.from("sessions").select("guest_count").eq("id", sessionA).single(),
+      "sessions select after valid update (ma2-cross-location)",
+    );
+    expect(sess.guest_count).toBe(NEW_GUEST_COUNT);
 
-    const { data: chanRows } = await org.service
-      .from("session_channel_amounts")
-      .select("channel_id, amount_cents")
-      .eq("session_id", sessionA);
+    const chanRows = expectData(
+      await org.service
+        .from("session_channel_amounts")
+        .select("channel_id, amount_cents")
+        .eq("session_id", sessionA),
+      "session_channel_amounts select after valid update (ma2-cross-location)",
+    );
     expect(chanRows).toEqual([{ channel_id: channelA, amount_cents: NEW_CHANNEL_AMOUNT }]);
 
-    const { data: termRows } = await org.service
-      .from("session_terminal_amounts")
-      .select("terminal_id, amount_cents")
-      .eq("session_id", sessionA);
+    const termRows = expectData(
+      await org.service
+        .from("session_terminal_amounts")
+        .select("terminal_id, amount_cents")
+        .eq("session_id", sessionA),
+      "session_terminal_amounts select after valid update (ma2-cross-location)",
+    );
     expect(termRows).toEqual([{ terminal_id: terminalA, amount_cents: NEW_TERMINAL_AMOUNT }]);
   });
 });

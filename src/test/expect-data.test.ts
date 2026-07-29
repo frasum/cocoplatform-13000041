@@ -25,10 +25,8 @@ describe("expectData (DB1-A Helfer)", () => {
 
   it("das übergebene Label steht in beiden Fehlermeldungen", () => {
     const label = "payment_terminals insert (unit)";
-    expect(() => expectData({ data: null, error: { message: "boom" } }, label)).toThrow(
-      new RegExp(label),
-    );
-    expect(() => expectData({ data: null, error: null }, label)).toThrow(new RegExp(label));
+    expect(() => expectData({ data: null, error: { message: "boom" } }, label)).toThrow(label);
+    expect(() => expectData({ data: null, error: null }, label)).toThrow(label);
   });
 
   it("hängt code/details/hint an, wenn vorhanden — und fehlt sauber, wenn nicht", () => {

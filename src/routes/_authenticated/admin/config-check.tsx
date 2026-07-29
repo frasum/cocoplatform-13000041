@@ -105,19 +105,15 @@ function ConfigCheckPage() {
     const marker = new Date().toISOString();
     setTestStatus({ kind: "sending", scope: "server" });
     try {
-      await callServerThrow();
-      // Sollte nie ankommen — der Handler wirft. Falls doch: als Fehler zeigen.
+      const res = await callServerThrow();
+      setTestStatus({ kind: "ok", scope: "server", at: res.at });
+    } catch (e) {
       setTestStatus({
         kind: "error",
         scope: "server",
-        message: "Server hat keinen Fehler geworfen (unerwartet).",
+        message: e instanceof Error ? e.message : String(e),
       });
-    } catch (e) {
-      // Erwartetes Verhalten: Server-Fn wirft, Fehler ist in Sentry gelandet.
-      setTestStatus({ kind: "ok", scope: "server", at: marker });
-      // Absichtlich nicht rethrown — Testauslösung ist erfolgreich, wenn der
-      // Server geworfen hat.
-      void e;
+      void marker;
     }
   }
 

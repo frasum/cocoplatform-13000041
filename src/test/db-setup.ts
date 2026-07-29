@@ -13,6 +13,11 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import type { AppRole } from "@/lib/admin/role-guard";
 
+// DB1 — Diagnose-Helfer für DB-Integrationstests. Re-Export, damit
+// Testdateien weiterhin nur aus `@/test/db-setup` importieren müssen.
+export { expectData } from "./expect-data";
+export type { PostgrestLike } from "./expect-data";
+
 export const dbTestsEnabled =
   process.env.SUPABASE_DB_TESTS === "1" &&
   !!process.env.SUPABASE_URL &&

@@ -775,9 +775,8 @@ function OrphanAccountsCard({ orphans }: { orphans: OrphanAuthAccount[] }) {
             </TableBody>
           </Table>
           <p className="px-4 py-2 text-xs text-muted-foreground">
-            Diese Konten haben sich angemeldet, sind aber nicht als Mitarbeiter dieser Organisation
-            verknüpft. Über „Neuer Mitarbeiter" oder die Einladung im Stammblatt lässt sich das
-            Konto zuordnen.
+            Diese Konten existieren in der Anmeldung, sind aber keinem Mitarbeiter zugeordnet. Über
+            „Neuer Mitarbeiter" oder die Einladung im Stammblatt lässt sich das Konto zuordnen.
           </p>
         </div>
       )}

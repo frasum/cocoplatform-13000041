@@ -56,7 +56,7 @@ export const triggerSentryTestErrorServer = createServerFn({ method: "POST" })
       );
       await captureServerError(err, {
         op: "admin.sentry.test",
-        orgId: caller.orgId ?? null,
+        orgId: caller.organizationId ?? null,
         callerStaffId: caller.staffId ?? null,
         role: caller.role,
         critical: false,

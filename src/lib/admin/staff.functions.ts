@@ -86,12 +86,13 @@ export const listStaff = createServerFn({ method: "GET" })
         staff_locations: unknown;
         staff_skills: unknown;
         staff_pins: unknown;
+        user_links: unknown;
       }[]
     >(
       await supabaseAdmin
         .from("staff")
         .select(
-          "id, first_name, last_name, display_name, perso_nr, is_active, role_assignments(role), staff_locations(location_id, department), staff_skills(skill_id, skills(category)), staff_pins(id)",
+          "id, first_name, last_name, display_name, perso_nr, is_active, role_assignments(role), staff_locations(location_id, department), staff_skills(skill_id, skills(category)), staff_pins(id), user_links(user_id)",
         )
         .eq("organization_id", caller.organizationId)
         .order("display_name"),
@@ -140,6 +141,11 @@ export const listStaff = createServerFn({ method: "GET" })
         skillCategories,
         skillIds,
         hasPin: s.staff_pins !== null,
+        // AC2 — Kontostatus: true, wenn ein user_links-Eintrag existiert.
+        // Nur das Bit, keine E-Mail/user_id (SD1: Listen-DTO bleibt personaldaten-frei).
+        hasAccount: Array.isArray(s.user_links)
+          ? (s.user_links as { user_id: string | null }[]).some((l) => !!l.user_id)
+          : !!(s.user_links as { user_id: string | null } | null)?.user_id,
       };
     });
   });

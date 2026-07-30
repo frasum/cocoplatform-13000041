@@ -9,7 +9,6 @@ import { parsePersonalCsv } from "./import-personal-csv";
 
 const STAFF_A = "staff-a";
 const STAFF_B = "staff-b";
-const FALLBACK = "2026-06-14";
 
 function rows(overrides: Partial<PersonalRowInput> = {}): PersonalRowInput[] {
   return [
@@ -19,7 +18,6 @@ function rows(overrides: Partial<PersonalRowInput> = {}): PersonalRowInput[] {
       lastName: "Sukphasathit",
       nickname: "ANDI",
       persoNr: 42,
-      hourlyRate: 16.5,
       employmentStart: "2024-01-15",
       ...overrides,
     },
@@ -51,10 +49,6 @@ describe("computePersonalPlan — Namen + perso_nr", () => {
       rows: rows(),
       staffMap: staffMap(),
       currentStaff: current,
-      currentComp: new Map([
-        [STAFF_A, { staffId: STAFF_A, hourlyRate: 16.5, validFrom: "2024-01-15" }],
-      ]),
-      fallbackValidFrom: FALLBACK,
     });
     expect(r.staffUpdates).toHaveLength(1);
     expect(r.staffUpdates[0].fields.first_name).toBe("Phattanaphol (ANDI)");
@@ -79,10 +73,6 @@ describe("computePersonalPlan — Namen + perso_nr", () => {
       rows: rows({ nickname: "" }),
       staffMap: staffMap(),
       currentStaff: current,
-      currentComp: new Map([
-        [STAFF_A, { staffId: STAFF_A, hourlyRate: 16.5, validFrom: "2024-01-15" }],
-      ]),
-      fallbackValidFrom: FALLBACK,
     });
     // Kein staff-Update überhaupt (alles identisch + nickname-Schutz).
     expect(r.staffUpdates).toHaveLength(0);
@@ -106,98 +96,9 @@ describe("computePersonalPlan — Namen + perso_nr", () => {
       rows: rows({ persoNr: null }),
       staffMap: staffMap(),
       currentStaff: current,
-      currentComp: new Map([
-        [STAFF_A, { staffId: STAFF_A, hourlyRate: 16.5, validFrom: "2024-01-15" }],
-      ]),
-      fallbackValidFrom: FALLBACK,
     });
     expect(r.staffUpdates).toHaveLength(0);
     expect(r.perStaff[0].nameDiff.perso_nr).toBeUndefined();
-  });
-});
-
-describe("computePersonalPlan — Compensation", () => {
-  it("(b) hourly_rate=0 wird als Insert geschrieben, nicht geskippt", () => {
-    const current = new Map<string, CurrentStaffRow>([
-      [
-        STAFF_A,
-        {
-          staffId: STAFF_A,
-          firstName: "Net",
-          lastName: "Net",
-          displayName: "NET",
-          persoNr: null,
-        },
-      ],
-    ]);
-    const r = computePersonalPlan({
-      rows: rows({
-        firstName: "Net",
-        lastName: "Net",
-        nickname: "NET",
-        persoNr: null,
-        hourlyRate: 0,
-        employmentStart: null,
-      }),
-      staffMap: staffMap(),
-      currentStaff: current,
-      currentComp: new Map(),
-      fallbackValidFrom: FALLBACK,
-    });
-    expect(r.totals.compInserts).toBe(1);
-    expect(r.compOps[0].op).toBe("insert");
-    expect(r.compOps[0].hourly_rate).toBe(0);
-  });
-
-  it("(c) employmentStart leer → compFallback=true, valid_from=fallback", () => {
-    const r = computePersonalPlan({
-      rows: rows({ employmentStart: null }),
-      staffMap: staffMap(),
-      currentStaff: new Map([
-        [
-          STAFF_A,
-          {
-            staffId: STAFF_A,
-            firstName: "Phattanaphol (ANDI)",
-            lastName: "Sukphasathit",
-            displayName: "ANDI",
-            persoNr: 42,
-          },
-        ],
-      ]),
-      currentComp: new Map(),
-      fallbackValidFrom: FALLBACK,
-    });
-    expect(r.compOps[0].valid_from).toBe(FALLBACK);
-    expect(r.compOps[0].fallback).toBe(true);
-    expect(r.perStaff[0].compFallback).toBe(true);
-    expect(r.totals.compFallbacks).toBe(1);
-  });
-
-  it("comp-UPSERT: bestehender Eintrag mit geändertem Lohn → update", () => {
-    const r = computePersonalPlan({
-      rows: rows({ hourlyRate: 18.0 }),
-      staffMap: staffMap(),
-      currentStaff: new Map([
-        [
-          STAFF_A,
-          {
-            staffId: STAFF_A,
-            firstName: "Phattanaphol (ANDI)",
-            lastName: "Sukphasathit",
-            displayName: "ANDI",
-            persoNr: 42,
-          },
-        ],
-      ]),
-      currentComp: new Map([
-        [STAFF_A, { staffId: STAFF_A, hourlyRate: 16.5, validFrom: "2024-01-15" }],
-      ]),
-      fallbackValidFrom: FALLBACK,
-    });
-    expect(r.totals.compUpdates).toBe(1);
-    expect(r.compOps[0].op).toBe("update");
-    expect(r.compOps[0].hourly_rate).toBe(18.0);
   });
 
   it("(e) Idempotenz: identische Eingabe + identischer Bestand = 0 Ops", () => {
@@ -216,14 +117,9 @@ describe("computePersonalPlan — Compensation", () => {
           },
         ],
       ]),
-      currentComp: new Map([
-        [STAFF_A, { staffId: STAFF_A, hourlyRate: 16.5, validFrom: "2024-01-15" }],
-      ]),
-      fallbackValidFrom: FALLBACK,
     });
     expect(r.totals.nameUpdates).toBe(0);
-    expect(r.totals.compInserts).toBe(0);
-    expect(r.totals.compUpdates).toBe(0);
+    expect(r.staffUpdates).toHaveLength(0);
   });
 });
 
@@ -233,26 +129,32 @@ describe("computePersonalPlan — Skips", () => {
       rows: rows({ altStaffId: "alt-geist" }),
       staffMap: staffMap(),
       currentStaff: new Map(),
-      currentComp: new Map(),
-      fallbackValidFrom: FALLBACK,
     });
     expect(r.totals.skippedCount).toBe(1);
     expect(r.skippedRows[0].reason).toBe("unknown_alt_staff");
     expect(r.perStaff).toHaveLength(0);
     expect(r.staffUpdates).toHaveLength(0);
-    expect(r.compOps).toHaveLength(0);
   });
 });
 
 describe("parsePersonalCsv", () => {
-  it("behält Klammer-Spitzname in first_name", () => {
+  it("behält Klammer-Spitzname in first_name (Alt-CSV mit hourly_rate-Spalte)", () => {
     const csv =
       "alt_staff_id;first_name;last_name;nickname;perso_nr;hourly_rate;employment_start\n" +
       "alt-1;Phattanaphol (ANDI);Sukphasathit;ANDI;42;16,5;2024-01-15";
     const r = parsePersonalCsv(csv);
     expect(r.warnings).toEqual([]);
     expect(r.rows[0].firstName).toBe("Phattanaphol (ANDI)");
-    expect(r.rows[0].hourlyRate).toBe(16.5);
+    expect(r.rows[0].employmentStart).toBe("2024-01-15");
+  });
+
+  it("akzeptiert CSV ohne hourly_rate-Spalte", () => {
+    const csv =
+      "alt_staff_id;first_name;last_name;nickname;perso_nr;employment_start\n" +
+      "alt-1;Andi;Suk;ANDI;42;2024-01-15";
+    const r = parsePersonalCsv(csv);
+    expect(r.warnings).toEqual([]);
+    expect(r.rows[0].persoNr).toBe(42);
     expect(r.rows[0].employmentStart).toBe("2024-01-15");
   });
 
@@ -263,16 +165,6 @@ describe("parsePersonalCsv", () => {
     const r = parsePersonalCsv(csv);
     expect(r.warnings).toEqual([]);
     expect(r.rows[0].employmentStart).toBeNull();
-    expect(r.rows[0].hourlyRate).toBe(0);
     expect(r.rows[0].persoNr).toBeNull();
-  });
-
-  it("warnt bei leerem hourly_rate und überspringt die Zeile", () => {
-    const csv =
-      "alt_staff_id;first_name;last_name;nickname;perso_nr;hourly_rate;employment_start\n" +
-      "alt-x;X;Y;;;;2024-01-01";
-    const r = parsePersonalCsv(csv);
-    expect(r.rows).toHaveLength(0);
-    expect(r.warnings[0].kind).toBe("invalid_number");
   });
 });

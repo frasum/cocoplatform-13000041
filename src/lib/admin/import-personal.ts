@@ -1,8 +1,8 @@
 // Reines Mapping-/Diff-Modul für `importStaffPersonalData` (Welle 1).
 // Keine I/O — alle Daten kommen als Parameter rein, das Ergebnis ist ein
 // Plan-Objekt mit Diff je MA, Skip-Liste und Bilanz. Damit ist die komplette
-// Geschäftslogik (Namens-Diff, display_name-Schutz, perso_nr-Schutz,
-// comp-UPSERT-Klassifikation, Fallback-Datum) ohne DB testbar.
+// Geschäftslogik (Namens-Diff, display_name-Schutz, perso_nr-Schutz)
+// ohne DB testbar. Lohnsätze sind seit ST1-C1 nicht mehr Teil des Imports.
 
 export type PersonalRowInput = {
   altStaffId: string;
@@ -12,8 +12,6 @@ export type PersonalRowInput = {
   nickname: string;
   /** Personalnummer; `null` = im CSV leer → NICHT überschreiben. */
   persoNr: number | null;
-  /** Stundenlohn in EUR (auch 0 ist gültig — bewusst, kein Skip). */
-  hourlyRate: number;
   /** YYYY-MM-DD; `null` = leer → Fallback auf `fallbackValidFrom`. */
   employmentStart: string | null;
 };
@@ -24,11 +22,6 @@ export type CurrentStaffRow = {
   lastName: string;
   displayName: string;
   persoNr: number | null;
-};
-export type CurrentCompRow = {
-  staffId: string;
-  hourlyRate: number;
-  validFrom: string;
 };
 
 export type PersonalSkipReason = "unknown_alt_staff";
@@ -47,22 +40,6 @@ export type StaffUpdateFields = {
   perso_nr?: number;
 };
 
-export type CompOp =
-  | {
-      op: "insert";
-      staffId: string;
-      hourly_rate: number;
-      valid_from: string;
-      fallback: boolean;
-    }
-  | {
-      op: "update";
-      staffId: string;
-      hourly_rate: number;
-      valid_from: string;
-      fallback: boolean;
-    };
-
 export type PersonalStaffDiff = {
   staffId: string;
   altStaffId: string;
@@ -72,12 +49,6 @@ export type PersonalStaffDiff = {
     display_name?: StaffFieldChange<string>;
     perso_nr?: StaffFieldChange<number | null>;
   };
-  compDiff: {
-    hourly_rate?: StaffFieldChange<number>;
-    valid_from?: StaffFieldChange<string>;
-  };
-  compOp: "insert" | "update" | "noop";
-  compFallback: boolean;
 };
 
 export type StaffUpdateOp = {
@@ -91,24 +62,16 @@ export type ComputePersonalPlanInput = {
   staffMap: Map<string, string>;
   /** staffId → bestehende staff-Felder (für Diff + display_name-Schutz). */
   currentStaff: Map<string, CurrentStaffRow>;
-  /** staffId → bestehende staff_compensation-Zeile (Unique staff_id). */
-  currentComp: Map<string, CurrentCompRow>;
-  /** YYYY-MM-DD; greift bei leerem employmentStart. */
-  fallbackValidFrom: string;
 };
 
 export type PersonalPlan = {
   perStaff: PersonalStaffDiff[];
   staffUpdates: StaffUpdateOp[];
-  compOps: CompOp[];
   skippedRows: SkippedPersonalRow[];
   totals: {
     rows: number;
     staff: number;
     nameUpdates: number;
-    compInserts: number;
-    compUpdates: number;
-    compFallbacks: number;
     skippedCount: number;
   };
 };
@@ -117,7 +80,6 @@ export function computePersonalPlan(input: ComputePersonalPlanInput): PersonalPl
   const skipped: SkippedPersonalRow[] = [];
   const perStaff: PersonalStaffDiff[] = [];
   const staffUpdates: StaffUpdateOp[] = [];
-  const compOps: CompOp[] = [];
   const touched = new Set<string>();
 
   for (const row of input.rows) {
@@ -182,72 +144,23 @@ export function computePersonalPlan(input: ComputePersonalPlanInput): PersonalPl
       staffUpdates.push({ staffId, fields });
     }
 
-    // --- staff_compensation ---
-    const fallback = !row.employmentStart;
-    const validFrom = row.employmentStart ?? input.fallbackValidFrom;
-    const compDiff: PersonalStaffDiff["compDiff"] = {};
-    const existingComp = input.currentComp.get(staffId);
-    let compOp: PersonalStaffDiff["compOp"] = "noop";
-
-    if (!existingComp) {
-      compDiff.hourly_rate = { from: 0, to: row.hourlyRate };
-      compDiff.valid_from = { from: "", to: validFrom };
-      compOps.push({
-        op: "insert",
-        staffId,
-        hourly_rate: row.hourlyRate,
-        valid_from: validFrom,
-        fallback,
-      });
-      compOp = "insert";
-    } else {
-      const rateChanged = existingComp.hourlyRate !== row.hourlyRate;
-      const dateChanged = existingComp.validFrom !== validFrom;
-      if (rateChanged) {
-        compDiff.hourly_rate = { from: existingComp.hourlyRate, to: row.hourlyRate };
-      }
-      if (dateChanged) {
-        compDiff.valid_from = { from: existingComp.validFrom, to: validFrom };
-      }
-      if (rateChanged || dateChanged) {
-        compOps.push({
-          op: "update",
-          staffId,
-          hourly_rate: row.hourlyRate,
-          valid_from: validFrom,
-          fallback,
-        });
-        compOp = "update";
-      }
-    }
-
     perStaff.push({
       staffId,
       altStaffId: row.altStaffId,
       nameDiff,
-      compDiff,
-      compOp,
-      compFallback: fallback && compOp !== "noop",
     });
   }
 
   const nameUpdates = staffUpdates.length;
-  const compInserts = compOps.filter((o) => o.op === "insert").length;
-  const compUpdates = compOps.filter((o) => o.op === "update").length;
-  const compFallbacks = perStaff.filter((p) => p.compFallback).length;
 
   return {
     perStaff,
     staffUpdates,
-    compOps,
     skippedRows: skipped,
     totals: {
       rows: input.rows.length,
       staff: touched.size,
       nameUpdates,
-      compInserts,
-      compUpdates,
-      compFallbacks,
       skippedCount: skipped.length,
     },
   };
@@ -262,7 +175,6 @@ export async function hashPersonalInput(rows: PersonalRowInput[]): Promise<strin
       lastName: r.lastName,
       nickname: r.nickname,
       persoNr: r.persoNr,
-      hourlyRate: r.hourlyRate,
       employmentStart: r.employmentStart,
     }))
     .sort((a, b) => a.altStaffId.localeCompare(b.altStaffId));

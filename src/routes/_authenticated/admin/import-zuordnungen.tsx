@@ -290,9 +290,7 @@ function PersonalSection() {
     },
     onSuccess: (r) => {
       const t = r.plan.totals;
-      toast.success(
-        `Personaldaten: ${t.nameUpdates} Namen-Updates · ${t.compInserts}+${t.compUpdates} Lohn-UPSERTs.`,
-      );
+      toast.success(`Personaldaten: ${t.nameUpdates} Namen-Updates.`);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -318,8 +316,8 @@ function PersonalSection() {
           Personaldaten (Welle 1)
         </h2>
         <p className="text-sm text-muted-foreground">
-          Übernahme von echten Vor-/Nachnamen, Personalnummern und Stundenlöhnen aus der
-          Tagesabrechnung. Leeres Eintrittsdatum → Fallback auf heute (im Bericht markiert).
+          Übernahme von echten Vor-/Nachnamen und Personalnummern aus der Tagesabrechnung.
+          Stundenlöhne werden nicht mehr importiert — Bereichs-Sätze werden im Stammblatt gepflegt.
         </p>
       </div>
 
@@ -371,7 +369,7 @@ function PersonalSection() {
             onClick={() => {
               if (!dry) return;
               const t = dry.plan.totals;
-              const msg = `Commit ausführen?\n\n${t.staff} MA · ${t.nameUpdates} Namen-Updates · ${t.compInserts}+${t.compUpdates} Lohn-UPSERTs · ${t.compFallbacks} Fallback-Datum · ${t.skippedCount} skipped.`;
+              const msg = `Commit ausführen?\n\n${t.staff} MA · ${t.nameUpdates} Namen-Updates · ${t.skippedCount} skipped.`;
               if (!window.confirm(msg)) return;
               commitMut.mutate();
             }}
@@ -399,14 +397,6 @@ function PersonalReport({ title, result }: { title: string; result: PersonalImpo
         <Badge variant="secondary">{t.rows} Zeilen</Badge>
         <Badge variant="secondary">{t.staff} MA betroffen</Badge>
         <Badge variant="secondary">{t.nameUpdates} Namen-Updates</Badge>
-        <Badge variant="secondary">
-          Lohn +{t.compInserts} / ~{t.compUpdates}
-        </Badge>
-        {t.compFallbacks > 0 ? (
-          <Badge variant="destructive">{t.compFallbacks} Fallback-Datum</Badge>
-        ) : (
-          <Badge variant="secondary">0 Fallback</Badge>
-        )}
         {t.skippedCount > 0 ? (
           <Badge variant="destructive">{t.skippedCount} skipped</Badge>
         ) : (
@@ -439,11 +429,6 @@ function PersonalReport({ title, result }: { title: string; result: PersonalImpo
               <div className="font-mono">{s.staffId}</div>
               <div>
                 Name-Diff: {Object.keys(s.nameDiff).length === 0 ? "—" : JSON.stringify(s.nameDiff)}
-              </div>
-              <div>
-                Lohn: {s.compOp}
-                {s.compFallback ? " · Fallback-Datum" : ""} ·{" "}
-                {Object.keys(s.compDiff).length === 0 ? "—" : JSON.stringify(s.compDiff)}
               </div>
             </div>
           ))}

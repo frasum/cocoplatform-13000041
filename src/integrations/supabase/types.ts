@@ -4318,51 +4318,6 @@ export type Database = {
           },
         ]
       }
-      staff_compensation: {
-        Row: {
-          created_at: string
-          hourly_rate: number
-          id: string
-          organization_id: string
-          staff_id: string
-          updated_at: string
-          valid_from: string
-        }
-        Insert: {
-          created_at?: string
-          hourly_rate: number
-          id?: string
-          organization_id: string
-          staff_id: string
-          updated_at?: string
-          valid_from: string
-        }
-        Update: {
-          created_at?: string
-          hourly_rate?: number
-          id?: string
-          organization_id?: string
-          staff_id?: string
-          updated_at?: string
-          valid_from?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "staff_compensation_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "staff_compensation_staff_id_fkey"
-            columns: ["staff_id"]
-            isOneToOne: true
-            referencedRelation: "staff"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       staff_compensation_rates: {
         Row: {
           created_at: string

@@ -3,8 +3,10 @@
 // Läuft NUR in CI mit lokalem `supabase start` (`SUPABASE_DB_TESTS=1`).
 // Geprüft wird, was die 6 Lohn/HR-Server-Funktionen intern via
 // `assertPermission` / `runWithPermission` (= `rpc('has_permission')`)
-// und die beiden SELECT-Policies auf staff_compensation /
-// staff_personal_details als Wahrheit verwenden.
+// und die SELECT-Policy auf staff_personal_details als Wahrheit verwenden.
+// Die Tabelle staff_compensation wurde in ST1-C4 abgerissen (Abriss-Serie
+// §117); die Keys payroll.compensation.view/.edit leben in den
+// Bereichssatz-Functions weiter und werden weiterhin geprüft.
 //
 // Matrix (siehe permissions-catalog.ts + Migration 20260618064251):
 //   admin   → alle 7 Keys
@@ -104,18 +106,7 @@ describe.skipIf(!dbTestsEnabled)("M4 Lohn/HR — Permissions & RLS pro Rolle", (
     // die SELECT-Sichtbarkeit unabhängig von der „eigenen" Zeile geprüft wird.
     targetStaffId = (await org.mkUser("staff")).staffId;
 
-    // staff_compensation befüllen (Service-Role bypassed RLS).
-    {
-      const { error } = await org.service.from("staff_compensation").insert({
-        organization_id: org.orgId,
-        staff_id: targetStaffId,
-        hourly_rate: 15.5,
-        valid_from: "2026-01-01",
-      });
-      if (error) throw new Error(`seed staff_compensation: ${error.message}`);
-    }
-
-    // staff_personal_details befüllen.
+    // staff_personal_details befüllen (Service-Role bypassed RLS).
     {
       const { error } = await org.service.from("staff_personal_details").insert({
         organization_id: org.orgId,
@@ -130,7 +121,6 @@ describe.skipIf(!dbTestsEnabled)("M4 Lohn/HR — Permissions & RLS pro Rolle", (
   afterAll(async () => {
     // Vor cleanup(): unsere zusätzlichen M4-Tabellen leeren, sonst
     // schlägt der Org-Delete in db-setup wegen FK-Resten fehl.
-    await org.service.from("staff_compensation").delete().eq("organization_id", org.orgId);
     await org.service.from("staff_personal_details").delete().eq("organization_id", org.orgId);
     await org.cleanup();
   });
@@ -146,19 +136,8 @@ describe.skipIf(!dbTestsEnabled)("M4 Lohn/HR — Permissions & RLS pro Rolle", (
     }
   }
 
-  // RLS-SELECT auf den beiden gegateten Tabellen: konsistent zu .view-Key.
+  // RLS-SELECT auf der gegateten Tabelle: konsistent zu .view-Key.
   for (const role of ["admin", "manager", "staff", "payroll"] as const) {
-    const canViewComp = EXPECTED[role]["payroll.compensation.view"];
-    it(`RLS staff_compensation SELECT als ${role} → ${canViewComp ? "1 Zeile" : "0 Zeilen"}`, async () => {
-      const client = await signInAsUser(users[role].email, users[role].password);
-      const { data, error } = await client
-        .from("staff_compensation")
-        .select("staff_id, hourly_rate")
-        .eq("staff_id", targetStaffId);
-      expect(error).toBeNull();
-      expect(data?.length ?? 0).toBe(canViewComp ? 1 : 0);
-    });
-
     const canViewPersonal = EXPECTED[role]["payroll.personal.view"];
     it(`RLS staff_personal_details SELECT als ${role} → ${canViewPersonal ? "1 Zeile" : "0 Zeilen"}`, async () => {
       const client = await signInAsUser(users[role].email, users[role].password);

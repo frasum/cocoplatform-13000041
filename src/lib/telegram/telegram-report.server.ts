@@ -13,6 +13,7 @@ import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
 import { sumNonGlTerminalCents } from "@/lib/cash/session-channels";
 import { sendTelegramToStaff } from "./telegram.functions";
+import { decideReportGate } from "./report-gate";
 import {
   buildDailyReport,
   DEFAULT_REPORT_FLAGS,
@@ -346,11 +347,39 @@ export async function runDailyReportForOrg(params: {
     }
   }
 
-  if (!skipGate) {
+  // TG3 — `last_sent` markiert einen ZUGESTELLTEN Bericht, nicht einen
+  // versuchten. Bei Totalausfall (delivered === 0) bleibt der Tag offen:
+  // der stündliche Cron greift wegen wrong-hour zwar erst am Folgetag wieder,
+  // aber der Sentry-Alarm unten macht den Ausfall sofort sichtbar, und der
+  // Admin kann über „Jetzt senden" manuell nachversenden (Bauherren-Entscheid:
+  // kein automatischer Same-Day-Retry).
+  const gate = decideReportGate({
+    skipGate,
+    recipientsTotal: recipients.length,
+    delivered,
+  });
+
+  if (gate.markSent) {
     await supabaseAdmin
       .from("organization_settings")
       .update({ telegram_report_last_sent: todayBerlin })
       .eq("organization_id", organizationId);
+  }
+
+  // Der Alarm läuft BEWUSST auch im skipGate-Pfad (manuelles „Jetzt senden"):
+  // auch dort soll ein Totalausfall in Sentry stehen, nicht nur im UI-Ergebnis.
+  if (gate.alarmNoDelivery) {
+    const { captureServerError } = await import("@/lib/monitoring/sentry.server");
+    await captureServerError(new Error("Telegram-Tagesbericht: keine einzige Zustellung"), {
+      op: "telegram.daily_report",
+      orgId: organizationId,
+      critical: false,
+      tags: {
+        recipients: recipients.length,
+        failed,
+        manual: skipGate === true,
+      },
+    });
   }
 
   return {

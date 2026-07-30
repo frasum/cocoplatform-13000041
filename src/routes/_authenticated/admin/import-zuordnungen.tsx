@@ -317,8 +317,7 @@ function PersonalSection() {
         </h2>
         <p className="text-sm text-muted-foreground">
           Übernahme von echten Vor-/Nachnamen und Personalnummern aus der Tagesabrechnung.
-          Stundenlöhne werden nicht mehr importiert — Bereichs-Sätze werden im Stammblatt
-          gepflegt.
+          Stundenlöhne werden nicht mehr importiert — Bereichs-Sätze werden im Stammblatt gepflegt.
         </p>
       </div>
 

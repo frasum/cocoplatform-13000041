@@ -30,7 +30,11 @@ describe("sfnOverviewRateCents", () => {
   it("leere Bereichs-Liste → Fallback-Hauptbereich service", () => {
     expect(sfnOverviewRateCents([], rates, "2026-07-31")).toBe(1500);
     expect(
-      sfnOverviewRateCents([], [{ department: "gl", validFrom: "2026-01-01", hourlyRateCents: 2200 }], "2026-07-31"),
+      sfnOverviewRateCents(
+        [],
+        [{ department: "gl", validFrom: "2026-01-01", hourlyRateCents: 2200 }],
+        "2026-07-31",
+      ),
     ).toBeNull();
   });
 });

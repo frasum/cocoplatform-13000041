@@ -1180,6 +1180,7 @@ export const getOrCreateOpenSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return getOrCreateOpenSessionCore(caller, data);
   });
 
@@ -1318,6 +1319,7 @@ export const updateSession = createServerFn({ method: "POST" })
   .inputValidator((input) => updateSessionSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return updateSessionCore(caller, data);
   });
 
@@ -1426,6 +1428,7 @@ export const finalizeSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return finalizeSessionCore(caller, data);
   });
 
@@ -1523,6 +1526,7 @@ export const lockSession = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    assertRealIdentity(caller);
     return lockSessionCore(caller, data);
   });
 
@@ -1539,6 +1543,7 @@ export const unlockSession = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    assertRealIdentity(caller);
     return unlockSessionCore(caller, data);
   });
 
@@ -1581,6 +1586,7 @@ export const reopenSession = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    assertRealIdentity(caller);
     return reopenSessionCore(caller, data);
   });
 
@@ -1659,6 +1665,7 @@ export const setCashLock = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    assertRealIdentity(caller);
     return setCashLockCore(caller, data);
   });
 
@@ -1744,6 +1751,7 @@ export const addSessionSatellite = createServerFn({ method: "POST" })
   .inputValidator((input) => satelliteAddSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return addSessionSatelliteCore(caller, data);
   });
 
@@ -1873,6 +1881,7 @@ export const removeSessionSatellite = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return runGuarded(caller.role, "manager", makeAuditWriter(caller), async () => {
       const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
       const waterline = await loadLocationCashLock(caller.organizationId, session.location_id);
@@ -2368,6 +2377,7 @@ export const correctWaiterSettlement = createServerFn({ method: "POST" })
   .inputValidator((input) => correctSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return correctWaiterSettlementCore(caller, data);
   });
 
@@ -2531,6 +2541,7 @@ export const adminCreateWaiterSettlement = createServerFn({ method: "POST" })
   .inputValidator((input) => adminCreateSettlementSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return adminCreateWaiterSettlementCore(caller, data);
   });
 
@@ -3295,6 +3306,7 @@ export const upsertSessionTipPoolEntry = createServerFn({ method: "POST" })
   .inputValidator((input) => tipPoolEntryUpsertSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return upsertSessionTipPoolEntryCore(caller, data);
   });
 
@@ -3433,6 +3445,7 @@ export const deleteSessionTipPoolEntry = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return deleteSessionTipPoolEntryCore(caller, data);
   });
 
@@ -3535,6 +3548,7 @@ export const addRosterSnapshotMissing = createServerFn({ method: "POST" })
   .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
     return addRosterSnapshotMissingCore(caller, data);
   });
 

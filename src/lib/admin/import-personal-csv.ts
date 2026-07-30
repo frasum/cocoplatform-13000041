@@ -1,10 +1,12 @@
 // Pure CSV-Parser für Personaldaten Welle 1.
-// Erwartete Spalten (Semikolon, BOM-toleriert):
-//   alt_staff_id;first_name;last_name;nickname;perso_nr;hourly_rate;employment_start
+// Pflichtspalten (Semikolon, BOM-toleriert):
+//   alt_staff_id;first_name;last_name  — optional: nickname;perso_nr;employment_start
 //
 // `first_name` wird 1:1 übernommen (inkl. Klammer-Spitznamen wie
 // "Phattanaphol (ANDI)"). `nickname`, `perso_nr` und `employment_start`
-// dürfen leer sein. `hourly_rate` ist Pflicht; `0` ist erlaubt.
+// dürfen leer sein.
+// `hourly_rate` wird seit ST1-C1 ignoriert — Bereichs-Sätze werden im
+// Stammblatt gepflegt (LG3b). Alte CSVs mit der Spalte bleiben einlesbar.
 
 import type { PersonalRowInput } from "./import-personal";
 
@@ -37,14 +39,6 @@ function parseHeader(line: string): Map<string, number> {
   return map;
 }
 
-function parseHourlyRate(raw: string): number | null {
-  if (raw.length === 0) return null;
-  // dt. Dezimalkomma toleranzhalber.
-  const normalized = raw.replace(",", ".");
-  const v = Number(normalized);
-  return Number.isFinite(v) ? v : null;
-}
-
 function parsePersoNr(raw: string): number | null {
   if (raw.length === 0) return null;
   const v = Number(raw);
@@ -73,11 +67,10 @@ export function parsePersonalCsv(csv: string): PersonalParseResult {
   const iLast = header.get("last_name");
   const iNick = header.get("nickname");
   const iPerso = header.get("perso_nr");
-  const iRate = header.get("hourly_rate");
   const iStart = header.get("employment_start");
-  if (iAlt == null || iFirst == null || iLast == null || iRate == null) {
+  if (iAlt == null || iFirst == null || iLast == null) {
     throw new Error(
-      "Personal-CSV: Spalten alt_staff_id;first_name;last_name;nickname;perso_nr;hourly_rate;employment_start erwartet.",
+      "Personal-CSV: Spalten alt_staff_id;first_name;last_name (optional: nickname;perso_nr;employment_start) erwartet.",
     );
   }
 
@@ -88,7 +81,6 @@ export function parsePersonalCsv(csv: string): PersonalParseResult {
     const lastName = cols[iLast] ?? "";
     const nickname = (iNick != null ? cols[iNick] : "") ?? "";
     const persoRaw = (iPerso != null ? cols[iPerso] : "") ?? "";
-    const rateRaw = cols[iRate] ?? "";
     const startRaw = (iStart != null ? cols[iStart] : "") ?? "";
 
     if (!altStaffId) {
@@ -101,11 +93,6 @@ export function parsePersonalCsv(csv: string): PersonalParseResult {
     }
     if (!lastName) {
       warnings.push({ kind: "missing_field", row: r, field: "last_name" });
-      continue;
-    }
-    const hourlyRate = parseHourlyRate(rateRaw);
-    if (hourlyRate === null) {
-      warnings.push({ kind: "invalid_number", row: r, field: "hourly_rate", raw: rateRaw });
       continue;
     }
     const persoNr = persoRaw.length > 0 ? parsePersoNr(persoRaw) : null;
@@ -128,7 +115,6 @@ export function parsePersonalCsv(csv: string): PersonalParseResult {
       lastName,
       nickname,
       persoNr,
-      hourlyRate,
       employmentStart,
     });
   }

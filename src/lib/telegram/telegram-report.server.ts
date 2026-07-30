@@ -13,6 +13,7 @@ import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
 import { sumNonGlTerminalCents } from "@/lib/cash/session-channels";
 import { sendTelegramToStaff } from "./telegram.functions";
+import { decideReportGate } from "./report-gate";
 import {
   buildDailyReport,
   DEFAULT_REPORT_FLAGS,

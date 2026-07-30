@@ -21,17 +21,13 @@ describe("isMonitoringSuppressed", () => {
     expect(isMonitoringSuppressed(err)).toBe(true);
   });
 
-  it("unterdrückt SentryTestError NICHT (Kanarienvogel-Sicherung)", () => {
-    expect(true).toBe(true);
-  });
-
   it("unterdrückt PreviewReadOnlyError (Vorschau ist read-only, IM1)", () => {
     const err = new PreviewReadOnlyError();
     expect(err.message).toBe(PREVIEW_READ_ONLY_MESSAGE);
     expect(isMonitoringSuppressed(err)).toBe(true);
   });
 
-  it("unterdrückt SentryTestError weiterhin NICHT", () => {
+  it("unterdrückt SentryTestError NICHT (Kanarienvogel-Sicherung)", () => {
     expect(isMonitoringSuppressed(new SentryTestError("server", "2026-07-29T00:00:00.000Z"))).toBe(
       false,
     );

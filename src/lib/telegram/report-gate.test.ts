@@ -23,7 +23,7 @@ describe("decideReportGate", () => {
     });
   });
 
-  it("Manueller Pfad, Totalausfall → Alarm auch bei „Jetzt senden"", () => {
+  it("Manueller Pfad, Totalausfall → Alarm auch bei Jetzt-senden", () => {
     expect(decideReportGate({ skipGate: true, recipientsTotal: 5, delivered: 0 })).toEqual({
       markSent: false,
       alarmNoDelivery: true,

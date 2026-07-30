@@ -15,11 +15,23 @@ const SOURCE = readFileSync("src/lib/cash/cash.functions.ts", "utf8");
 
 type Block = { name: string; body: string };
 
+// Toleriert atypische Formatierungen:
+//   export const f = createServerFn(...)
+//   export   const  f   =   createServerFn
+//   export const f: SomeType = createServerFn
+//   const f = createServerFn  (nicht exportiert, aber lokal weiterverwendet)
+//   Zeilenumbrüche zwischen Name, "=" und createServerFn
+const DECL_RE = /(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=;]+)?=\s*createServerFn\b/g;
+// createServerFn-Vorkommen, die KEINE Deklaration sind (Import, Kommentar-Erwähnung):
+const CREATE_RE = /\bcreateServerFn\b/g;
+const POST_RE = /method\s*:\s*["'`]POST["'`]/;
+const ASSERT_RE = /assertRealIdentity\s*\(/;
+
 function splitBlocks(source: string): Block[] {
-  const re = /export const (\w+) = createServerFn/g;
   const starts: { name: string; index: number }[] = [];
   let m: RegExpExecArray | null;
-  while ((m = re.exec(source)) !== null) {
+  DECL_RE.lastIndex = 0;
+  while ((m = DECL_RE.exec(source)) !== null) {
     starts.push({ name: m[1], index: m.index });
   }
   return starts.map((s, i) => ({
@@ -30,12 +42,14 @@ function splitBlocks(source: string): Block[] {
 
 const BLOCKS = splitBlocks(SOURCE);
 
+function callRe(fn: string): RegExp {
+  return new RegExp(`\\b${fn}\\s*\\(`);
+}
+
 function unguarded(loader: string): string[] {
+  const loaderRe = callRe(loader);
   return BLOCKS.filter(
-    (b) =>
-      b.body.includes('method: "POST"') &&
-      b.body.includes(`${loader}(`) &&
-      !b.body.includes("assertRealIdentity("),
+    (b) => POST_RE.test(b.body) && loaderRe.test(b.body) && !ASSERT_RE.test(b.body),
   ).map((b) => b.name);
 }
 
@@ -52,8 +66,20 @@ describe("Kassen-Schreibpfade sind vorschau-geschützt", () => {
 
   it("das Zerlege-Regex findet genügend POST-Admin-Blöcke (Schärfe-Gegenprobe)", () => {
     const adminPosts = BLOCKS.filter(
-      (b) => b.body.includes('method: "POST"') && b.body.includes("loadAdminCaller("),
+      (b) => POST_RE.test(b.body) && callRe("loadAdminCaller").test(b.body),
     );
     expect(adminPosts.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("die Zerlegung erfasst JEDE createServerFn-Deklaration der Datei", () => {
+    // Vollständigkeits-Gegenprobe: jedes createServerFn-Vorkommen ist entweder
+    // Teil des Imports oder Startpunkt genau eines Blocks. Bleibt etwas übrig,
+    // hat eine ungewöhnliche Schreibweise das Deklarations-Regex ausgehebelt —
+    // dann wären ihre Schreibpfade ungeprüft durchgerutscht.
+    CREATE_RE.lastIndex = 0;
+    const occurrences = SOURCE.match(CREATE_RE)?.length ?? 0;
+    const importOccurrences = (SOURCE.match(/import\s*\{[^}]*\bcreateServerFn\b[^}]*\}/g) ?? [])
+      .length;
+    expect(occurrences - importOccurrences).toBe(BLOCKS.length);
   });
 });

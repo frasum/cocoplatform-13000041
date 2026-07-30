@@ -46,7 +46,12 @@ export const PLACEHOLDER_CATALOG = [
     description: "Beschäftigungsbeginn, dd.MM.yyyy",
   },
   { key: "iban", label: "IBAN", description: "IBAN des Mitarbeiters" },
-  { key: "stundenlohn", label: "Stundenlohn", description: "Brutto-Stundenlohn, z. B. 13,50 €" },
+  {
+    key: "stundenlohn",
+    label: "Stundenlohn",
+    description:
+      "Brutto-Stundenlohn; bei mehreren Arbeitsbereichen je Bereich, z. B. „je nach Einsatzbereich: Service 14,50 €/h · Küche 15,00 €/h“",
+  },
   { key: "wochenstunden", label: "Wochenstunden", description: "Vereinbarte Wochenstunden" },
   { key: "monatsstunden", label: "Monatsstunden", description: "Vereinbarte Monatsstunden" },
   { key: "arbeitgeber_name", label: "Arbeitgeber", description: "Firmenname des Arbeitgebers" },
@@ -72,7 +77,7 @@ function formatDateDe(iso: string | null | undefined): string | null {
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
 
-function formatEuroFromCents(cents: number | null | undefined): string | null {
+export function formatEuroFromCents(cents: number | null | undefined): string | null {
   if (cents === null || cents === undefined || Number.isNaN(cents)) return null;
   const euros = cents / 100;
   return (
@@ -105,7 +110,7 @@ export type PlaceholderInput = {
     iban?: string | null;
   } | null;
   compensation: {
-    hourly_wage_cents?: number | null;
+    wage_text?: string | null;
     contracted_hours_per_month?: number | null;
   } | null;
   organization: {
@@ -140,7 +145,7 @@ export function buildPlaceholderData(input: PlaceholderInput): Record<string, st
   put("iban", nonEmpty(d?.iban));
 
   const c = input.compensation;
-  put("stundenlohn", formatEuroFromCents(c?.hourly_wage_cents ?? null));
+  put("stundenlohn", nonEmpty(c?.wage_text));
   const monthly = c?.contracted_hours_per_month ?? null;
   if (monthly !== null && monthly !== undefined && !Number.isNaN(monthly)) {
     out.monatsstunden = String(monthly);

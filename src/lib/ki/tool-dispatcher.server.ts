@@ -20,6 +20,8 @@ import {
   type RennerRawRow,
 } from "@/lib/pos/renner-penner-core";
 import { aggregatePersonnel, type WorkEntry } from "@/lib/statistics/personnel-core";
+import { loadPersonnelAttributionContext } from "@/lib/statistics/personnel-load.server";
+import type { Department } from "@/lib/time/primary-department";
 import {
   aggregateByBusinessDate,
   groupTakeawayByChannel,
@@ -656,7 +658,7 @@ async function personalkostenQuote(ctx: ToolContext, input: Record<string, unkno
 
   let q = ctx.admin
     .from("time_entries")
-    .select("staff_id, started_at, ended_at, break_minutes, business_date, location_id")
+    .select("staff_id, started_at, ended_at, break_minutes, business_date, location_id, department")
     .eq("organization_id", ctx.organizationId)
     .gte("business_date", from)
     .lte("business_date", to)
@@ -665,37 +667,51 @@ async function personalkostenQuote(ctx: ToolContext, input: Record<string, unkno
   const { data: rows, error } = await q;
   if (error) throw new Error(error.message);
 
-  const workEntries: WorkEntry[] = [];
+  type RawEntry = {
+    staffId: string;
+    businessDate: string;
+    netMinutes: number;
+    rawDepartment: Department | null;
+  };
+  const raw: RawEntry[] = [];
   const staffIdSet = new Set<string>();
   for (const r of rows ?? []) {
     if (!r.ended_at || !r.started_at) continue;
     const gross = grossMinutesBetween(new Date(r.started_at), new Date(r.ended_at));
     const net = Math.max(0, gross - Number(r.break_minutes ?? 0));
     staffIdSet.add(r.staff_id as string);
-    workEntries.push({
+    raw.push({
       staffId: r.staff_id as string,
       businessDate: r.business_date as string,
       netMinutes: net,
+      rawDepartment: (r.department as Department | null) ?? null,
     });
   }
 
-  const compByStaff: Record<string, CompRow[]> = {};
-  if (staffIdSet.size > 0) {
-    const { data: comp, error: compErr } = await ctx.admin
-      .from("staff_compensation")
-      .select("staff_id, valid_from, hourly_rate")
-      .eq("organization_id", ctx.organizationId)
-      .in("staff_id", [...staffIdSet]);
-    if (compErr) throw new Error(compErr.message);
-    for (const c of comp ?? []) {
-      if (!c.staff_id || !c.valid_from || c.hourly_rate === null) continue;
-      (compByStaff[c.staff_id as string] ??= []).push({
-        validFrom: c.valid_from as string,
-        hourlyRateEur: Number(c.hourly_rate),
-      });
-    }
-  }
-  const agg = aggregatePersonnel(workEntries, compByStaff);
+  // ST1-A — Bereichs-Sätze + LG3b-Attribution (gleiche Quelle wie Statistik).
+  const attribution = await loadPersonnelAttributionContext(
+    ctx.admin,
+    ctx.organizationId,
+    [...staffIdSet],
+    from,
+    to,
+  );
+  const workEntries: WorkEntry[] = raw.map((e) => {
+    const attr = attribution.attribute({
+      staffId: e.staffId,
+      businessDate: e.businessDate,
+      rawDepartment: e.rawDepartment,
+    });
+    return {
+      staffId: e.staffId,
+      businessDate: e.businessDate,
+      netMinutes: e.netMinutes,
+      department: attr.department,
+      unresolved: attr.unresolved,
+    };
+  });
+
+  const agg = aggregatePersonnel(workEntries, attribution.ratesByStaff);
 
   // Umsatz derselbe Ausschnitt.
   const umsatz = await umsatzZeitraum(ctx, { from, to, location_id: locationId ?? "" });

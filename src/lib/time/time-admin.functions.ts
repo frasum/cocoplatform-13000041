@@ -25,7 +25,57 @@ import { isAbsenceWorkday } from "./urlaub-count";
 import type { SfnShiftRow } from "@/lib/lohn/sfn-geld/types";
 import { computeStaffSfn } from "@/lib/lohn/compute-staff-sfn";
 import { primaryDepartment, type Department } from "./primary-department";
+import { sfnOverviewRateCents } from "./sfn-rate";
+import type { RateRow } from "@/lib/lohn/rate-resolution";
 import { selectAllPaged } from "@/lib/supabase/select-all";
+
+// ST1-C2 — Satz-Quelle der SFN-Übersicht: Hauptbereichs-Satz aus
+// staff_compensation_rates (Näherung, siehe sfn-rate.ts). Einmal hier,
+// von beiden SFN-Handlern genutzt (die frühere wortgleiche Doppelung
+// des Alt-Skalar-Maps entfällt).
+type SfnRateAdmin = (typeof import("@/integrations/supabase/client.server"))["supabaseAdmin"];
+
+async function loadSfnRateResolver(
+  admin: SfnRateAdmin,
+  organizationId: string,
+  onDate: string,
+): Promise<(staffId: string) => number | null> {
+  const { data: rateRows, error: rateErr } = await admin
+    .from("staff_compensation_rates")
+    .select("staff_id, department, valid_from, hourly_rate")
+    .eq("organization_id", organizationId)
+    .lte("valid_from", onDate);
+  if (rateErr) throw rateErr;
+  const ratesByStaff = new Map<string, RateRow[]>();
+  for (const r of rateRows ?? []) {
+    if (!r.staff_id || !r.department || !r.valid_from || r.hourly_rate === null) continue;
+    const list = ratesByStaff.get(r.staff_id) ?? [];
+    list.push({
+      department: r.department as Department,
+      validFrom: r.valid_from as string,
+      // EUR → Cent: genau hier, einmalig (Muster wie personnel-load.server.ts).
+      hourlyRateCents: Math.round(Number(r.hourly_rate) * 100),
+    });
+    ratesByStaff.set(r.staff_id, list);
+  }
+
+  const { data: locRows, error: locErr } = await admin
+    .from("staff_locations")
+    .select("staff_id, department")
+    .eq("organization_id", organizationId);
+  if (locErr) throw locErr;
+  const deptsByStaff = new Map<string, Department[]>();
+  for (const r of locRows ?? []) {
+    if (!r.staff_id || !r.department) continue;
+    const list = deptsByStaff.get(r.staff_id) ?? [];
+    const dept = r.department as Department;
+    if (!list.includes(dept)) list.push(dept);
+    deptsByStaff.set(r.staff_id, list);
+  }
+
+  return (staffId: string) =>
+    sfnOverviewRateCents(deptsByStaff.get(staffId) ?? [], ratesByStaff.get(staffId) ?? [], onDate);
+}
 
 // N12: Wochenstart auf Montag derselben ISO-Woche normalisieren.
 // Übergibt ein Client einen Mittwoch, kommt die Woche Mo–So zurück — statt
@@ -466,19 +516,7 @@ export const getSfnOverview = createServerFn({ method: "GET" })
     const { data: rows, error } = await sfnQuery;
     if (error) throw error;
 
-    const { data: comps, error: compErr } = await supabaseAdmin
-      .from("staff_compensation")
-      .select("staff_id, hourly_rate, valid_from")
-      .eq("organization_id", caller.organizationId)
-      .lte("valid_from", data.toDate)
-      .order("valid_from", { ascending: false });
-    if (compErr) throw compErr;
-    const rateByStaff = new Map<string, number>();
-    for (const c of comps ?? []) {
-      if (!rateByStaff.has(c.staff_id)) {
-        rateByStaff.set(c.staff_id, Math.round(Number(c.hourly_rate ?? 0) * 100));
-      }
-    }
+    const rateOf = await loadSfnRateResolver(supabaseAdmin, caller.organizationId, data.toDate);
 
     const rowsByStaff = new Map<string, SfnShiftRow[]>();
     for (const r of rows ?? []) {
@@ -494,11 +532,13 @@ export const getSfnOverview = createServerFn({ method: "GET" })
     }
 
     const sfn = Array.from(rowsByStaff.entries()).map(([staffId, sfnRows]) => {
-      const rate = rateByStaff.get(staffId) ?? 0;
+      const resolved = rateOf(staffId);
+      const rate = resolved ?? 0;
       const { simple, extended, zuschlagCents } = computeStaffSfn(sfnRows, rate);
       return {
         staffId,
         hourlyRateCents: rate,
+        rateMissing: resolved === null,
         zuschlagCents,
         simple: {
           night25Hours: simple.night25Hours,
@@ -1225,23 +1265,12 @@ export const getSfnOverviewBatch = createServerFn({ method: "GET" })
       data.toDate,
     );
 
-    const { data: comps, error: compErr } = await supabaseAdmin
-      .from("staff_compensation")
-      .select("staff_id, hourly_rate, valid_from")
-      .eq("organization_id", caller.organizationId)
-      .lte("valid_from", data.toDate)
-      .order("valid_from", { ascending: false });
-    if (compErr) throw compErr;
-    const rateByStaff = new Map<string, number>();
-    for (const c of comps ?? []) {
-      if (!rateByStaff.has(c.staff_id)) {
-        rateByStaff.set(c.staff_id, Math.round(Number(c.hourly_rate ?? 0) * 100));
-      }
-    }
+    const rateOf = await loadSfnRateResolver(supabaseAdmin, caller.organizationId, data.toDate);
 
     type SfnEntry = {
       staffId: string;
       hourlyRateCents: number;
+      rateMissing: boolean;
       zuschlagCents: number;
       simple: { night25Hours: number; night40Hours: number; sundayHours: number };
       extended: {
@@ -1275,11 +1304,13 @@ export const getSfnOverviewBatch = createServerFn({ method: "GET" })
     for (const lid of data.locationIds) {
       const staffMap = rowsByLocStaff.get(lid) ?? new Map<string, SfnShiftRow[]>();
       const sfn: SfnEntry[] = Array.from(staffMap.entries()).map(([staffId, sfnRows]) => {
-        const rate = rateByStaff.get(staffId) ?? 0;
+        const resolved = rateOf(staffId);
+        const rate = resolved ?? 0;
         const { simple, extended, zuschlagCents } = computeStaffSfn(sfnRows, rate);
         return {
           staffId,
           hourlyRateCents: rate,
+          rateMissing: resolved === null,
           zuschlagCents,
           simple: {
             night25Hours: simple.night25Hours,

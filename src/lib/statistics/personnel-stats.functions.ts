@@ -22,6 +22,7 @@ import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { grossMinutesBetween } from "@/lib/time/break-rules";
 import { paidMinutes } from "@/lib/time/paid-hours";
 import { selectAllPaged } from "@/lib/supabase/select-all";
+import { loadPersonnelAttributionContext } from "./personnel-load.server";
 import type { Department } from "@/lib/time/primary-department";
 import { computeTrend, type Trend } from "./revenue-core";
 import {

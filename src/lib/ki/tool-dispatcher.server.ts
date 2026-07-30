@@ -19,7 +19,7 @@ import {
   type RennerEntry,
   type RennerRawRow,
 } from "@/lib/pos/renner-penner-core";
-import { aggregatePersonnel, type CompRow, type WorkEntry } from "@/lib/statistics/personnel-core";
+import { aggregatePersonnel, type WorkEntry } from "@/lib/statistics/personnel-core";
 import {
   aggregateByBusinessDate,
   groupTakeawayByChannel,

@@ -20,6 +20,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { writeAuditLog } from "./audit";
 import { isImpersonationExpired } from "./impersonation-expiry";
 import { expectMaybe, expectVoid } from "@/lib/supabase/expect-ok";
+import { ForbiddenError } from "./role-guard";
 
 export type ActiveImpersonation = {
   targetStaffId: string;

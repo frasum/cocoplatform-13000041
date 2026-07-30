@@ -934,6 +934,7 @@ function CompensationRatesSection({ staffId }: { staffId: string }) {
               department={dept}
               entries={q.data.departments[dept]}
               today={today}
+              cutoff={cutoff}
               onSave={(payload) => {
                 setMsg(null);
                 saveMut.mutate({ department: dept, ...payload });
@@ -956,6 +957,7 @@ function DepartmentRatesRow({
   department,
   entries,
   today,
+  cutoff,
   onSave,
   onDelete,
   pending,
@@ -963,6 +965,7 @@ function DepartmentRatesRow({
   department: (typeof DEPT_ORDER)[number];
   entries: CompensationRateEntry[];
   today: string;
+  cutoff: string;
   onSave: (p: { id: string | null; hourlyRate: number; validFrom: string | null }) => void;
   onDelete: (id: string) => void;
   pending: boolean;
@@ -971,6 +974,7 @@ function DepartmentRatesRow({
   const [adding, setAdding] = useState(false);
   const [newRate, setNewRate] = useState("");
   const [newFrom, setNewFrom] = useState("");
+  const [localErr, setLocalErr] = useState<string | null>(null);
 
   // Neueste Zeile (max valid_from) als aktueller Satz — Historie hat listServer
   // bereits absteigend sortiert.
@@ -982,10 +986,17 @@ function DepartmentRatesRow({
     if (trimmed === "") return;
     const num = Number(trimmed);
     if (!Number.isFinite(num)) return;
+    const from = newFrom.trim() === "" ? null : newFrom.trim();
+    // Gleicher Guard wie serverseitig — verhindert den 500er statt ihn zu provozieren.
+    if (from !== null && !isValidFromAllowed(from, today)) {
+      setLocalErr(`Rückwirkung nur bis Periodenbeginn (${cutoff}) erlaubt.`);
+      return;
+    }
+    setLocalErr(null);
     onSave({
       id: null,
       hourlyRate: num,
-      validFrom: newFrom.trim() === "" ? null : newFrom.trim(),
+      validFrom: from,
     });
     setAdding(false);
     setNewRate("");
@@ -1057,8 +1068,12 @@ function DepartmentRatesRow({
             <span className="text-muted-foreground">Gültig ab</span>
             <input
               type="date"
+              min={cutoff}
               value={newFrom}
-              onChange={(e) => setNewFrom(e.target.value)}
+              onChange={(e) => {
+                setNewFrom(e.target.value);
+                setLocalErr(null);
+              }}
               className="w-40 rounded-md border border-input bg-background px-2 py-1 text-sm"
             />
           </label>
@@ -1076,6 +1091,7 @@ function DepartmentRatesRow({
               setAdding(false);
               setNewRate("");
               setNewFrom("");
+              setLocalErr(null);
             }}
             className="rounded-md border border-input bg-background px-2 py-1 text-xs font-medium hover:bg-accent"
           >
@@ -1084,6 +1100,8 @@ function DepartmentRatesRow({
           <span className="text-[11px] text-muted-foreground">Leer ⇒ heute.</span>
         </div>
       )}
+
+      {localErr && <p className="mt-2 text-xs text-destructive">{localErr}</p>}
 
       {showHistory && history.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs text-muted-foreground">

@@ -66,8 +66,20 @@ describe("Kassen-Schreibpfade sind vorschau-geschützt", () => {
 
   it("das Zerlege-Regex findet genügend POST-Admin-Blöcke (Schärfe-Gegenprobe)", () => {
     const adminPosts = BLOCKS.filter(
-      (b) => b.body.includes('method: "POST"') && b.body.includes("loadAdminCaller("),
+      (b) => POST_RE.test(b.body) && callRe("loadAdminCaller").test(b.body),
     );
     expect(adminPosts.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("die Zerlegung erfasst JEDE createServerFn-Deklaration der Datei", () => {
+    // Vollständigkeits-Gegenprobe: jedes createServerFn-Vorkommen ist entweder
+    // Teil des Imports oder Startpunkt genau eines Blocks. Bleibt etwas übrig,
+    // hat eine ungewöhnliche Schreibweise das Deklarations-Regex ausgehebelt —
+    // dann wären ihre Schreibpfade ungeprüft durchgerutscht.
+    CREATE_RE.lastIndex = 0;
+    const occurrences = SOURCE.match(CREATE_RE)?.length ?? 0;
+    const importOccurrences = (SOURCE.match(/import\s*\{[^}]*\bcreateServerFn\b[^}]*\}/g) ?? [])
+      .length;
+    expect(occurrences - importOccurrences).toBe(BLOCKS.length);
   });
 });

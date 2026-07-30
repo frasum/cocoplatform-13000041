@@ -935,7 +935,8 @@ function PersonnelView({
       ) : null}
       {personnel.totals.unratedNetHours > 0 ? (
         <div className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-          Ohne Satz: {personnel.totals.unratedNetHours.toLocaleString("de-DE", {
+          Ohne Satz:{" "}
+          {personnel.totals.unratedNetHours.toLocaleString("de-DE", {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}{" "}

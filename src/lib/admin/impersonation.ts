@@ -88,8 +88,18 @@ export async function resolveActiveImpersonation(
 export const PREVIEW_READ_ONLY_MESSAGE =
   "Die Vorschau ist schreibgeschützt — Aktion nicht möglich.";
 
+// IM1a — eigene Fehlerklasse, damit der Vorschau-Abbruch als erwartetes
+// Fachverhalten erkennbar ist (isMonitoringSuppressed prüft `name`, um einen
+// zyklischen Import admin ↔ impersonation zu vermeiden). Message unverändert.
+export class PreviewReadOnlyError extends Error {
+  constructor(message: string = PREVIEW_READ_ONLY_MESSAGE) {
+    super(message);
+    this.name = "PreviewReadOnlyError";
+  }
+}
+
 export function assertRealIdentity(caller: { impersonatedBy?: string | null }): void {
   if (caller.impersonatedBy) {
-    throw new Error(PREVIEW_READ_ONLY_MESSAGE);
+    throw new PreviewReadOnlyError();
   }
 }

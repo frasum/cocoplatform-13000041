@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { isMonitoringSuppressed } from "./admin-call";
 import { ForbiddenError } from "./role-guard";
+import { PreviewReadOnlyError, PREVIEW_READ_ONLY_MESSAGE } from "./impersonation";
 import { SentryTestError } from "@/lib/monitoring/sentry-selftest";
 
 describe("isMonitoringSuppressed", () => {
@@ -17,6 +18,12 @@ describe("isMonitoringSuppressed", () => {
   it("unterdrückt PoolHoursWarningError anhand des name-Felds", () => {
     const err = new Error("Warn");
     err.name = "PoolHoursWarningError";
+    expect(isMonitoringSuppressed(err)).toBe(true);
+  });
+
+  it("unterdrückt PreviewReadOnlyError (Vorschau ist read-only, IM1)", () => {
+    const err = new PreviewReadOnlyError();
+    expect(err.message).toBe(PREVIEW_READ_ONLY_MESSAGE);
     expect(isMonitoringSuppressed(err)).toBe(true);
   });
 

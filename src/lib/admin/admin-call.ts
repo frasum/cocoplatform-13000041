@@ -50,12 +50,12 @@ export type GuardedCallContext = {
  *   cash) zu vermeiden.
  * - PreviewReadOnlyError: Abbruch der Admin-Vorschau (IM1). Die Vorschau ist
  *   strikt lesend; ein Schreibklick darin ist erwartetes Fachverhalten und
- *   darf keinen Sentry-Alarm erzeugen. Ebenfalls namensbasiert.
+ *   darf keinen Sentry-Alarm erzeugen. Erbt von ForbiddenError und wird
+ *   deshalb bereits vom ersten Check abgedeckt (kein Sonderfall nötig).
  */
 export function isMonitoringSuppressed(err: unknown): boolean {
   if (err instanceof ForbiddenError) return true;
   if (err instanceof Error && err.name === "PoolHoursWarningError") return true;
-  if (err instanceof Error && err.name === "PreviewReadOnlyError") return true;
   return false;
 }
 

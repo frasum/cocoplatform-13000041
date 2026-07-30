@@ -20,6 +20,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { writeAuditLog } from "./audit";
 import { isImpersonationExpired } from "./impersonation-expiry";
 import { expectMaybe, expectVoid } from "@/lib/supabase/expect-ok";
+import { ForbiddenError } from "./role-guard";
 
 export type ActiveImpersonation = {
   targetStaffId: string;
@@ -88,10 +89,11 @@ export async function resolveActiveImpersonation(
 export const PREVIEW_READ_ONLY_MESSAGE =
   "Die Vorschau ist schreibgeschützt — Aktion nicht möglich.";
 
-// IM1a — eigene Fehlerklasse, damit der Vorschau-Abbruch als erwartetes
-// Fachverhalten erkennbar ist (isMonitoringSuppressed prüft `name`, um einen
-// zyklischen Import admin ↔ impersonation zu vermeiden). Message unverändert.
-export class PreviewReadOnlyError extends Error {
+// IM1a — Vorschau-Abbruch ist ein Berechtigungsfall: die Klasse erbt von
+// ForbiddenError, damit UI (403-Behandlung) und Monitoring
+// (isMonitoringSuppressed) sie ohne Sonderregel wie vorgesehen behandeln.
+// Eigener `name` bleibt für Diagnose/Logs erhalten. Message unverändert.
+export class PreviewReadOnlyError extends ForbiddenError {
   constructor(message: string = PREVIEW_READ_ONLY_MESSAGE) {
     super(message);
     this.name = "PreviewReadOnlyError";

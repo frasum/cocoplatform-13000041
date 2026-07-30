@@ -21,7 +21,7 @@ const baseInput: PlaceholderInput = {
     employment_start_date: "2026-07-01",
     iban: "DE00 0000",
   },
-  compensation: { hourly_wage_cents: 1350, contracted_hours_per_month: 130 },
+  compensation: { wage_text: "13,50 €/h", contracted_hours_per_month: 130 },
   organization: {
     arbeitgeber_name: "SORN GmbH",
     arbeitgeber_adresse: "Hauptstr. 2",
@@ -32,9 +32,9 @@ const baseInput: PlaceholderInput = {
 };
 
 describe("buildPlaceholderData", () => {
-  it("formatiert Cents als '13,50 €' und Datum als dd.MM.yyyy", () => {
+  it("übernimmt den Lohntext und formatiert Datum als dd.MM.yyyy", () => {
     const d = buildPlaceholderData(baseInput);
-    expect(d.stundenlohn).toBe("13,50 €");
+    expect(d.stundenlohn).toBe("13,50 €/h");
     expect(d.geburtsdatum).toBe("07.03.1995");
     expect(d.eintrittsdatum).toBe("01.07.2026");
     expect(d.heute).toBe("03.07.2026");

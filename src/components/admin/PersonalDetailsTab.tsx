@@ -11,7 +11,6 @@ import {
   parsePersonalDetailsPatch,
   type PersonalDetailsFields,
 } from "@/lib/admin/personal-details.schema";
-import { getStaffCompensation, upsertStaffCompensation } from "@/lib/admin/compensation.functions";
 import {
   listStaffCompensationRates,
   upsertStaffCompensationRate,

@@ -21,7 +21,6 @@ import {
 } from "@/lib/pos/renner-penner-core";
 import { aggregatePersonnel, type WorkEntry } from "@/lib/statistics/personnel-core";
 import { loadPersonnelAttributionContext } from "@/lib/statistics/personnel-load.server";
-import type { Department } from "@/lib/time/primary-department";
 import {
   aggregateByBusinessDate,
   groupTakeawayByChannel,

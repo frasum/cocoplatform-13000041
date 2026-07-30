@@ -136,7 +136,7 @@ describe.skipIf(!dbTestsEnabled)("M4 Lohn/HR — Permissions & RLS pro Rolle", (
     }
   }
 
-  // RLS-SELECT auf den beiden gegateten Tabellen: konsistent zu .view-Key.
+  // RLS-SELECT auf der gegateten Tabelle: konsistent zu .view-Key.
   for (const role of ["admin", "manager", "staff", "payroll"] as const) {
     const canViewPersonal = EXPECTED[role]["payroll.personal.view"];
     it(`RLS staff_personal_details SELECT als ${role} → ${canViewPersonal ? "1 Zeile" : "0 Zeilen"}`, async () => {

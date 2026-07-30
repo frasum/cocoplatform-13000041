@@ -516,19 +516,7 @@ export const getSfnOverview = createServerFn({ method: "GET" })
     const { data: rows, error } = await sfnQuery;
     if (error) throw error;
 
-    const { data: comps, error: compErr } = await supabaseAdmin
-      .from("staff_compensation")
-      .select("staff_id, hourly_rate, valid_from")
-      .eq("organization_id", caller.organizationId)
-      .lte("valid_from", data.toDate)
-      .order("valid_from", { ascending: false });
-    if (compErr) throw compErr;
-    const rateByStaff = new Map<string, number>();
-    for (const c of comps ?? []) {
-      if (!rateByStaff.has(c.staff_id)) {
-        rateByStaff.set(c.staff_id, Math.round(Number(c.hourly_rate ?? 0) * 100));
-      }
-    }
+    const rateOf = await loadSfnRateResolver(supabaseAdmin, caller.organizationId, data.toDate);
 
     const rowsByStaff = new Map<string, SfnShiftRow[]>();
     for (const r of rows ?? []) {
@@ -544,11 +532,13 @@ export const getSfnOverview = createServerFn({ method: "GET" })
     }
 
     const sfn = Array.from(rowsByStaff.entries()).map(([staffId, sfnRows]) => {
-      const rate = rateByStaff.get(staffId) ?? 0;
+      const resolved = rateOf(staffId);
+      const rate = resolved ?? 0;
       const { simple, extended, zuschlagCents } = computeStaffSfn(sfnRows, rate);
       return {
         staffId,
         hourlyRateCents: rate,
+        rateMissing: resolved === null,
         zuschlagCents,
         simple: {
           night25Hours: simple.night25Hours,

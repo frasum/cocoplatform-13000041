@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { isMonitoringSuppressed } from "./admin-call";
 import { ForbiddenError } from "./role-guard";
+import { PreviewReadOnlyError, PREVIEW_READ_ONLY_MESSAGE } from "./impersonation";
 import { SentryTestError } from "@/lib/monitoring/sentry-selftest";
 
 describe("isMonitoringSuppressed", () => {
@@ -21,6 +22,16 @@ describe("isMonitoringSuppressed", () => {
   });
 
   it("unterdrückt SentryTestError NICHT (Kanarienvogel-Sicherung)", () => {
+    expect(true).toBe(true);
+  });
+
+  it("unterdrückt PreviewReadOnlyError (Vorschau ist read-only, IM1)", () => {
+    const err = new PreviewReadOnlyError();
+    expect(err.message).toBe(PREVIEW_READ_ONLY_MESSAGE);
+    expect(isMonitoringSuppressed(err)).toBe(true);
+  });
+
+  it("unterdrückt SentryTestError weiterhin NICHT", () => {
     expect(isMonitoringSuppressed(new SentryTestError("server", "2026-07-29T00:00:00.000Z"))).toBe(
       false,
     );

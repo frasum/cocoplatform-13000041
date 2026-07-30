@@ -16,6 +16,9 @@ import {
   listPlaceholdersInTemplate,
   type PlaceholderInput,
 } from "./document-placeholders";
+import { formatWageLines, resolveWageLines } from "./wage-lines";
+import type { RateRow } from "@/lib/lohn/rate-resolution";
+import type { Department } from "@/lib/time/primary-department";
 
 const DOC_TYPES = ["arbeitsvertrag", "arbeitszeugnis_einfach", "arbeitsbescheinigung"] as const;
 export type DocType = (typeof DOC_TYPES)[number];
@@ -197,7 +200,7 @@ async function loadPlaceholderInput(
   if (sErr) throw sErr;
   if (!staff) throw new Error("Mitarbeiter nicht gefunden.");
 
-  const [detailsRes, compRes, settingsRes, locRes] = await Promise.all([
+  const [detailsRes, ratesRes, settingsRes, locRes] = await Promise.all([
     supabaseAdmin
       .from("staff_personal_details")
       .select(
@@ -206,12 +209,9 @@ async function loadPlaceholderInput(
       .eq("staff_id", staffId)
       .maybeSingle(),
     supabaseAdmin
-      .from("staff_compensation")
-      .select("hourly_rate, valid_from")
-      .eq("staff_id", staffId)
-      .order("valid_from", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .from("staff_compensation_rates")
+      .select("department, valid_from, hourly_rate")
+      .eq("staff_id", staffId),
     supabaseAdmin
       .from("organization_settings")
       .select("arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter")
@@ -223,7 +223,7 @@ async function loadPlaceholderInput(
       .eq("staff_id", staffId),
   ]);
   if (detailsRes.error) throw detailsRes.error;
-  if (compRes.error) throw compRes.error;
+  if (ratesRes.error) throw ratesRes.error;
   if (settingsRes.error) throw settingsRes.error;
   if (locRes.error) throw locRes.error;
 
@@ -240,16 +240,19 @@ async function loadPlaceholderInput(
 
   const { todayIso } = await import("@/lib/format");
   const today = todayIso();
-  const hourlyRate = compRes.data?.hourly_rate ?? null;
+  // LG3b/ST1-B — EUR→Cents genau hier, am IO-Rand.
+  const rates: RateRow[] = (ratesRes.data ?? []).map((r) => ({
+    department: r.department as Department,
+    validFrom: r.valid_from as string,
+    hourlyRateCents: Math.round(Number(r.hourly_rate) * 100),
+  }));
+  const wageText = formatWageLines(resolveWageLines(rates, today));
 
   return {
     staff: { first_name: staff.first_name, last_name: staff.last_name },
     details: detailsRes.data ?? null,
     compensation: {
-      hourly_wage_cents:
-        hourlyRate !== null && hourlyRate !== undefined
-          ? Math.round(Number(hourlyRate) * 100)
-          : null,
+      wage_text: wageText,
       contracted_hours_per_month: staff.contracted_hours_per_month,
     },
     organization: settingsRes.data ?? null,

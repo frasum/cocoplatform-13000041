@@ -1,86 +1,145 @@
 import { describe, expect, it } from "vitest";
-import {
-  aggregatePersonnel,
-  laborCostCents,
-  personnelRatioPct,
-  selectHourlyRateEur,
-  type CompRow,
-  type WorkEntry,
-} from "./personnel-core";
+import type { RateRow } from "@/lib/lohn/rate-resolution";
+import { aggregatePersonnel, personnelRatioPct, type WorkEntry } from "./personnel-core";
 
-describe("selectHourlyRateEur", () => {
-  const rows: CompRow[] = [
-    { validFrom: "2025-01-01", hourlyRateEur: 12 },
-    { validFrom: "2026-01-01", hourlyRateEur: 13.5 },
-    { validFrom: "2026-06-15", hourlyRateEur: 14 },
-  ];
-
-  it("nimmt den zuletzt bekannten Satz (größtes validFrom) unabhängig vom workDate", () => {
-    // Semantik-Wechsel: staff_compensation hat keine echte Historie,
-    // valid_from ist nur „zuletzt geändert am" → Statistik darf für
-    // Tage VOR dem Update nicht still auf 0 fallen.
-    expect(selectHourlyRateEur(rows, "2026-06-20")).toBe(14);
-    expect(selectHourlyRateEur(rows, "2026-06-14")).toBe(14);
-    expect(selectHourlyRateEur(rows, "2025-12-31")).toBe(14);
-    expect(selectHourlyRateEur(rows, "2024-01-01")).toBe(14);
-  });
-
-  it("keine Zeile → null", () => {
-    expect(selectHourlyRateEur([], "2026-06-15")).toBeNull();
-  });
+const entry = (p: Partial<WorkEntry> & Pick<WorkEntry, "staffId" | "netMinutes">): WorkEntry => ({
+  businessDate: "2026-06-01",
+  department: "service",
+  unresolved: false,
+  ...p,
 });
 
-describe("laborCostCents", () => {
-  it("3,5 h × 13,50 € = 4725 ct", () => {
-    expect(laborCostCents(3.5, 13.5)).toBe(4725);
-  });
-
-  it("rundet zu ganzen Cents", () => {
-    expect(laborCostCents(1.333, 10)).toBe(1333);
-    expect(laborCostCents(1 / 3, 10)).toBe(333);
-  });
-});
-
-describe("aggregatePersonnel", () => {
-  const comp: Record<string, CompRow[]> = {
-    a: [{ validFrom: "2026-01-01", hourlyRateEur: 15 }],
-    b: [{ validFrom: "2026-01-01", hourlyRateEur: 20 }],
-    // c hat keinen Eintrag
-  };
-
-  it("summiert zwei Einträge eines Staff", () => {
-    const entries: WorkEntry[] = [
-      { staffId: "a", businessDate: "2026-06-01", netMinutes: 120 }, // 2h
-      { staffId: "a", businessDate: "2026-06-02", netMinutes: 90 }, // 1.5h
+describe("aggregatePersonnel — Bereichs-Sätze (ST1-A)", () => {
+  it("zwei Bereiche, zwei Sätze → bereichsgenaue Produkte", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [
+        { department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 },
+        { department: "gl", validFrom: "2026-01-01", hourlyRateCents: 2200 },
+      ],
+    };
+    const entries = [
+      entry({ staffId: "a", netMinutes: 120, department: "service" }), // 2h × 15,00
+      entry({ staffId: "a", netMinutes: 60, department: "gl" }), // 1h × 22,00
     ];
-    const agg = aggregatePersonnel(entries, comp);
-    expect(agg.perStaff).toHaveLength(1);
-    expect(agg.perStaff[0].staffId).toBe("a");
-    expect(agg.perStaff[0].netHours).toBe(3.5);
-    expect(agg.perStaff[0].laborCostCents).toBe(5250); // 3.5 * 15 * 100
-    expect(agg.totalNetHours).toBe(3.5);
-    expect(agg.totalLaborCostCents).toBe(5250);
+    const agg = aggregatePersonnel(entries, rates);
+    expect(agg.totalNetHours).toBe(3);
+    expect(agg.totalLaborCostCents).toBe(3000 + 2200);
+    expect(agg.unratedNetHours).toBe(0);
     expect(agg.staffWithoutRate).toEqual([]);
   });
 
-  it("Staff ohne gültigen Satz → in staffWithoutRate, Kosten 0, Stunden gezählt", () => {
-    const entries: WorkEntry[] = [
-      { staffId: "c", businessDate: "2026-06-01", netMinutes: 60 },
-      { staffId: "c", businessDate: "2026-06-02", netMinutes: 60 },
+  it("Satzwechsel per valid_from wirkt tagesgenau", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [
+        { department: "service", validFrom: "2026-01-01", hourlyRateCents: 1400 },
+        { department: "service", validFrom: "2026-06-15", hourlyRateCents: 1600 },
+      ],
+    };
+    const entries = [
+      entry({ staffId: "a", netMinutes: 60, businessDate: "2026-06-14" }),
+      entry({ staffId: "a", netMinutes: 60, businessDate: "2026-06-15" }),
     ];
-    const agg = aggregatePersonnel(entries, comp);
-    expect(agg.staffWithoutRate).toEqual(["c"]);
-    expect(agg.perStaff[0].laborCostCents).toBe(0);
-    expect(agg.perStaff[0].netHours).toBe(2);
+    const agg = aggregatePersonnel(entries, rates);
+    expect(agg.totalLaborCostCents).toBe(1400 + 1600);
+  });
+
+  it("kein Satz gepflegt → unratedNetHours statt 0-Kosten-Mischung", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 }],
+    };
+    const entries = [
+      entry({ staffId: "a", netMinutes: 60, department: "service" }),
+      entry({ staffId: "a", netMinutes: 90, department: "kitchen" }), // kein Küchensatz
+    ];
+    const agg = aggregatePersonnel(entries, rates);
+    expect(agg.totalLaborCostCents).toBe(1500);
+    expect(agg.unratedNetHours).toBe(1.5);
+    expect(agg.staffWithoutRate).toEqual(["a"]);
+    expect(agg.perStaff[0].unratedNetHours).toBe(1.5);
+    expect(agg.totalNetHours).toBe(2.5);
+  });
+
+  it("unresolved-Eintrag wird nicht bewertet, auch wenn ein Satz existiert", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 120, department: "service", unresolved: true })],
+      rates,
+    );
     expect(agg.totalLaborCostCents).toBe(0);
+    expect(agg.unratedNetHours).toBe(2);
+    expect(agg.staffWithoutRate).toEqual(["a"]);
+  });
+
+  it("Cent-genaue Rundung je Eintrag", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1000 }],
+    };
+    // 20 min = 1/3 h → 333,33 ct → 333 ct je Eintrag, dreimal = 999 ct
+    const entries = [1, 2, 3].map(() => entry({ staffId: "a", netMinutes: 20 }));
+    const agg = aggregatePersonnel(entries, rates);
+    expect(agg.totalLaborCostCents).toBe(999);
+  });
+
+  it("leere Eingabe → Nullaggregat", () => {
+    const agg = aggregatePersonnel([], {});
+    expect(agg).toEqual({
+      totalNetHours: 0,
+      totalLaborCostCents: 0,
+      unratedNetHours: 0,
+      perStaff: [],
+      staffWithoutRate: [],
+    });
+  });
+
+  it("Satz mit valid_from nach dem Arbeitstag zählt nicht (kein Rückwirken)", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-07-01", hourlyRateCents: 1500 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60, businessDate: "2026-06-30" })],
+      rates,
+    );
+    expect(agg.totalLaborCostCents).toBe(0);
+    expect(agg.unratedNetHours).toBe(1);
+  });
+
+  it("kein Bereichs-Fallback: GL-Satz bewertet keine Service-Stunden", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "gl", validFrom: "2026-01-01", hourlyRateCents: 2200 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60, department: "service" })],
+      rates,
+    );
+    expect(agg.totalLaborCostCents).toBe(0);
+    expect(agg.staffWithoutRate).toEqual(["a"]);
+  });
+
+  it("gemischte Belegschaft: nur die unbewertete Person wird gemeldet", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60 }), entry({ staffId: "b", netMinutes: 60 })],
+      rates,
+    );
+    expect(agg.totalLaborCostCents).toBe(1500);
+    expect(agg.staffWithoutRate).toEqual(["b"]);
+    expect(agg.unratedNetHours).toBe(1);
+    expect(agg.totalNetHours).toBe(2);
   });
 
   it("Sortierung perStaff absteigend nach laborCostCents", () => {
-    const entries: WorkEntry[] = [
-      { staffId: "a", businessDate: "2026-06-01", netMinutes: 60 }, // 1500 ct
-      { staffId: "b", businessDate: "2026-06-01", netMinutes: 60 }, // 2000 ct
-    ];
-    const agg = aggregatePersonnel(entries, comp);
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 }],
+      b: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 2000 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60 }), entry({ staffId: "b", netMinutes: 60 })],
+      rates,
+    );
     expect(agg.perStaff.map((p) => p.staffId)).toEqual(["b", "a"]);
   });
 });

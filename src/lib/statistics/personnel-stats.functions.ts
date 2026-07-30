@@ -1,10 +1,15 @@
-// M-Statistik S-8 — Read-Server-Fn: Personalquote-Basisdaten pro
+// M-Statistik S-8 / ST1-A — Read-Server-Fn: Personalquote-Basisdaten pro
 // Kalendermonat (oder freies Datumsfenster) inkl. Vorperiode + Trend.
 //
 // EHRLICHKEITSREGEL: liefert *Basis-Brutto-Lohnkosten* (Netto-Stunden ×
-// staff_compensation.hourly_rate in EUR). Bewusst NICHT enthalten:
-// Arbeitgeber-SV-Anteil, SFN-Zuschläge, zweiter Satz `hourly_rate_2`.
-// Werte sind eine Näherung — NICHT die volle Arbeitgeberkostenquote.
+// Bereichs-Stundensatz aus `staff_compensation_rates`). Bewusst NICHT
+// enthalten: Arbeitgeber-SV-Anteil, SFN-Zuschläge. Werte sind eine
+// Näherung — NICHT die volle Arbeitgeberkostenquote.
+//
+// ST1-A: Attribution je Zeiteintrag über `attributeEntry` (LG3b) und
+// Satz-Auflösung über `resolveRateCents` — dieselben Funktionen wie im
+// Lohnpfad. Der Alt-Skalar `staff_compensation.hourly_rate` wird hier
+// nicht mehr gelesen. Stunden ohne Satz werden ausgewiesen (Variant B).
 //
 // Die Personalquote selbst (cost/revenue) wird hier nicht gerechnet.
 // Die UI kombiniert getPersonnelStats + getRevenueStats und ruft
@@ -17,6 +22,9 @@ import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { grossMinutesBetween } from "@/lib/time/break-rules";
 import { paidMinutes } from "@/lib/time/paid-hours";
 import { selectAllPaged } from "@/lib/supabase/select-all";
+import { attributeEntry } from "@/lib/lohn/entry-attribution";
+import type { RateRow } from "@/lib/lohn/rate-resolution";
+import { primaryDepartment, type Department } from "@/lib/time/primary-department";
 import { computeTrend, type Trend } from "./revenue-core";
 import {
   currentMonth,
@@ -24,12 +32,7 @@ import {
   previousMonthRange,
   previousRangeForDates,
 } from "./period-window";
-import {
-  aggregatePersonnel,
-  type CompRow,
-  type PersonnelAgg,
-  type WorkEntry,
-} from "./personnel-core";
+import { aggregatePersonnel, type PersonnelAgg, type WorkEntry } from "./personnel-core";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;

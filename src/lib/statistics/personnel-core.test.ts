@@ -82,6 +82,55 @@ describe("aggregatePersonnel — Bereichs-Sätze (ST1-A)", () => {
     expect(agg.totalLaborCostCents).toBe(999);
   });
 
+  it("leere Eingabe → Nullaggregat", () => {
+    const agg = aggregatePersonnel([], {});
+    expect(agg).toEqual({
+      totalNetHours: 0,
+      totalLaborCostCents: 0,
+      unratedNetHours: 0,
+      perStaff: [],
+      staffWithoutRate: [],
+    });
+  });
+
+  it("Satz mit valid_from nach dem Arbeitstag zählt nicht (kein Rückwirken)", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-07-01", hourlyRateCents: 1500 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60, businessDate: "2026-06-30" })],
+      rates,
+    );
+    expect(agg.totalLaborCostCents).toBe(0);
+    expect(agg.unratedNetHours).toBe(1);
+  });
+
+  it("kein Bereichs-Fallback: GL-Satz bewertet keine Service-Stunden", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "gl", validFrom: "2026-01-01", hourlyRateCents: 2200 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60, department: "service" })],
+      rates,
+    );
+    expect(agg.totalLaborCostCents).toBe(0);
+    expect(agg.staffWithoutRate).toEqual(["a"]);
+  });
+
+  it("gemischte Belegschaft: nur die unbewertete Person wird gemeldet", () => {
+    const rates: Record<string, RateRow[]> = {
+      a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 }],
+    };
+    const agg = aggregatePersonnel(
+      [entry({ staffId: "a", netMinutes: 60 }), entry({ staffId: "b", netMinutes: 60 })],
+      rates,
+    );
+    expect(agg.totalLaborCostCents).toBe(1500);
+    expect(agg.staffWithoutRate).toEqual(["b"]);
+    expect(agg.unratedNetHours).toBe(1);
+    expect(agg.totalNetHours).toBe(2);
+  });
+
   it("Sortierung perStaff absteigend nach laborCostCents", () => {
     const rates: Record<string, RateRow[]> = {
       a: [{ department: "service", validFrom: "2026-01-01", hourlyRateCents: 1500 }],

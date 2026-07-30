@@ -9,7 +9,6 @@ import { parsePersonalCsv } from "./import-personal-csv";
 
 const STAFF_A = "staff-a";
 const STAFF_B = "staff-b";
-const FALLBACK = "2026-06-14";
 
 function rows(overrides: Partial<PersonalRowInput> = {}): PersonalRowInput[] {
   return [

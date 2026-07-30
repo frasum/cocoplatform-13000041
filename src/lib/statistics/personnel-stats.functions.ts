@@ -22,9 +22,7 @@ import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { grossMinutesBetween } from "@/lib/time/break-rules";
 import { paidMinutes } from "@/lib/time/paid-hours";
 import { selectAllPaged } from "@/lib/supabase/select-all";
-import { attributeEntry } from "@/lib/lohn/entry-attribution";
-import type { RateRow } from "@/lib/lohn/rate-resolution";
-import { primaryDepartment, type Department } from "@/lib/time/primary-department";
+import type { Department } from "@/lib/time/primary-department";
 import { computeTrend, type Trend } from "./revenue-core";
 import {
   currentMonth,
@@ -117,11 +115,14 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
         break_minutes: number | null;
         business_date: string | null;
         location_id: string | null;
+        department: string | null;
         id: string;
       }>((from, to) => {
         let q = supabaseAdmin
           .from("time_entries")
-          .select("id, staff_id, started_at, ended_at, break_minutes, business_date, location_id")
+          .select(
+            "id, staff_id, started_at, ended_at, break_minutes, business_date, location_id, department",
+          )
           .eq("organization_id", org)
           .gte("business_date", win.startDate)
           .lte("business_date", win.endDate)
@@ -131,7 +132,13 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
         return q.range(from, to);
       });
 
-      const entries: WorkEntry[] = [];
+      type RawEntry = {
+        staffId: string;
+        businessDate: string;
+        netMinutes: number;
+        rawDepartment: Department | null;
+      };
+      const raw: RawEntry[] = [];
       const staffIdSet = new Set<string>();
       let totalNetMinutes = 0;
       let lastDataDay: string | null = null;
@@ -144,32 +151,39 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
         if (net > 0 && (lastDataDay === null || r.business_date > lastDataDay)) {
           lastDataDay = r.business_date;
         }
-        entries.push({
+        raw.push({
           staffId: r.staff_id,
           businessDate: r.business_date,
           netMinutes: net,
+          rawDepartment: (r.department as Department | null) ?? null,
         });
       }
       const staffIds = Array.from(staffIdSet);
 
-      const compByStaff: Record<string, CompRow[]> = {};
-      if (staffIds.length > 0) {
-        const { data: comp, error: compErr } = await supabaseAdmin
-          .from("staff_compensation")
-          .select("staff_id, valid_from, hourly_rate")
-          .eq("organization_id", org)
-          .in("staff_id", staffIds);
-        if (compErr) throw compErr;
-        for (const c of comp ?? []) {
-          if (!c.staff_id || !c.valid_from || c.hourly_rate === null) continue;
-          (compByStaff[c.staff_id] ??= []).push({
-            validFrom: c.valid_from,
-            hourlyRateEur: Number(c.hourly_rate),
-          });
-        }
-      }
+      // ST1-A — Bereichs-Sätze + LG3b-Attribution je Eintrag.
+      const ctx = await loadPersonnelAttributionContext(
+        supabaseAdmin,
+        org,
+        staffIds,
+        win.startDate,
+        win.endDate,
+      );
+      const entries: WorkEntry[] = raw.map((e) => {
+        const attr = ctx.attribute({
+          staffId: e.staffId,
+          businessDate: e.businessDate,
+          rawDepartment: e.rawDepartment,
+        });
+        return {
+          staffId: e.staffId,
+          businessDate: e.businessDate,
+          netMinutes: e.netMinutes,
+          department: attr.department,
+          unresolved: attr.unresolved,
+        };
+      });
 
-      const agg = aggregatePersonnel(entries, compByStaff);
+      const agg = aggregatePersonnel(entries, ctx.ratesByStaff);
       return { agg, totalNetMinutes, staffIds, lastDataDay };
     }
 
@@ -218,12 +232,14 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
       totals: {
         netHours: cur.agg.totalNetHours,
         laborCostCents: cur.agg.totalLaborCostCents,
+        unratedNetHours: cur.agg.unratedNetHours,
       },
       perStaff: cur.agg.perStaff.map((p) => ({
         staffId: p.staffId,
         name: staffNames[p.staffId] ?? p.staffId,
         netHours: p.netHours,
         laborCostCents: p.laborCostCents,
+        unratedNetHours: p.unratedNetHours,
       })),
       staffWithoutRate: cur.agg.staffWithoutRate,
       previous: prev

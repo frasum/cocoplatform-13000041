@@ -40,7 +40,6 @@ export function formatWageLines(lines: readonly WageLine[]): string | null {
   const amount = (cents: number) => `${formatEuroFromCents(cents) ?? ""}/h`;
   if (lines.length === 1) return amount(lines[0].rateCents);
   return (
-    "je nach Einsatzbereich: " +
-    lines.map((l) => `${l.label} ${amount(l.rateCents)}`).join(" · ")
+    "je nach Einsatzbereich: " + lines.map((l) => `${l.label} ${amount(l.rateCents)}`).join(" · ")
   );
 }

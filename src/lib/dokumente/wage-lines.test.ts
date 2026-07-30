@@ -21,7 +21,11 @@ describe("wage-lines", () => {
 
   it("zwei/drei Bereiche: Präfix und feste Reihenfolge", () => {
     const lines = resolveWageLines(
-      [r("gl", "2026-01-01", 2200), r("kitchen", "2026-01-01", 1500), r("service", "2026-01-01", 1450)],
+      [
+        r("gl", "2026-01-01", 2200),
+        r("kitchen", "2026-01-01", 1500),
+        r("service", "2026-01-01", 1450),
+      ],
       "2026-07-30",
     );
     expect(lines.map((l) => l.department)).toEqual(["service", "kitchen", "gl"]);
@@ -32,7 +36,11 @@ describe("wage-lines", () => {
 
   it("valid_from-Historie: jüngste Zeile <= Stichtag gewinnt, Zukunft wirkt nicht", () => {
     const lines = resolveWageLines(
-      [r("service", "2026-01-01", 1400), r("service", "2026-06-01", 1450), r("service", "2026-09-01", 1600)],
+      [
+        r("service", "2026-01-01", 1400),
+        r("service", "2026-06-01", 1450),
+        r("service", "2026-09-01", 1600),
+      ],
       "2026-07-30",
     );
     expect(formatWageLines(lines)).toBe("14,50 €/h");
@@ -48,9 +56,9 @@ describe("wage-lines", () => {
   });
 
   it("Cent-Formatierung deutsch", () => {
-    expect(formatWageLines(resolveWageLines([r("service", "2020-01-01", 1450)], "2026-07-30"))).toBe(
-      "14,50 €/h",
-    );
+    expect(
+      formatWageLines(resolveWageLines([r("service", "2020-01-01", 1450)], "2026-07-30")),
+    ).toBe("14,50 €/h");
     expect(formatWageLines(resolveWageLines([r("gl", "2020-01-01", 2200)], "2026-07-30"))).toBe(
       "22,00 €/h",
     );

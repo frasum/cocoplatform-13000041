@@ -1265,23 +1265,12 @@ export const getSfnOverviewBatch = createServerFn({ method: "GET" })
       data.toDate,
     );
 
-    const { data: comps, error: compErr } = await supabaseAdmin
-      .from("staff_compensation")
-      .select("staff_id, hourly_rate, valid_from")
-      .eq("organization_id", caller.organizationId)
-      .lte("valid_from", data.toDate)
-      .order("valid_from", { ascending: false });
-    if (compErr) throw compErr;
-    const rateByStaff = new Map<string, number>();
-    for (const c of comps ?? []) {
-      if (!rateByStaff.has(c.staff_id)) {
-        rateByStaff.set(c.staff_id, Math.round(Number(c.hourly_rate ?? 0) * 100));
-      }
-    }
+    const rateOf = await loadSfnRateResolver(supabaseAdmin, caller.organizationId, data.toDate);
 
     type SfnEntry = {
       staffId: string;
       hourlyRateCents: number;
+      rateMissing: boolean;
       zuschlagCents: number;
       simple: { night25Hours: number; night40Hours: number; sundayHours: number };
       extended: {
@@ -1315,11 +1304,13 @@ export const getSfnOverviewBatch = createServerFn({ method: "GET" })
     for (const lid of data.locationIds) {
       const staffMap = rowsByLocStaff.get(lid) ?? new Map<string, SfnShiftRow[]>();
       const sfn: SfnEntry[] = Array.from(staffMap.entries()).map(([staffId, sfnRows]) => {
-        const rate = rateByStaff.get(staffId) ?? 0;
+        const resolved = rateOf(staffId);
+        const rate = resolved ?? 0;
         const { simple, extended, zuschlagCents } = computeStaffSfn(sfnRows, rate);
         return {
           staffId,
           hourlyRateCents: rate,
+          rateMissing: resolved === null,
           zuschlagCents,
           simple: {
             night25Hours: simple.night25Hours,

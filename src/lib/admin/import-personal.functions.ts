@@ -2,10 +2,10 @@
 //
 // Admin-only. Nimmt geparste Personaldaten-Zeilen entgegen, löst sie über
 // `staff_identity_map` auf, berechnet den Diff via reinem
-// `computePersonalPlan` und schreibt im Commit-Pfad in `staff` /
-// `staff_compensation`. Dry-Run schreibt nichts. Commit mit Bilanz 0/0/0
-// schreibt ebenfalls keinen Audit-Eintrag (Log-Hygiene, analog
-// `importStaffAssignments`).
+// `computePersonalPlan` und schreibt im Commit-Pfad in `staff`.
+// Lohnsätze sind seit ST1-C1 nicht mehr Teil des Imports.
+// Dry-Run schreibt nichts. Commit ohne Änderungen schreibt ebenfalls keinen
+// Audit-Eintrag (Log-Hygiene, analog `importStaffAssignments`).
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -29,7 +29,6 @@ const inputSchema = z.object({
       lastName: z.string().min(1),
       nickname: z.string(),
       persoNr: z.number().int().nullable(),
-      hourlyRate: z.number().min(0),
       employmentStart: dateOrEmpty,
     }),
   ),
@@ -74,10 +73,7 @@ export const importStaffPersonalData = createServerFn({ method: "POST" })
       });
     };
 
-    const noChanges =
-      plan.totals.nameUpdates === 0 &&
-      plan.totals.compInserts === 0 &&
-      plan.totals.compUpdates === 0;
+    const noChanges = plan.totals.nameUpdates === 0;
 
     if (noChanges) {
       return { mode: "commit" as const, plan };
@@ -109,9 +105,6 @@ export const importStaffPersonalData = createServerFn({ method: "POST" })
               rows: committed.plan.totals.rows,
               staff: committed.plan.totals.staff,
               nameUpdates: committed.plan.totals.nameUpdates,
-              compInserts: committed.plan.totals.compInserts,
-              compUpdates: committed.plan.totals.compUpdates,
-              compFallbacks: committed.plan.totals.compFallbacks,
               skippedCount: committed.plan.totals.skippedCount,
               inputHash,
             },

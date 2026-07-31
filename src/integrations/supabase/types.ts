@@ -1806,6 +1806,8 @@ export type Database = {
           postal_code: string | null
           street: string | null
           timezone: string
+          tip_distribution_mode_from_override: string | null
+          tip_distribution_mode_override: string | null
           tip_pool_min_hours_override: number | null
           tip_service_pool_enabled: boolean
           updated_at: string
@@ -1836,6 +1838,8 @@ export type Database = {
           postal_code?: string | null
           street?: string | null
           timezone?: string
+          tip_distribution_mode_from_override?: string | null
+          tip_distribution_mode_override?: string | null
           tip_pool_min_hours_override?: number | null
           tip_service_pool_enabled?: boolean
           updated_at?: string
@@ -1866,6 +1870,8 @@ export type Database = {
           postal_code?: string | null
           street?: string | null
           timezone?: string
+          tip_distribution_mode_from_override?: string | null
+          tip_distribution_mode_override?: string | null
           tip_pool_min_hours_override?: number | null
           tip_service_pool_enabled?: boolean
           updated_at?: string
@@ -2354,6 +2360,8 @@ export type Database = {
           test_mode_email: string | null
           test_mode_enabled: boolean
           time_locked_through_date: string | null
+          tip_distribution_mode: string
+          tip_distribution_mode_from: string | null
           tip_pool_min_hours: number
           updated_at: string
         }
@@ -2384,6 +2392,8 @@ export type Database = {
           test_mode_email?: string | null
           test_mode_enabled?: boolean
           time_locked_through_date?: string | null
+          tip_distribution_mode?: string
+          tip_distribution_mode_from?: string | null
           tip_pool_min_hours?: number
           updated_at?: string
         }
@@ -2414,6 +2424,8 @@ export type Database = {
           test_mode_email?: string | null
           test_mode_enabled?: boolean
           time_locked_through_date?: string | null
+          tip_distribution_mode?: string
+          tip_distribution_mode_from?: string | null
           tip_pool_min_hours?: number
           updated_at?: string
         }

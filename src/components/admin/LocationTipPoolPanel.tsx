@@ -13,6 +13,9 @@ type Props = {
     kitchenTipRateOverride: number | null;
     tipPoolMinHoursOverride: number | null;
     kitchenManualOnlyOverride: boolean | null;
+    // TG4 — Modus + Stichtag erben als Paar (siehe tip-settings.ts).
+    tipDistributionModeOverride: "hours" | "headcount" | null;
+    tipDistributionModeFromOverride: string | null;
   };
   onSaved?: () => void;
 };
@@ -61,6 +64,10 @@ export function LocationTipPoolPanel({ locationId, initial, onSaved }: Props) {
         ? "true"
         : "false",
   );
+  const [mode, setMode] = useState<"" | "hours" | "headcount">(
+    initial.tipDistributionModeOverride ?? "",
+  );
+  const [modeFrom, setModeFrom] = useState<string>(initial.tipDistributionModeFromOverride ?? "");
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,6 +79,11 @@ export function LocationTipPoolPanel({ locationId, initial, onSaved }: Props) {
       const rate = parsePctToRate(rateStr);
       const hrs = parseHours(minHStr);
       const km = manual === "" ? null : manual === "true";
+      const modeOverride = mode === "" ? null : mode;
+      const modeFromOverride = modeOverride === null || modeFrom.trim() === "" ? null : modeFrom;
+      if (modeOverride === "headcount" && modeFromOverride === null) {
+        throw new Error("Kopfteilung braucht ein Startdatum (keine rückwirkende Umstellung).");
+      }
       await callSave({
         data: {
           locationId,
@@ -79,6 +91,8 @@ export function LocationTipPoolPanel({ locationId, initial, onSaved }: Props) {
           kitchenTipRateOverride: rate,
           tipPoolMinHoursOverride: hrs,
           kitchenManualOnlyOverride: km,
+          tipDistributionModeOverride: modeOverride,
+          tipDistributionModeFromOverride: modeFromOverride,
         },
       });
     },
@@ -94,6 +108,12 @@ export function LocationTipPoolPanel({ locationId, initial, onSaved }: Props) {
     defaultsQ.data == null ? "…" : `${(defaultsQ.data.kitchenTipRate * 100).toFixed(2)} %`;
   const orgHours = defaultsQ.data == null ? "…" : String(defaultsQ.data.tipPoolMinHours);
   const orgManual = defaultsQ.data == null ? "…" : defaultsQ.data.kitchenManualOnly ? "an" : "aus";
+  const orgMode =
+    defaultsQ.data == null
+      ? "…"
+      : defaultsQ.data.tipDistributionMode === "headcount"
+        ? `Kopfteilung ab ${defaultsQ.data.tipDistributionModeFrom ?? "—"}`
+        : "nach Stunden";
 
   const inputCls = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
@@ -145,6 +165,30 @@ export function LocationTipPoolPanel({ locationId, initial, onSaved }: Props) {
             <option value="true">an</option>
             <option value="false">aus</option>
           </select>
+        </label>
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-foreground">Verteilung im Pool</span>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as "" | "hours" | "headcount")}
+            className={inputCls}
+          >
+            <option value="">Standard: {orgMode}</option>
+            <option value="hours">nach Stunden</option>
+            <option value="headcount">Kopfteilung</option>
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="block text-xs text-muted-foreground">Gültig ab (nur mit eigenem Modus)</span>
+          <input
+            type="date"
+            value={modeFrom}
+            onChange={(e) => setModeFrom(e.target.value)}
+            disabled={mode === ""}
+            className={`${inputCls} disabled:opacity-60`}
+          />
         </label>
       </div>
       <div className="flex items-center gap-2">

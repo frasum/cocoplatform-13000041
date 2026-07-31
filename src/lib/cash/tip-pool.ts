@@ -22,6 +22,26 @@
 import type { StaffDepartment } from "@/lib/staff-domain";
 export type { StaffDepartment };
 
+// TG4 — Verteilmodus innerhalb eines Pools. Betrifft AUSSCHLIESSLICH die
+// Aufteilung auf die bereits ermittelte Teilnehmerliste; wer teilnimmt
+// (Mindeststunden, participates_in_pool, GL-Ausschluss) bleibt unberührt.
+export type TipDistributionMode = "hours" | "headcount";
+
+/**
+ * Welcher Verteilmodus gilt an einem Geschäftstag?
+ * Vor dem Stichtag und ohne Stichtag gilt immer "hours" — die Historie
+ * bleibt dadurch exakt reproduzierbar (TG4, keine Rückwirkung).
+ * Vergleich als String-Vergleich auf ISO-Datum (keine Zeitzonen-Falle).
+ */
+export function resolveTipDistributionMode(
+  businessDate: string,
+  mode: TipDistributionMode,
+  modeFrom: string | null,
+): TipDistributionMode {
+  if (modeFrom === null) return "hours";
+  return businessDate >= modeFrom ? mode : "hours";
+}
+
 /**
  * Effektive Pool-Teilnahme: Session-Übersteuerung schlägt den Stammdaten-Default,
  * vollständig entkoppelt von den Stunden. NULL = kein Override → Default.
@@ -79,6 +99,8 @@ export function activeSettlements<T extends { status?: string | null }>(
 export type TipPoolInput = {
   kitchenPoolCents: number;
   servicePoolCents: number;
+  // TG4 — Pflichtfeld: jede Aufrufstelle muss den Modus bewusst wählen.
+  distributionMode: TipDistributionMode;
   settlements: Array<{
     staffId: string;
     posSalesCents: number;
@@ -129,8 +151,34 @@ function round2(n: number): number {
 function distribute(
   poolCents: number,
   participants: Array<{ staffId: string; hours: number; department: "kitchen" | "service" }>,
+  mode: TipDistributionMode,
 ): { shares: TipPoolShare[]; remainder: number } {
   if (!Number.isInteger(poolCents)) throw new Error("poolCents must be integer cents");
+  if (mode === "headcount") {
+    // TG4 — Kopfteilung: jeder Teilnehmer gleich viel, Stunden spielen für
+    // die Höhe keine Rolle (nur noch für die Berechtigung, s. computeTipPool).
+    if (poolCents <= 0 || participants.length === 0) {
+      return {
+        shares: participants.map((p) => ({
+          staffId: p.staffId,
+          department: p.department,
+          hoursWorked: round2(p.hours),
+          shareCents: 0,
+        })),
+        remainder: poolCents,
+      };
+    }
+    const per = Math.floor(poolCents / participants.length / 100) * 100;
+    return {
+      shares: participants.map((p) => ({
+        staffId: p.staffId,
+        department: p.department,
+        hoursWorked: round2(p.hours),
+        shareCents: per,
+      })),
+      remainder: poolCents - per * participants.length,
+    };
+  }
   const totalHours = participants.reduce((s, p) => s + p.hours, 0);
   if (poolCents <= 0 || totalHours <= 0) {
     return {
@@ -190,8 +238,8 @@ export function computeTipPool(input: TipPoolInput): TipPoolResult {
     else service.push({ staffId, hours, department: "service" });
   }
 
-  const k = distribute(input.kitchenPoolCents, kitchen);
-  const s = distribute(input.servicePoolCents, service);
+  const k = distribute(input.kitchenPoolCents, kitchen, input.distributionMode);
+  const s = distribute(input.servicePoolCents, service, input.distributionMode);
 
   return {
     kitchenPoolCents: input.kitchenPoolCents,

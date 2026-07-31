@@ -568,6 +568,8 @@ type LocationRowData = {
   kitchen_tip_rate_override?: number | string | null;
   tip_pool_min_hours_override?: number | string | null;
   kitchen_manual_only_override?: boolean | null;
+  tip_distribution_mode_override?: string | null;
+  tip_distribution_mode_from_override?: string | null;
 };
 
 function LocationSectionPanel(props: {
@@ -669,6 +671,13 @@ function LocationSectionPanel(props: {
             loc.kitchen_manual_only_override == null
               ? null
               : Boolean(loc.kitchen_manual_only_override),
+          tipDistributionModeOverride:
+            loc.tip_distribution_mode_override === "headcount"
+              ? "headcount"
+              : loc.tip_distribution_mode_override === "hours"
+                ? "hours"
+                : null,
+          tipDistributionModeFromOverride: loc.tip_distribution_mode_from_override ?? null,
         }}
         onSaved={props.onGeoChanged}
       />

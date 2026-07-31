@@ -136,10 +136,19 @@ export function resolveEdlohnSlots(
   //     Mapping: der Slot ist nicht bestimmbar. Deterministische Notbelegung
   //     in Bucket-Reihenfolge, damit die Anzeige die getrennten Sätze zeigt —
   //     der Export wird über `mappingMissing` geblockt.
-  let next: SlotNumber = 1;
+  const used = new Set<SlotNumber>();
   for (const b of active) {
-    slots.set(b.department, mapByDept.get(b.department) ?? next);
-    if (next < 3) next = (next + 1) as SlotNumber;
+    const mapped = mapByDept.get(b.department);
+    if (mapped != null) {
+      slots.set(b.department, mapped);
+      used.add(mapped);
+    }
+  }
+  for (const b of active) {
+    if (slots.has(b.department)) continue;
+    const free = ([1, 2, 3] as SlotNumber[]).find((s) => !used.has(s)) ?? 3;
+    slots.set(b.department, free);
+    used.add(free);
   }
   return { slots, mappingMissing: true, unmappedDepartments: unmapped };
 }

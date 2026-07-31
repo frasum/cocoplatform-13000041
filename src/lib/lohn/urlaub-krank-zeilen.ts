@@ -18,41 +18,57 @@ export function buildUrlaubKrankZeilen(args: {
    * SV-Rechnung vorbei (kein RV-Eigenanteil, aber St-Brutto ≠ 0).
    */
   beschaeftigung?: Beschaeftigungsart;
+  /**
+   * UK1/K2 — `true`, wenn der U/K-Satz aus dem Vertragssatz des Haupt-
+   * bereichs kommt, weil im 91-Tage-Fenster keine bezahlten Stunden lagen
+   * (`no_hours`). Dann entsteht KEINE Zuschlagszeile (3M-Ø): es gibt keine
+   * Basis, und eine 0-€-Zeile wäre Rauschen — edlohn rechnet den
+   * Durchschnitt in diesem Fall selbst (Lohnbüro-bestätigt 31.07.2026).
+   * Die Basis-Zeilen tragen den Zusatz „(ohne 3M-Basis)" — auch im Export,
+   * weil die Bezeichnung Teil der Entgeltzeile ist.
+   */
+  ohneDreiMonatsBasis?: boolean;
 }): Entgeltzeile[] {
   const { urlaubTage, krankTage, sollHoursPerDay, hourlyRateCents, sfnTagCent } = args;
   const kat = zeitlohnKategorie(args.beschaeftigung ?? "normal");
+  const ohneBasis = args.ohneDreiMonatsBasis === true;
+  const zusatz = ohneBasis ? " (ohne 3M-Basis)" : "";
   const zeilen: Entgeltzeile[] = [];
 
   if (urlaubTage > 0) {
     const stunden = urlaubTage * sollHoursPerDay;
     zeilen.push({
       kategorie: kat,
-      bezeichnung: "Urlaubsstunden",
+      bezeichnung: `Urlaubsstunden${zusatz}`,
       betragCent: Math.round(stunden * hourlyRateCents),
       stunden,
       satzCent: hourlyRateCents,
     });
-    zeilen.push({
-      kategorie: kat,
-      bezeichnung: "Zuschlag Urlaubsentgelt (3M-Ø)",
-      betragCent: Math.round(urlaubTage * sfnTagCent),
-    });
+    if (!ohneBasis) {
+      zeilen.push({
+        kategorie: kat,
+        bezeichnung: "Zuschlag Urlaubsentgelt (3M-Ø)",
+        betragCent: Math.round(urlaubTage * sfnTagCent),
+      });
+    }
   }
 
   if (krankTage > 0) {
     const stunden = krankTage * sollHoursPerDay;
     zeilen.push({
       kategorie: kat,
-      bezeichnung: "Lohnfortzahlung Krankheit",
+      bezeichnung: `Lohnfortzahlung Krankheit${zusatz}`,
       betragCent: Math.round(stunden * hourlyRateCents),
       stunden,
       satzCent: hourlyRateCents,
     });
-    zeilen.push({
-      kategorie: kat,
-      bezeichnung: "Zuschlag Krank (3M-Ø)",
-      betragCent: Math.round(krankTage * sfnTagCent),
-    });
+    if (!ohneBasis) {
+      zeilen.push({
+        kategorie: kat,
+        bezeichnung: "Zuschlag Krank (3M-Ø)",
+        betragCent: Math.round(krankTage * sfnTagCent),
+      });
+    }
   }
 
   return zeilen;

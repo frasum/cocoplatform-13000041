@@ -151,8 +151,34 @@ function round2(n: number): number {
 function distribute(
   poolCents: number,
   participants: Array<{ staffId: string; hours: number; department: "kitchen" | "service" }>,
+  mode: TipDistributionMode,
 ): { shares: TipPoolShare[]; remainder: number } {
   if (!Number.isInteger(poolCents)) throw new Error("poolCents must be integer cents");
+  if (mode === "headcount") {
+    // TG4 — Kopfteilung: jeder Teilnehmer gleich viel, Stunden spielen für
+    // die Höhe keine Rolle (nur noch für die Berechtigung, s. computeTipPool).
+    if (poolCents <= 0 || participants.length === 0) {
+      return {
+        shares: participants.map((p) => ({
+          staffId: p.staffId,
+          department: p.department,
+          hoursWorked: round2(p.hours),
+          shareCents: 0,
+        })),
+        remainder: poolCents,
+      };
+    }
+    const per = Math.floor(poolCents / participants.length / 100) * 100;
+    return {
+      shares: participants.map((p) => ({
+        staffId: p.staffId,
+        department: p.department,
+        hoursWorked: round2(p.hours),
+        shareCents: per,
+      })),
+      remainder: poolCents - per * participants.length,
+    };
+  }
   const totalHours = participants.reduce((s, p) => s + p.hours, 0);
   if (poolCents <= 0 || totalHours <= 0) {
     return {
@@ -212,8 +238,8 @@ export function computeTipPool(input: TipPoolInput): TipPoolResult {
     else service.push({ staffId, hours, department: "service" });
   }
 
-  const k = distribute(input.kitchenPoolCents, kitchen);
-  const s = distribute(input.servicePoolCents, service);
+  const k = distribute(input.kitchenPoolCents, kitchen, input.distributionMode);
+  const s = distribute(input.servicePoolCents, service, input.distributionMode);
 
   return {
     kitchenPoolCents: input.kitchenPoolCents,

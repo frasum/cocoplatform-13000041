@@ -555,6 +555,8 @@ export const berechneLohnUebersicht = createServerFn({ method: "GET" })
           persoNr: persoNr == null ? null : String(persoNr),
           buckets: r.deptBuckets,
           unresolvedHoursUnrounded: r.unresolvedHoursUnrounded,
+          // SL1 — Slot-Blocker fließt in denselben Gate ein.
+          unmappedSlotDepartments: r.unmappedSlotDepartments,
         });
         const sumCat = (cat: string) =>
           r.zeilen.filter((z) => z.kategorie === cat).reduce((sum, z) => sum + z.betragCent, 0);

@@ -388,8 +388,16 @@ export async function computeLohnForStaff(
       rateCents: s.rateCents,
       // LG3b 2b — SFN je Bereich für den Übersichts-Export.
       zuschlagCents: (args.mode === "extended" ? s.extended : s.simple).zuschlagCents,
+      // SL1 — aufgelöster edlohn-Slot (nur für Bereiche mit Stunden).
+      edlohnSlot: slotResolution.slots.get(s.department) ?? null,
     })),
     ukMissingDepartments,
+    // UK1/K2 — U/K-Satz aus Vertragssatz, keine 3M-Zuschlagszeile.
+    ukOhneDreiMonatsBasis,
+    // SL1 — Blocker-Rohdaten: Bereiche ohne Slot-Mapping bei mehreren Sätzen.
+    unmappedSlotDepartments: slotResolution.mappingMissing
+      ? slotResolution.unmappedDepartments
+      : [],
   };
 }
 

@@ -136,3 +136,27 @@ describe("mergeTipSettings — TG4 Paar-Vererbung Verteilmodus", () => {
     expect(r.distributionModeFrom).toBe("2026-08-01");
   });
 });
+
+// TG4-N1 — Migrations-Neutralität: Default-Zustand rechnet durchgängig
+// nach Stunden, unabhängig vom Geschäftstag.
+describe("TG4-N1 — Default-Zustand ist verhaltensneutral", () => {
+  it("mode='hours' + from=null ergibt an jedem Geschäftstag 'hours'", () => {
+    const merged = mergeTipSettings({
+      org: {
+        kitchenTipRate: 0.02,
+        tipPoolMinHours: 2.5,
+        kitchenManualOnly: false,
+        distributionMode: "hours",
+        distributionModeFrom: null,
+      },
+      location: null,
+    });
+    expect(merged.distributionMode).toBe("hours");
+    expect(merged.distributionModeFrom).toBeNull();
+    for (const d of ["2025-01-01", "2026-07-30", "2030-12-31"]) {
+      expect(
+        resolveTipDistributionMode(d, merged.distributionMode, merged.distributionModeFrom),
+      ).toBe("hours");
+    }
+  });
+});

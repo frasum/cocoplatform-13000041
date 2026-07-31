@@ -651,3 +651,51 @@ describe("computeTipPool — headcount", () => {
     expect(r.serviceRemainder).toBe(5_000);
   });
 });
+
+// TG4-N1 — Eigenschaften der Kopfteilung (keine bestehenden Erwartungen berührt).
+describe("TG4-N1 — Kopfteilung: Eigenschaften", () => {
+  const depts = new Map<string, "kitchen" | "service">([
+    ["s1", "service"],
+    ["s2", "service"],
+    ["s3", "service"],
+    ["s4", "service"],
+  ]);
+
+  it("Rest bleibt unter Teilnehmerzahl * 100 Cent und nie negativ", () => {
+    for (const pool of [0, 1, 99, 100, 5_001, 12_345, 999_999]) {
+      for (const n of [1, 2, 3, 4]) {
+        const ids = ["s1", "s2", "s3", "s4"].slice(0, n);
+        const r = computeTipPool({
+          distributionMode: "headcount",
+          kitchenPoolCents: 0,
+          servicePoolCents: pool,
+          settlements: [],
+          timeEntries: ids.map((id) => ({ staffId: id, startedAt: iso(10), endedAt: iso(18) })),
+          staffDepartments: depts,
+          staffParticipates: participatesAll(ids),
+        });
+        expect(r.serviceRemainder).toBeGreaterThanOrEqual(0);
+        expect(r.serviceRemainder).toBeLessThan(ids.length * 100);
+      }
+    }
+  });
+
+  it("Berechtigung unberührt: excludedByMinHours identisch in beiden Modi", () => {
+    const input = {
+      kitchenPoolCents: 0,
+      servicePoolCents: 30_000,
+      settlements: [],
+      timeEntries: [
+        { staffId: "s1", startedAt: iso(10), endedAt: iso(18) },
+        { staffId: "s2", startedAt: iso(10), endedAt: iso(11) },
+        { staffId: "s3", startedAt: iso(10), endedAt: iso(10, 30) },
+      ],
+      staffDepartments: depts,
+      staffParticipates: participatesAll(["s1", "s2", "s3"]),
+      minHoursPerDay: 2.5,
+    };
+    const byHours = computeTipPool({ ...input, distributionMode: "hours" });
+    const byHeads = computeTipPool({ ...input, distributionMode: "headcount" });
+    expect(byHeads.excludedByMinHours).toEqual(byHours.excludedByMinHours);
+  });
+});

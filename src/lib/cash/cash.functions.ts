@@ -813,7 +813,7 @@ export type LoadedOrgSettings = Awaited<ReturnType<typeof loadOrgSettings>>;
 export async function computeSessionTipPoolCore(
   caller: AdminCaller,
   session: LoadedSession,
-  settings: LoadedOrgSettings | TipSettings,
+  settings: TipSettings,
 ): Promise<
   TipPoolResult & {
     staffNames: Record<string, string>;
@@ -839,9 +839,8 @@ export async function computeSessionTipPoolCore(
     }>;
   }
 > {
-  // Standort-Vererbung: LoadedOrgSettings hat kein `servicePoolEnabled`.
-  // Ohne expliziten Wert → true (bitgenau Alt-Verhalten für Bestand).
-  const servicePoolEnabled = (settings as TipSettings).servicePoolEnabled ?? true;
+  // Standort-Vererbung: mergeTipSettings liefert den Wert bereits aufgelöst.
+  const servicePoolEnabled = settings.servicePoolEnabled ?? true;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   const [settlementsRes, timeRes, manualRes] = await Promise.all([
@@ -983,15 +982,13 @@ export async function computeSessionTipPoolCore(
     minHoursPerDay: settings.tipPoolMinHours,
     // TG4 — einziger Auflösungspunkt: Stichtag gegen den Geschäftstag der
     // Session. Vor dem Stichtag (oder ohne) bleibt es bei "hours".
-    // Der Legacy-Pfad (LoadedOrgSettings ohne TG4-Felder) bleibt bei "hours".
-    distributionMode:
-      "distributionMode" in settings
-        ? resolveTipDistributionMode(
-            session.business_date,
-            settings.distributionMode,
-            settings.distributionModeFrom,
-          )
-        : "hours",
+    // TG4-N1: kein stiller Fallback mehr — der Aufrufer muss TipSettings
+    // liefern (loadTipSettings), sonst schlägt bereits tsc fehl.
+    distributionMode: resolveTipDistributionMode(
+      session.business_date,
+      settings.distributionMode,
+      settings.distributionModeFrom,
+    ),
   });
 
   // Bei deaktivertem Service-Pool: keine Service-Shares ausweisen und

@@ -622,7 +622,7 @@ describe("computeTipPool — headcount", () => {
       settlements: [],
       timeEntries: [
         { staffId: "s1", startedAt: iso(10), endedAt: iso(20) },
-        { staffId: "s2", startedAt: iso(18), endedAt: iso(20) },
+        { staffId: "s2", startedAt: iso(17), endedAt: iso(20) }, // 3h
         { staffId: "s3", startedAt: iso(19), endedAt: iso(20) }, // 1h < 2,5h
       ],
       staffDepartments: depts,

@@ -21,7 +21,14 @@ import { buildUrlaubKrankZeilen } from "./urlaub-krank-zeilen";
 import { zeitlohnKategorie } from "./kategorie";
 import { computeWeightedUkRate, type UkRateSlot } from "./uk-rate-weighted";
 import { resolveRateCents, type RateRow } from "./rate-resolution";
-import type { Department } from "@/lib/time/primary-department";
+import { primaryDepartment, type Department } from "@/lib/time/primary-department";
+import {
+  resolveEdlohnSlots,
+  slotKategorie,
+  slotLabel,
+  type SlotMappingRow,
+  type SlotNumber,
+} from "./edlohn-slots";
 import {
   computeExportBlockers,
   type StaffBlocker,
@@ -34,29 +41,11 @@ const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 // die Implementierung liegt jetzt in `./kategorie` (zirkelfrei).
 export { zeitlohnKategorie };
 
-// LG3b 2a-iii — Lohnart-Bezeichnungen je Bereich (Lohnbüro 27.07., siehe
-// docs/LG3b-bereichs-saetze.md). Der Zeitlohn-Split je Bereich ersetzt die
-// Ein-Zeilen-Ausgabe des Alt-Pfads. Ein-Bereichs-Personen erhalten weiterhin
-// genau eine Zeitlohn-Zeile mit identischem Betrag — Baseline-Nullmessung.
-const ZEITLOHN_LABEL: Record<Department, string> = {
-  service: "Zeitlohn (Service)",
-  gl: "Zeitlohn 2 (GL)",
-  kitchen: "Zeitlohn 3 (Küche)",
-};
-// LG3b A3 — Kategorien je Bereich (Nicht-Minijob). Etappe-1-Kategorien
-// werden jetzt hier tatsächlich erzeugt — die 2b-Export-Spalten mappen
-// darüber. Minijob bleibt bereichsunabhängig `aushilfe_paust`; die
-// Bereichsunterscheidung tragen dann die Labels.
-const ZEITLOHN_KATEGORIE: Record<Department, "zeitlohn" | "zeitlohn_2" | "zeitlohn_3"> = {
-  service: "zeitlohn",
-  gl: "zeitlohn_2",
-  kitchen: "zeitlohn_3",
-};
-const AUSHILFE_LABEL: Record<Department, string> = {
-  service: "Aushilfe-Zeitlohn (Service, pauschal)",
-  gl: "Aushilfe-Zeitlohn 2 (GL, pauschal)",
-  kitchen: "Aushilfe-Zeitlohn 3 (Küche, pauschal)",
-};
+// SL1 — Bezeichnung UND Kategorie der Zeitlohn-Zeilen folgen ab jetzt dem
+// edlohn-Slot je Person (siehe `./edlohn-slots`), nicht mehr starr dem
+// Bereich. Die bereichsweise Rechnung bleibt unverändert: Stunden, Sätze,
+// Beträge und SFN-Töpfe sind bit-identisch. SFN-Zeilen bleiben bewusst
+// bereichsweise mit ihren Bestands-Bezeichnungen.
 const SFN_LABEL: Record<Department, string> = {
   service: "Service",
   gl: "GL",

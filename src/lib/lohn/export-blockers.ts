@@ -127,6 +127,12 @@ export function computeExportBlockers(payloads: readonly StaffExportPayload[]): 
       }
     }
 
+    // (4) SL1 — fehlendes edlohn-Slot-Mapping bei mehreren Bereichen mit
+    // unterschiedlichen Sätzen. Ein Grund je betroffenem Bereich.
+    for (const d of p.unmappedSlotDepartments ?? []) {
+      reasons.push({ reason: "missing_slot_mapping", department: d });
+    }
+
     if (reasons.length > 0) {
       out.push({
         staffId: p.staffId,

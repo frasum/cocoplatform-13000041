@@ -22,6 +22,26 @@
 import type { StaffDepartment } from "@/lib/staff-domain";
 export type { StaffDepartment };
 
+// TG4 — Verteilmodus innerhalb eines Pools. Betrifft AUSSCHLIESSLICH die
+// Aufteilung auf die bereits ermittelte Teilnehmerliste; wer teilnimmt
+// (Mindeststunden, participates_in_pool, GL-Ausschluss) bleibt unberührt.
+export type TipDistributionMode = "hours" | "headcount";
+
+/**
+ * Welcher Verteilmodus gilt an einem Geschäftstag?
+ * Vor dem Stichtag und ohne Stichtag gilt immer "hours" — die Historie
+ * bleibt dadurch exakt reproduzierbar (TG4, keine Rückwirkung).
+ * Vergleich als String-Vergleich auf ISO-Datum (keine Zeitzonen-Falle).
+ */
+export function resolveTipDistributionMode(
+  businessDate: string,
+  mode: TipDistributionMode,
+  modeFrom: string | null,
+): TipDistributionMode {
+  if (modeFrom === null) return "hours";
+  return businessDate >= modeFrom ? mode : "hours";
+}
+
 /**
  * Effektive Pool-Teilnahme: Session-Übersteuerung schlägt den Stammdaten-Default,
  * vollständig entkoppelt von den Stunden. NULL = kein Override → Default.
@@ -79,6 +99,8 @@ export function activeSettlements<T extends { status?: string | null }>(
 export type TipPoolInput = {
   kitchenPoolCents: number;
   servicePoolCents: number;
+  // TG4 — Pflichtfeld: jede Aufrufstelle muss den Modus bewusst wählen.
+  distributionMode: TipDistributionMode;
   settlements: Array<{
     staffId: string;
     posSalesCents: number;

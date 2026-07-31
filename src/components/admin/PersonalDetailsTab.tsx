@@ -18,6 +18,10 @@ import {
   type CompensationRatesDto,
   type CompensationRateEntry,
 } from "@/lib/admin/compensation-rates.functions";
+import {
+  listStaffEdlohnSlots,
+  setStaffEdlohnSlot,
+} from "@/lib/admin/edlohn-slots.functions";
 import { isValidFromAllowed, periodStart } from "@/lib/time/valid-from-guard";
 import { todayIso } from "@/lib/format";
 
@@ -726,6 +730,82 @@ const DEPT_LABEL: Record<(typeof DEPT_ORDER)[number], string> = {
   kitchen: "Küche",
   service: "Service",
 };
+
+// SL1 — edlohn-Slot je Bereich. Rein export-relevant: die Nummer steuert
+// Bezeichnung, Kategorie und Export-Spalte, NICHT die Berechnung. Nötig nur,
+// wenn eine Person in mehreren Bereichen mit UNTERSCHIEDLICHEN Sätzen läuft.
+function EdlohnSlotsSection({ staffId }: { staffId: string }) {
+  const queryClient = useQueryClient();
+  const listFn = useServerFn(listStaffEdlohnSlots);
+  const saveFn = useServerFn(setStaffEdlohnSlot);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const q = useQuery({
+    queryKey: ["admin", "staff", staffId, "edlohn-slots"],
+    queryFn: () => listFn({ data: { staffId } }),
+  });
+
+  const saveMut = useMutation({
+    mutationFn: async (payload: {
+      department: (typeof DEPT_ORDER)[number];
+      slot: 1 | 2 | 3 | null;
+    }) => saveFn({ data: { staffId, ...payload } }),
+    onSuccess: async () => {
+      setMsg("Gespeichert.");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "staff", staffId, "edlohn-slots"],
+      });
+    },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler beim Speichern."),
+  });
+
+  const bySlot = new Map((q.data ?? []).map((e) => [e.department, e.slot]));
+
+  return (
+    <fieldset className="space-y-3 rounded-md border border-border p-4">
+      <legend className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        edlohn-Zeitlohn-Slots (nur Admin)
+      </legend>
+      <p className="text-xs text-muted-foreground">
+        Die Slot-Nummer ist die Anlage-Reihenfolge der Zeitlohn-Lohnart in edlohn für DIESE Person (1
+        = Zeitlohn, 2 = Zeitlohn 2, 3 = Zeitlohn 3). Sie steuert nur Bezeichnung, Kategorie und
+        Export-Spalte — nicht die Rechnung. Zuordnung ist nur nötig, wenn mehrere Bereiche mit
+        unterschiedlichen Sätzen bebucht werden; bei gleichen Sätzen läuft alles auf Slot 1.
+      </p>
+      {q.isLoading ? (
+        <p className="text-sm text-muted-foreground">Lade…</p>
+      ) : q.error ? (
+        <p className="text-sm text-destructive">Slots konnten nicht geladen werden.</p>
+      ) : (
+        <div className="space-y-2">
+          {DEPT_ORDER.map((dept) => (
+            <div key={dept} className="flex items-center gap-3">
+              <span className="w-32 text-sm">{DEPT_LABEL[dept]}</span>
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                value={bySlot.get(dept) ?? ""}
+                onChange={(e) => {
+                  setMsg(null);
+                  const v = e.target.value;
+                  saveMut.mutate({
+                    department: dept,
+                    slot: v === "" ? null : (Number(v) as 1 | 2 | 3),
+                  });
+                }}
+              >
+                <option value="">— nicht zugeordnet —</option>
+                <option value="1">1 — Zeitlohn</option>
+                <option value="2">2 — Zeitlohn 2</option>
+                <option value="3">3 — Zeitlohn 3</option>
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+      {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
+    </fieldset>
+  );
+}
 
 function CompensationRatesSection({ staffId }: { staffId: string }) {
   const queryClient = useQueryClient();

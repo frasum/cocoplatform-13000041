@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mergeTipSettings } from "./tip-settings";
+import { resolveTipDistributionMode } from "./tip-pool";
 
 const org = {
   kitchenTipRate: 0.02,

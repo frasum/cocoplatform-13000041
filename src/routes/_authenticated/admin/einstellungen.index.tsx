@@ -96,6 +96,9 @@ function OrgSettingsPage() {
   const [tipRatePercent, setTipRatePercent] = useState("");
   const [minHours, setMinHours] = useState("");
   const [kitchenManualOnly, setKitchenManualOnly] = useState(false);
+  // TG4 — Verteilmodus + Stichtag (leerer String = kein Stichtag).
+  const [distributionMode, setDistributionMode] = useState<"hours" | "headcount">("hours");
+  const [distributionModeFrom, setDistributionModeFrom] = useState("");
   const [testModeEnabled, setTestModeEnabled] = useState(false);
   const [testModeEmail, setTestModeEmail] = useState("");
   const [orderReplyTelegramEnabled, setOrderReplyTelegramEnabled] = useState(false);
@@ -113,6 +116,8 @@ function OrgSettingsPage() {
     setTipRatePercent((settingsQ.data.kitchenTipRate * 100).toFixed(2));
     setMinHours(settingsQ.data.tipPoolMinHours.toFixed(2));
     setKitchenManualOnly(settingsQ.data.kitchenManualOnly);
+    setDistributionMode(settingsQ.data.tipDistributionMode);
+    setDistributionModeFrom(settingsQ.data.tipDistributionModeFrom ?? "");
     setTestModeEnabled(settingsQ.data.testModeEnabled);
     setTestModeEmail(settingsQ.data.testModeEmail ?? "");
     setOrderReplyTelegramEnabled(settingsQ.data.orderReplyTelegramEnabled);
@@ -137,6 +142,9 @@ function OrgSettingsPage() {
       if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
         throw new Error("Test-E-Mail-Adresse ist ungültig.");
       }
+      if (distributionMode === "headcount" && distributionModeFrom.trim() === "") {
+        throw new Error("Kopfteilung braucht ein Startdatum (keine rückwirkende Umstellung).");
+      }
       return callUpdate({
         data: {
           kitchenTipRate: rate,
@@ -146,6 +154,9 @@ function OrgSettingsPage() {
           testModeEmail: trimmedEmail === "" ? null : trimmedEmail,
           orderReplyTelegramEnabled,
           orderReplyForwardUnassigned,
+          tipDistributionMode: distributionMode,
+          tipDistributionModeFrom:
+            distributionModeFrom.trim() === "" ? null : distributionModeFrom.trim(),
         },
       });
     },
@@ -213,6 +224,10 @@ function OrgSettingsPage() {
             setMinHours={setMinHours}
             kitchenManualOnly={kitchenManualOnly}
             setKitchenManualOnly={setKitchenManualOnly}
+            distributionMode={distributionMode}
+            setDistributionMode={setDistributionMode}
+            distributionModeFrom={distributionModeFrom}
+            setDistributionModeFrom={setDistributionModeFrom}
             msg={msg}
             err={err}
             isPending={mutation.isPending}

@@ -15,6 +15,11 @@ type Props = {
   setMinHours: (value: string) => void;
   kitchenManualOnly: boolean;
   setKitchenManualOnly: (value: boolean) => void;
+  // TG4 — Verteilmodus + Stichtag (Org-Standard).
+  distributionMode: "hours" | "headcount";
+  setDistributionMode: (value: "hours" | "headcount") => void;
+  distributionModeFrom: string;
+  setDistributionModeFrom: (value: string) => void;
   msg: string | null;
   err: string | null;
   isPending: boolean;
@@ -29,6 +34,10 @@ export function TrinkgeldpoolSection({
   setMinHours,
   kitchenManualOnly,
   setKitchenManualOnly,
+  distributionMode,
+  setDistributionMode,
+  distributionModeFrom,
+  setDistributionModeFrom,
   msg,
   err,
   isPending,
@@ -92,6 +101,37 @@ export function TrinkgeldpoolSection({
             </span>
           </span>
         </label>
+
+        {/* TG4 — Kopfteilung: wirkt erst ab dem Stichtag, Historie bleibt „nach Stunden". */}
+        <div className="space-y-2 rounded-md border border-input bg-muted/30 p-3">
+          <span className="block text-xs font-medium text-muted-foreground">
+            Verteilung innerhalb des Pools
+          </span>
+          <select
+            value={distributionMode}
+            onChange={(e) => setDistributionMode(e.target.value as "hours" | "headcount")}
+            disabled={!canEdit}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60"
+          >
+            <option value="hours">Nach Stunden (bisher)</option>
+            <option value="headcount">Kopfteilung (alle gleich)</option>
+          </select>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-medium text-muted-foreground">Gültig ab</span>
+            <input
+              type="date"
+              value={distributionModeFrom}
+              onChange={(e) => setDistributionModeFrom(e.target.value)}
+              disabled={!canEdit}
+              className="w-44 rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60"
+            />
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Ohne Startdatum bleibt es bei „Nach Stunden". Tage vor dem Startdatum werden nie
+            rückwirkend umgestellt. Wer teilnimmt (Mindeststunden, Pool-Teilnahme), ändert sich
+            nicht — nur die Höhe der Anteile.
+          </p>
+        </div>
 
         {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
         {err && <p className="text-xs text-destructive">{err}</p>}

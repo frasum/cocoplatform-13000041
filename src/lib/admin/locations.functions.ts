@@ -505,35 +505,37 @@ export const setLocationDayServiceEnabled = createServerFn({ method: "POST" })
 // TG1 — Trinkgeld-Einstellungen je Standort (Service-Pool + Overrides)
 // =========================================================================
 
-const tipSettingsSchema = z.object({
-  locationId: z.string().uuid(),
-  tipServicePoolEnabled: z.boolean(),
-  kitchenTipRateOverride: z.number().min(0).max(0.2).nullable(),
-  tipPoolMinHoursOverride: z.number().min(0).max(24).nullable(),
-  kitchenManualOnlyOverride: z.boolean().nullable(),
-  // TG4 — Modus + Stichtag als Paar: entweder beide leer (Org erbt) oder
-  // Modus gesetzt. "headcount" verlangt zusätzlich ein Startdatum.
-  tipDistributionModeOverride: z.enum(["hours", "headcount"]).nullable(),
-  tipDistributionModeFromOverride: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Stichtag muss ein Datum sein.")
-    .nullable(),
-}).superRefine((v, ctx) => {
-  if (v.tipDistributionModeOverride === "headcount" && !v.tipDistributionModeFromOverride) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["tipDistributionModeFromOverride"],
-      message: "Kopfteilung braucht ein Startdatum (keine rückwirkende Umstellung).",
-    });
-  }
-  if (v.tipDistributionModeOverride === null && v.tipDistributionModeFromOverride !== null) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["tipDistributionModeFromOverride"],
-      message: "Stichtag ohne eigenen Modus ist nicht möglich (Standard wird geerbt).",
-    });
-  }
-});
+const tipSettingsSchema = z
+  .object({
+    locationId: z.string().uuid(),
+    tipServicePoolEnabled: z.boolean(),
+    kitchenTipRateOverride: z.number().min(0).max(0.2).nullable(),
+    tipPoolMinHoursOverride: z.number().min(0).max(24).nullable(),
+    kitchenManualOnlyOverride: z.boolean().nullable(),
+    // TG4 — Modus + Stichtag als Paar: entweder beide leer (Org erbt) oder
+    // Modus gesetzt. "headcount" verlangt zusätzlich ein Startdatum.
+    tipDistributionModeOverride: z.enum(["hours", "headcount"]).nullable(),
+    tipDistributionModeFromOverride: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Stichtag muss ein Datum sein.")
+      .nullable(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.tipDistributionModeOverride === "headcount" && !v.tipDistributionModeFromOverride) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tipDistributionModeFromOverride"],
+        message: "Kopfteilung braucht ein Startdatum (keine rückwirkende Umstellung).",
+      });
+    }
+    if (v.tipDistributionModeOverride === null && v.tipDistributionModeFromOverride !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tipDistributionModeFromOverride"],
+        message: "Stichtag ohne eigenen Modus ist nicht möglich (Standard wird geerbt).",
+      });
+    }
+  });
 
 export const updateLocationTipSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -635,9 +637,9 @@ export const getOrgTipDefaults = createServerFn({ method: "GET" })
       kitchenTipRate: Number(data?.kitchen_tip_rate ?? 0.02),
       tipPoolMinHours: Number(data?.tip_pool_min_hours ?? 2.5),
       kitchenManualOnly: Boolean(data?.kitchen_manual_only ?? false),
-      tipDistributionMode: (data?.tip_distribution_mode === "headcount"
-        ? "headcount"
-        : "hours") as "hours" | "headcount",
+      tipDistributionMode: (data?.tip_distribution_mode === "headcount" ? "headcount" : "hours") as
+        | "hours"
+        | "headcount",
       tipDistributionModeFrom: data?.tip_distribution_mode_from ?? null,
     };
   });

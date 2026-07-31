@@ -181,7 +181,9 @@ export function LocationTipPoolPanel({ locationId, initial, onSaved }: Props) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="block text-xs text-muted-foreground">Gültig ab (nur mit eigenem Modus)</span>
+          <span className="block text-xs text-muted-foreground">
+            Gültig ab (nur mit eigenem Modus)
+          </span>
           <input
             type="date"
             value={modeFrom}

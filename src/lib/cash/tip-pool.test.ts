@@ -343,7 +343,9 @@ describe("computeTipPool: Mindeststunden", () => {
       staffParticipates: participatesAll(["s1"]),
     };
     expect(computeTipPool({ distributionMode: "hours" as const, ...base }).shares).toHaveLength(1);
-    expect(computeTipPool({ distributionMode: "hours" as const, ...base, minHoursPerDay: 0 }).shares).toHaveLength(1);
+    expect(
+      computeTipPool({ distributionMode: "hours" as const, ...base, minHoursPerDay: 0 }).shares,
+    ).toHaveLength(1);
   });
 });
 

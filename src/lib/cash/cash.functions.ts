@@ -27,6 +27,7 @@ import {
   effectiveParticipation,
   poolFullyUnallocated,
   resolvePoolTimeEntries,
+  resolveTipDistributionMode,
   type TipPoolResult,
   type StaffDepartment,
 } from "./tip-pool";

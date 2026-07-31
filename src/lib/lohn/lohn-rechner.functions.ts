@@ -67,8 +67,9 @@ function isoMinusDays(iso: string, days: number): string {
  *     `computeWeightedUkRate`:
  *       - `missing_rate` → 0 € mit rotem Marker; Export-Blocker durch die
  *         Blocker-Struktur unten.
- *       - `no_hours` → §104-Halt: konkrete Fehlermeldung wird geworfen
- *         (Übersicht fängt je Zeile ab, Einzelansicht zeigt sie).
+ *       - `no_hours` → UK1-Fallback: Vertragssatz des Hauptbereichs
+ *         (WZ1-Priorität), Zuschlagszeile entfällt, Basis-Zeilen tragen
+ *         „(ohne 3M-Basis)". Fehlt auch dieser Satz → Blocker `missing_rate`.
  *   Der stille 0-€-Fallback ist damit weg.
  */
 interface UkRateResolution {

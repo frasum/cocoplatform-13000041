@@ -426,7 +426,8 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     // identisch zur früheren Drei-Zeilen-Fassung (3 × 18.400 = 55.200 c).
     expect(r.unmappedSlotDepartments).toEqual([]);
     const zeitZeilen = r.zeilen.filter(
-      (z) => z.kategorie === "zeitlohn" || z.kategorie === "zeitlohn_2" || z.kategorie === "zeitlohn_3",
+      (z) =>
+        z.kategorie === "zeitlohn" || z.kategorie === "zeitlohn_2" || z.kategorie === "zeitlohn_3",
     );
     expect(zeitZeilen).toHaveLength(1);
     const einzige = zeitZeilen[0];

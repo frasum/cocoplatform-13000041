@@ -18,10 +18,7 @@ import {
   type CompensationRatesDto,
   type CompensationRateEntry,
 } from "@/lib/admin/compensation-rates.functions";
-import {
-  listStaffEdlohnSlots,
-  setStaffEdlohnSlot,
-} from "@/lib/admin/edlohn-slots.functions";
+import { listStaffEdlohnSlots, setStaffEdlohnSlot } from "@/lib/admin/edlohn-slots.functions";
 import { isValidFromAllowed, periodStart } from "@/lib/time/valid-from-guard";
 import { todayIso } from "@/lib/format";
 
@@ -767,8 +764,8 @@ function EdlohnSlotsSection({ staffId }: { staffId: string }) {
         edlohn-Zeitlohn-Slots (nur Admin)
       </legend>
       <p className="text-xs text-muted-foreground">
-        Die Slot-Nummer ist die Anlage-Reihenfolge der Zeitlohn-Lohnart in edlohn für DIESE Person (1
-        = Zeitlohn, 2 = Zeitlohn 2, 3 = Zeitlohn 3). Sie steuert nur Bezeichnung, Kategorie und
+        Die Slot-Nummer ist die Anlage-Reihenfolge der Zeitlohn-Lohnart in edlohn für DIESE Person
+        (1 = Zeitlohn, 2 = Zeitlohn 2, 3 = Zeitlohn 3). Sie steuert nur Bezeichnung, Kategorie und
         Export-Spalte — nicht die Rechnung. Zuordnung ist nur nötig, wenn mehrere Bereiche mit
         unterschiedlichen Sätzen bebucht werden; bei gleichen Sätzen läuft alles auf Slot 1.
       </p>

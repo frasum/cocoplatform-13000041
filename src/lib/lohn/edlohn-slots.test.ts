@@ -1,10 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  resolveEdlohnSlots,
-  slotKategorie,
-  slotLabel,
-  type SlotBucket,
-} from "./edlohn-slots";
+import { resolveEdlohnSlots, slotKategorie, slotLabel, type SlotBucket } from "./edlohn-slots";
 
 function b(department: SlotBucket["department"], h: number, rate: number | null): SlotBucket {
   return { department, paidHoursUnrounded: h, rateCents: rate };

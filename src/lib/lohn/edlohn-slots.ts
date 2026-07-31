@@ -87,9 +87,7 @@ export function slotLabel(
   const base = minijob ? "Aushilfe-Zeitlohn" : "Zeitlohn";
   const nummer = slot > 1 ? ` ${slot}` : "";
   const bereiche = departments.map((d) => DEPT_LABEL[d]).join(", ");
-  return minijob
-    ? `${base}${nummer} (${bereiche}, pauschal)`
-    : `${base}${nummer} (${bereiche})`;
+  return minijob ? `${base}${nummer} (${bereiche}, pauschal)` : `${base}${nummer} (${bereiche})`;
 }
 
 /**

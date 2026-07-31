@@ -4630,6 +4630,51 @@ export type Database = {
           },
         ]
       }
+      staff_edlohn_slots: {
+        Row: {
+          created_at: string
+          department: Database["public"]["Enums"]["staff_department"]
+          id: string
+          organization_id: string
+          slot: number
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          department: Database["public"]["Enums"]["staff_department"]
+          id?: string
+          organization_id: string
+          slot: number
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          department?: Database["public"]["Enums"]["staff_department"]
+          id?: string
+          organization_id?: string
+          slot?: number
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_edlohn_slots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_edlohn_slots_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_identity_map: {
         Row: {
           alt_id: string

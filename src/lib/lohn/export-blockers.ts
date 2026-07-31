@@ -9,15 +9,24 @@
 //     Payroll-Zugänge ohne Stunden (z. B. Viktoria Schaffer) blockieren nie.
 //   * Prüfung auf ungerundeten `paidHours` — 0,2 h zählt, auch wenn die
 //     Anzeige 0,00 zeigt. Toleranz nur gegen Fließkomma-Rauschen.
-//   * Drei Gründe: `missing_rate`, `missing_perso_nr`, `unresolved_department`.
-//     Eine Person kann mehrere gleichzeitig haben; ein Grund je Bucket-Detail.
+//   * Vier Gründe: `missing_rate`, `missing_perso_nr`, `unresolved_department`
+//     und (SL1) `missing_slot_mapping`. Eine Person kann mehrere gleichzeitig
+//     haben; ein Grund je Bucket-Detail.
+//   * SL1 — `missing_slot_mapping` greift NUR, wenn ≥ 2 Bereiche mit Stunden
+//     ≥ 2 unterschiedliche aufgelöste Sätze tragen und kein vollständiges
+//     edlohn-Slot-Mapping vorliegt. Bei identischen Sätzen ist der Slot
+//     eindeutig (alle auf 1, eine aggregierte Zeile) — kein Blocker.
 
 import type { Department } from "@/lib/time/primary-department";
 
 /** Grenze gegen Fließkomma-Rauschen — 1 Sekunde ≈ 0,000278 h. */
 const HOURS_EPS = 1e-9;
 
-export type BlockerReason = "missing_rate" | "missing_perso_nr" | "unresolved_department";
+export type BlockerReason =
+  | "missing_rate"
+  | "missing_perso_nr"
+  | "unresolved_department"
+  | "missing_slot_mapping";
 
 export interface DeptBucket {
   department: Department;
@@ -36,6 +45,12 @@ export interface StaffExportPayload {
   buckets: readonly DeptBucket[];
   /** UNGERUNDETE Stunden von Einträgen, deren Bereich nicht zuordenbar war. */
   unresolvedHoursUnrounded: number;
+  /**
+   * SL1 — Bereiche mit Stunden ohne edlohn-Slot-Mapping, obwohl der Slot
+   * wegen unterschiedlicher Sätze nicht bestimmbar ist. Leer/undefined =
+   * kein Slot-Blocker.
+   */
+  unmappedSlotDepartments?: readonly Department[];
 }
 
 export interface BlockerDetail {
@@ -110,6 +125,12 @@ export function computeExportBlockers(payloads: readonly StaffExportPayload[]): 
           hoursUnrounded: b.paidHoursUnrounded,
         });
       }
+    }
+
+    // (4) SL1 — fehlendes edlohn-Slot-Mapping bei mehreren Bereichen mit
+    // unterschiedlichen Sätzen. Ein Grund je betroffenem Bereich.
+    for (const d of p.unmappedSlotDepartments ?? []) {
+      reasons.push({ reason: "missing_slot_mapping", department: d });
     }
 
     if (reasons.length > 0) {

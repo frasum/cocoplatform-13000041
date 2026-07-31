@@ -475,6 +475,8 @@ function BlockerBanner({ blockers }: { blockers: StaffBlocker[] }) {
     missing_perso_nr: "Personalnummer fehlt",
     missing_rate: "Stundensatz fehlt",
     unresolved_department: "Bereich nicht zuordenbar",
+    // SL1 — Slot-Zuordnung fehlt (mehrere Bereiche mit verschiedenen Sätzen).
+    missing_slot_mapping: "edlohn-Slot fehlt",
   };
   const DEPT_LABEL: Record<string, string> = {
     service: "Service",
@@ -500,6 +502,9 @@ function BlockerBanner({ blockers }: { blockers: StaffBlocker[] }) {
                 .map((r) => {
                   const base = REASON_LABEL[r.reason] ?? r.reason;
                   if (r.reason === "missing_rate" && r.department) {
+                    return `${base} (${DEPT_LABEL[r.department] ?? r.department})`;
+                  }
+                  if (r.reason === "missing_slot_mapping" && r.department) {
                     return `${base} (${DEPT_LABEL[r.department] ?? r.department})`;
                   }
                   return base;

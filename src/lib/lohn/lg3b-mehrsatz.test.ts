@@ -353,13 +353,20 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
     expect(byDept.get("service")?.rateCents).toBe(1600);
     expect(byDept.get("kitchen")).toBeUndefined();
 
-    // A3 — zwei Zeitlohn-Zeilen mit den Etappe-1-Kategorien.
-    const glZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn 2 (GL)");
-    const svZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn (Service)");
+    // SL1 — Bezeichnung und Kategorie folgen dem edlohn-SLOT, nicht dem
+    // Bereich (edlohn-Ist Juli 2026: alle Ein-Bereich-Personen auf Slot 1,
+    // Lohnbüro-bestätigt 31.07.2026). Unterschiedliche Sätze ohne Mapping →
+    // getrennte Zeilen in Bucket-Reihenfolge (gl = Slot 1, service = Slot 2)
+    // plus Blocker `missing_slot_mapping`.
+    // Nur Label-/Kategorie-Erwartung angepasst — Stunden, Sätze und Beträge
+    // unten sind unverändert.
+    const glZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn (GL)");
+    const svZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn 2 (Service)");
     expect(glZeit).toBeDefined();
     expect(svZeit).toBeDefined();
-    expect(glZeit?.kategorie).toBe("zeitlohn_2");
-    expect(svZeit?.kategorie).toBe("zeitlohn");
+    expect(glZeit?.kategorie).toBe("zeitlohn");
+    expect(svZeit?.kategorie).toBe("zeitlohn_2");
+    expect(r.unmappedSlotDepartments).toEqual(["gl", "service"]);
     expect(glZeit?.satzCent).toBe(2200);
     expect(svZeit?.satzCent).toBe(1600);
     // Handrechnung: 54,00 h × 2200 c = 118.800 c · 18,75 h × 1600 c = 30.000 c.
@@ -412,23 +419,23 @@ describe("LG3b 2a-iii-b — Mehrsatz-Fixtures", () => {
       expect(byDept.get(d)?.rateCents).toBe(2300);
     }
 
-    // A3 — drei Zeitlohn-Zeilen mit den Etappe-1-Kategorien, je Satz 2300.
-    const glZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn 2 (GL)");
-    const kiZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn 3 (Küche)");
-    const svZeit = r.zeilen.find((z) => z.bezeichnung === "Zeitlohn (Service)");
-    expect(glZeit?.kategorie).toBe("zeitlohn_2");
-    expect(kiZeit?.kategorie).toBe("zeitlohn_3");
-    expect(svZeit?.kategorie).toBe("zeitlohn");
-    for (const z of [glZeit, kiZeit, svZeit]) {
-      expect(z?.satzCent).toBe(2300);
-      expect(z?.stunden).toBeCloseTo(8, 6);
-      expect(z?.betragCent).toBe(8 * 2300); // 18.400 c je Bereich
-    }
-
-    // Summe der drei Zeilen-Beträge === paidHours-Gesamt × 2300
-    // (gleicher Satz ⇒ keine Rundungsdrift).
-    const sumBetrag = glZeit!.betragCent + kiZeit!.betragCent + svZeit!.betragCent;
-    expect(sumBetrag).toBe(24 * 2300);
+    // SL1 — identischer Satz in allen Bereichen ⇒ der Slot ist eindeutig
+    // (alle auf 1) und die Zeitlohn-Zeilen aggregieren sich zu EINER Zeile.
+    // Genau so führt edlohn diese Personen (GERARD-Muster, Lohnbüro-bestätigt
+    // 31.07.2026); kein Blocker. Rechenwerte unverändert: die Summe ist
+    // identisch zur früheren Drei-Zeilen-Fassung (3 × 18.400 = 55.200 c).
+    expect(r.unmappedSlotDepartments).toEqual([]);
+    const zeitZeilen = r.zeilen.filter(
+      (z) => z.kategorie === "zeitlohn" || z.kategorie === "zeitlohn_2" || z.kategorie === "zeitlohn_3",
+    );
+    expect(zeitZeilen).toHaveLength(1);
+    const einzige = zeitZeilen[0];
+    expect(einzige.bezeichnung).toBe("Zeitlohn (GL, Küche, Service)");
+    expect(einzige.kategorie).toBe("zeitlohn");
+    expect(einzige.satzCent).toBe(2300);
+    expect(einzige.stunden).toBeCloseTo(24, 6);
+    expect(einzige.betragCent).toBe(3 * (8 * 2300));
+    expect(einzige.betragCent).toBe(24 * 2300);
 
     // Exakte SFN-Summen-Assertion (alle Töpfe × 2300):
     // Alle Schichten liegen Mo–Fr zwischen 10:00 und 16:00 — keine

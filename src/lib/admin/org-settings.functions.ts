@@ -33,6 +33,10 @@ export type OrgSettings = {
   // PB1 — Runde 1: Wert wird angezeigt und bedienbar, aber NICHT von
   // Stunden-/Lohnberechnung gelesen. Default true = Alt-Verhalten.
   pausenBezahlt: boolean;
+  // TG4 — Verteilmodus im Trinkgeld-Pool + Stichtag (ohne Stichtag bleibt
+  // es fachlich bei „hours", siehe resolveTipDistributionMode).
+  tipDistributionMode: "hours" | "headcount";
+  tipDistributionModeFrom: string | null;
 };
 
 const updateSchema = z
@@ -50,6 +54,13 @@ const updateSchema = z
       .or(z.literal("").transform(() => null)),
     orderReplyTelegramEnabled: z.boolean().optional(),
     orderReplyForwardUnassigned: z.boolean().optional(),
+    tipDistributionMode: z.enum(["hours", "headcount"]).optional(),
+    tipDistributionModeFrom: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Stichtag muss ein Datum sein.")
+      .nullable()
+      .optional()
+      .or(z.literal("").transform(() => null)),
   })
   .superRefine((v, ctx) => {
     if (v.testModeEnabled && !v.testModeEmail) {
@@ -57,6 +68,13 @@ const updateSchema = z
         code: z.ZodIssueCode.custom,
         path: ["testModeEmail"],
         message: "Bei aktivem Testmodus ist eine gültige E-Mail-Adresse Pflicht.",
+      });
+    }
+    if (v.tipDistributionMode === "headcount" && !v.tipDistributionModeFrom) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["tipDistributionModeFrom"],
+        message: "Kopfteilung braucht ein Startdatum (keine rückwirkende Umstellung).",
       });
     }
   });
@@ -80,11 +98,13 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       order_reply_telegram_enabled: boolean | null;
       order_reply_forward_unassigned: boolean | null;
       pausen_bezahlt: boolean | null;
+      tip_distribution_mode: string | null;
+      tip_distribution_mode_from: string | null;
     }>(
       await supabaseAdmin
         .from("organization_settings")
         .select(
-          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, test_mode_enabled, test_mode_email, betriebsnummer, arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter, telegram_bot_username, order_reply_telegram_enabled, order_reply_forward_unassigned, pausen_bezahlt",
+          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, test_mode_enabled, test_mode_email, betriebsnummer, arbeitgeber_name, arbeitgeber_adresse, arbeitgeber_vertreter, telegram_bot_username, order_reply_telegram_enabled, order_reply_forward_unassigned, pausen_bezahlt, tip_distribution_mode, tip_distribution_mode_from",
         )
         .eq("organization_id", caller.organizationId)
         .maybeSingle(),
@@ -106,6 +126,8 @@ export const getOrgSettings = createServerFn({ method: "GET" })
       // Default true bewahrt das Alt-Verhalten, falls die Zeile noch nichts
       // enthält (Migration setzt DB-Default ebenfalls auf true).
       pausenBezahlt: Boolean(data?.pausen_bezahlt ?? true),
+      tipDistributionMode: data?.tip_distribution_mode === "headcount" ? "headcount" : "hours",
+      tipDistributionModeFrom: data?.tip_distribution_mode_from ?? null,
     };
   });
 
@@ -145,6 +167,12 @@ export const updateOrgSettings = createServerFn({ method: "POST" })
               ...(data.orderReplyForwardUnassigned !== undefined
                 ? { order_reply_forward_unassigned: data.orderReplyForwardUnassigned }
                 : {}),
+              ...(data.tipDistributionMode !== undefined
+                ? { tip_distribution_mode: data.tipDistributionMode }
+                : {}),
+              ...(data.tipDistributionModeFrom !== undefined
+                ? { tip_distribution_mode_from: data.tipDistributionModeFrom }
+                : {}),
             })
             .eq("organization_id", caller.organizationId),
           "updateOrgSettings.update",
@@ -163,6 +191,8 @@ export const updateOrgSettings = createServerFn({ method: "POST" })
               testModeEmail: data.testModeEmail,
               orderReplyTelegramEnabled: data.orderReplyTelegramEnabled ?? null,
               orderReplyForwardUnassigned: data.orderReplyForwardUnassigned ?? null,
+              tipDistributionMode: data.tipDistributionMode ?? null,
+              tipDistributionModeFrom: data.tipDistributionModeFrom ?? null,
             },
           },
         };

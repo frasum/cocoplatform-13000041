@@ -20,6 +20,7 @@ const participatesAll = (ids: string[]) => new Map(ids.map((id) => [id, true]));
 describe("computeTipPool", () => {
   it("(a) Normalfall: 2 Küche + 2 Service mit unterschiedlichen Stunden (Euro-Abrundung)", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 10_000,
       servicePoolCents: 30_000,
       settlements: [],
@@ -47,6 +48,7 @@ describe("computeTipPool", () => {
 
   it("(b) Rundungsrest bleibt im Pool (Euro)", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 299,
       servicePoolCents: 0,
       settlements: [],
@@ -71,6 +73,7 @@ describe("computeTipPool", () => {
 
   it("(c) participates_in_pool=false wird ausgeschlossen", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 1_000,
       servicePoolCents: 0,
       settlements: [],
@@ -93,6 +96,7 @@ describe("computeTipPool", () => {
 
   it("(d) GL ist aus beiden Pools ausgeschlossen", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 500,
       servicePoolCents: 500,
       settlements: [],
@@ -115,6 +119,7 @@ describe("computeTipPool", () => {
 
   it("(e) leere time_entries → alle shares 0, Reste = Pool-Summen", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 1_234,
       servicePoolCents: 5_678,
       settlements: [
@@ -139,6 +144,7 @@ describe("computeTipPool", () => {
 describe("computeTipPool: Euro-Abrundung der Auszahlung", () => {
   it("Service 176,73 € / 3 Personen ~gleich → je 58,00 €, Rest 2,73 €", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 17_673,
       settlements: [],
@@ -165,6 +171,7 @@ describe("computeTipPool: Euro-Abrundung der Auszahlung", () => {
 
   it("Pool 50,99 € / 1 Person → 50,00 €, Rest 99 Cent", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 5_099,
       settlements: [],
@@ -179,6 +186,7 @@ describe("computeTipPool: Euro-Abrundung der Auszahlung", () => {
 
   it("Leerer Pool / 0 Stunden: alle shareCents=0, remainder=pool", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 4_242,
       settlements: [],
@@ -192,6 +200,7 @@ describe("computeTipPool: Euro-Abrundung der Auszahlung", () => {
 
   it("Küche 100,00 € bei 5 h / 3 h → 62,00 € / 37,00 €, Rest 1,00 €", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 10_000,
       servicePoolCents: 0,
       settlements: [],
@@ -277,6 +286,7 @@ describe("computeTipTotalCents: Tagesabrechnung-Angleichung (16.06.2026)", () =>
 describe("computeTipPool: Mindeststunden", () => {
   it("schließt Mitarbeiter unter Grenze aus und nimmt 2:30 inklusiv mit", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 10_000,
       settlements: [],
@@ -304,6 +314,7 @@ describe("computeTipPool: Mindeststunden", () => {
 
   it("Tagessumme zählt: mehrere Stempelungen werden summiert", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 1_000,
       settlements: [],
@@ -330,8 +341,8 @@ describe("computeTipPool: Mindeststunden", () => {
       staffDepartments: new Map<string, "kitchen" | "service" | "gl">([["s1", "service"]]),
       staffParticipates: participatesAll(["s1"]),
     };
-    expect(computeTipPool({ ...base }).shares).toHaveLength(1);
-    expect(computeTipPool({ ...base, minHoursPerDay: 0 }).shares).toHaveLength(1);
+    expect(computeTipPool({ distributionMode: "hours" as const, ...base }).shares).toHaveLength(1);
+    expect(computeTipPool({ distributionMode: "hours" as const, ...base, minHoursPerDay: 0 }).shares).toHaveLength(1);
   });
 });
 
@@ -429,6 +440,7 @@ describe("effectiveParticipation", () => {
 describe("computeTipPool: Teilnahme-Übersteuerung entkoppelt von Stunden", () => {
   it("(b) 'früher heimgeschickt': echte Stunden, aber participates=false → kein Anteil; Rest teilt sich Pool", () => {
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 10_000,
       settlements: [],
@@ -458,6 +470,7 @@ describe("computeTipPool: Teilnahme-Übersteuerung entkoppelt von Stunden", () =
   it("(c) Standard-Nicht-Teilnehmer wird per Override zugeschaltet und erhält Anteil", () => {
     expect(effectiveParticipation(true, false)).toBe(true);
     const r = computeTipPool({
+      distributionMode: "hours",
       kitchenPoolCents: 0,
       servicePoolCents: 10_000,
       settlements: [],

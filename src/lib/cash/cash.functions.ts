@@ -983,11 +983,15 @@ export async function computeSessionTipPoolCore(
     minHoursPerDay: settings.tipPoolMinHours,
     // TG4 — einziger Auflösungspunkt: Stichtag gegen den Geschäftstag der
     // Session. Vor dem Stichtag (oder ohne) bleibt es bei "hours".
-    distributionMode: resolveTipDistributionMode(
-      session.business_date,
-      settings.distributionMode,
-      settings.distributionModeFrom,
-    ),
+    // Der Legacy-Pfad (LoadedOrgSettings ohne TG4-Felder) bleibt bei "hours".
+    distributionMode:
+      "distributionMode" in settings
+        ? resolveTipDistributionMode(
+            session.business_date,
+            settings.distributionMode,
+            settings.distributionModeFrom,
+          )
+        : "hours",
   });
 
   // Bei deaktivertem Service-Pool: keine Service-Shares ausweisen und

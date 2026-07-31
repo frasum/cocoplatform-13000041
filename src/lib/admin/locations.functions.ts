@@ -50,7 +50,7 @@ export const listLocations = createServerFn({ method: "GET" })
     let query = supabaseAdmin
       .from("locations")
       .select(
-        "id, name, timezone, street, postal_code, city, delivery_notes, phone, contact_name, contact_phone, latitude, longitude, geofence_radius_m, geocoded_at, geocoded_address, cash_balance_target_cents, is_active, enabled_service_periods, tip_service_pool_enabled, kitchen_tip_rate_override, tip_pool_min_hours_override, kitchen_manual_only_override",
+        "id, name, timezone, street, postal_code, city, delivery_notes, phone, contact_name, contact_phone, latitude, longitude, geofence_radius_m, geocoded_at, geocoded_address, cash_balance_target_cents, is_active, enabled_service_periods, tip_service_pool_enabled, kitchen_tip_rate_override, tip_pool_min_hours_override, kitchen_manual_only_override, tip_distribution_mode_override, tip_distribution_mode_from_override",
       )
       .eq("organization_id", caller.organizationId)
       .order("name");
@@ -511,6 +511,28 @@ const tipSettingsSchema = z.object({
   kitchenTipRateOverride: z.number().min(0).max(0.2).nullable(),
   tipPoolMinHoursOverride: z.number().min(0).max(24).nullable(),
   kitchenManualOnlyOverride: z.boolean().nullable(),
+  // TG4 — Modus + Stichtag als Paar: entweder beide leer (Org erbt) oder
+  // Modus gesetzt. "headcount" verlangt zusätzlich ein Startdatum.
+  tipDistributionModeOverride: z.enum(["hours", "headcount"]).nullable(),
+  tipDistributionModeFromOverride: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Stichtag muss ein Datum sein.")
+    .nullable(),
+}).superRefine((v, ctx) => {
+  if (v.tipDistributionModeOverride === "headcount" && !v.tipDistributionModeFromOverride) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["tipDistributionModeFromOverride"],
+      message: "Kopfteilung braucht ein Startdatum (keine rückwirkende Umstellung).",
+    });
+  }
+  if (v.tipDistributionModeOverride === null && v.tipDistributionModeFromOverride !== null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["tipDistributionModeFromOverride"],
+      message: "Stichtag ohne eigenen Modus ist nicht möglich (Standard wird geerbt).",
+    });
+  }
 });
 
 export const updateLocationTipSettings = createServerFn({ method: "POST" })
@@ -527,11 +549,13 @@ export const updateLocationTipSettings = createServerFn({ method: "POST" })
         kitchen_tip_rate_override: number | string | null;
         tip_pool_min_hours_override: number | string | null;
         kitchen_manual_only_override: boolean | null;
+        tip_distribution_mode_override: string | null;
+        tip_distribution_mode_from_override: string | null;
       }>(
         await supabaseAdmin
           .from("locations")
           .select(
-            "id, name, tip_service_pool_enabled, kitchen_tip_rate_override, tip_pool_min_hours_override, kitchen_manual_only_override",
+            "id, name, tip_service_pool_enabled, kitchen_tip_rate_override, tip_pool_min_hours_override, kitchen_manual_only_override, tip_distribution_mode_override, tip_distribution_mode_from_override",
           )
           .eq("id", data.locationId)
           .eq("organization_id", caller.organizationId)
@@ -547,6 +571,8 @@ export const updateLocationTipSettings = createServerFn({ method: "POST" })
             kitchen_tip_rate_override: data.kitchenTipRateOverride,
             tip_pool_min_hours_override: data.tipPoolMinHoursOverride,
             kitchen_manual_only_override: data.kitchenManualOnlyOverride,
+            tip_distribution_mode_override: data.tipDistributionModeOverride,
+            tip_distribution_mode_from_override: data.tipDistributionModeFromOverride,
           })
           .eq("id", data.locationId)
           .eq("organization_id", caller.organizationId),
@@ -565,12 +591,16 @@ export const updateLocationTipSettings = createServerFn({ method: "POST" })
               kitchenTipRateOverride: loc.kitchen_tip_rate_override,
               tipPoolMinHoursOverride: loc.tip_pool_min_hours_override,
               kitchenManualOnlyOverride: loc.kitchen_manual_only_override,
+              tipDistributionModeOverride: loc.tip_distribution_mode_override,
+              tipDistributionModeFromOverride: loc.tip_distribution_mode_from_override,
             },
             after: {
               tipServicePoolEnabled: data.tipServicePoolEnabled,
               kitchenTipRateOverride: data.kitchenTipRateOverride,
               tipPoolMinHoursOverride: data.tipPoolMinHoursOverride,
               kitchenManualOnlyOverride: data.kitchenManualOnlyOverride,
+              tipDistributionModeOverride: data.tipDistributionModeOverride,
+              tipDistributionModeFromOverride: data.tipDistributionModeFromOverride,
             },
           },
         },
@@ -589,10 +619,14 @@ export const getOrgTipDefaults = createServerFn({ method: "GET" })
       kitchen_tip_rate: number | string | null;
       tip_pool_min_hours: number | string | null;
       kitchen_manual_only: boolean | null;
+      tip_distribution_mode: string | null;
+      tip_distribution_mode_from: string | null;
     }>(
       await supabaseAdmin
         .from("organization_settings")
-        .select("kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only")
+        .select(
+          "kitchen_tip_rate, tip_pool_min_hours, kitchen_manual_only, tip_distribution_mode, tip_distribution_mode_from",
+        )
         .eq("organization_id", caller.organizationId)
         .maybeSingle(),
       "getOrgTipDefaults",
@@ -601,5 +635,9 @@ export const getOrgTipDefaults = createServerFn({ method: "GET" })
       kitchenTipRate: Number(data?.kitchen_tip_rate ?? 0.02),
       tipPoolMinHours: Number(data?.tip_pool_min_hours ?? 2.5),
       kitchenManualOnly: Boolean(data?.kitchen_manual_only ?? false),
+      tipDistributionMode: (data?.tip_distribution_mode === "headcount"
+        ? "headcount"
+        : "hours") as "hours" | "headcount",
+      tipDistributionModeFrom: data?.tip_distribution_mode_from ?? null,
     };
   });

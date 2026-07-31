@@ -225,9 +225,10 @@ export async function computeLohnForStaff(
         usedDepts,
         fallbackRateCents: sfn.hourlyRateCents,
       })
-    : { rateCents: sfn.hourlyRateCents ?? 0, missingDepartments: [] };
+    : { rateCents: sfn.hourlyRateCents ?? 0, missingDepartments: [], ohneDreiMonatsBasis: false };
   const ukHourlyRateCents = ukResolution.rateCents;
   const ukMissingDepartments = ukResolution.missingDepartments;
+  const ukOhneDreiMonatsBasis = ukResolution.ohneDreiMonatsBasis;
 
   const ukZeilen = buildUrlaubKrankZeilen({
     urlaubTage: usedUrlaubTage,
@@ -236,6 +237,7 @@ export async function computeLohnForStaff(
     hourlyRateCents: ukHourlyRateCents,
     sfnTagCent: diagnose.avgSfnTagCent,
     beschaeftigung: person.beschaeftigung,
+    ohneDreiMonatsBasis: ukOhneDreiMonatsBasis,
   });
 
   const { data: recurring, error: recErr } = await supabaseAdmin
@@ -250,29 +252,63 @@ export async function computeLohnForStaff(
     betragCent: r.betrag_cent,
   }));
 
-  // LG3b 2a-iii — Zeitlohn und SFN je Bereich (Lohnart-Split). Bei
-  // Ein-Bereichs-Personen entsteht wie im Alt-Pfad genau eine Zeitlohn-Zeile
-  // und genau eine SFN-Zeile — die Baseline-Nullmessung bleibt bit-identisch
-  // (service → `zeitlohn`).
+  // SL1 — Zeitlohn-Zeilen je edlohn-SLOT (nicht je Bereich). Die Rechnung
+  // bleibt bereichsweise: Betrag je Bereich wird wie bisher einzeln gerundet
+  // und dann je Slot summiert — dadurch sind Stunden und Beträge
+  // bit-identisch zur Bereichs-Fassung. Bei identischen Sätzen ohne Mapping
+  // laufen alle Bereiche auf Slot 1 und ergeben genau EINE Zeile (edlohn-Ist,
+  // GERARD-Fall).
   const fallbackKat = zeitlohnKategorie(person.beschaeftigung);
-  const zeitlohnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
+  const isMinijob = person.beschaeftigung === "minijob";
+  const { data: slotRows, error: slotErr } = await supabaseAdmin
+    .from("staff_edlohn_slots")
+    .select("department, slot")
+    .eq("staff_id", args.staffId);
+  if (slotErr) throw slotErr;
+  const slotMapping: SlotMappingRow[] = (slotRows ?? []).map((r) => ({
+    department: r.department as Department,
+    slot: r.slot as SlotNumber,
+  }));
+  const slotResolution = resolveEdlohnSlots(
+    sfn.deptSlices.map((s) => ({
+      department: s.department,
+      paidHoursUnrounded: s.paidHours,
+      rateCents: s.rateCents,
+    })),
+    slotMapping,
+  );
+
+  type SlotGroup = {
+    slot: SlotNumber;
+    departments: Department[];
+    stunden: number;
+    betragCent: number;
+    rates: Set<number>;
+  };
+  const slotGroups = new Map<SlotNumber, SlotGroup>();
+  for (const slice of sfn.deptSlices) {
+    const slot = slotResolution.slots.get(slice.department);
+    if (slot == null) continue; // Bereich ohne Stunden
     const rate = slice.rateCents ?? 0;
-    const isMinijob = person.beschaeftigung === "minijob";
-    const label = isMinijob ? AUSHILFE_LABEL[slice.department] : ZEITLOHN_LABEL[slice.department];
-    // A3 — Kategorie je Bereich (Nicht-Minijob). Minijob bleibt bereichs-
-    // unabhängig `aushilfe_paust`; die Bereichsunterscheidung tragen die
-    // Labels. Etappe-1-Kategorien werden hierüber tatsächlich erzeugt.
-    const kategorie: Kategorie = isMinijob
-      ? "aushilfe_paust"
-      : ZEITLOHN_KATEGORIE[slice.department];
-    return {
-      kategorie,
-      bezeichnung: label,
-      betragCent: Math.round(slice.paidHours * rate),
-      stunden: slice.paidHours,
-      satzCent: rate,
-    };
-  });
+    const g =
+      slotGroups.get(slot) ??
+      ({ slot, departments: [], stunden: 0, betragCent: 0, rates: new Set<number>() } as SlotGroup);
+    g.departments.push(slice.department);
+    g.stunden = Math.round((g.stunden + slice.paidHours) * 100) / 100;
+    g.betragCent += Math.round(slice.paidHours * rate);
+    g.rates.add(rate);
+    slotGroups.set(slot, g);
+  }
+  const zeitlohnZeilen: Entgeltzeile[] = [...slotGroups.values()]
+    .sort((a, b) => a.slot - b.slot)
+    .map((g) => ({
+      kategorie: (isMinijob ? "aushilfe_paust" : slotKategorie(g.slot)) as Kategorie,
+      bezeichnung: slotLabel(g.slot, g.departments, isMinijob),
+      betragCent: g.betragCent,
+      stunden: g.stunden,
+      // Satz nur ausweisen, wenn die aggregierte Zeile genau einen Satz trägt.
+      satzCent: g.rates.size === 1 ? [...g.rates][0] : undefined,
+    }));
 
   const sfnZeilen: Entgeltzeile[] = sfn.deptSlices.map((slice) => {
     const bucket = args.mode === "extended" ? slice.extended : slice.simple;

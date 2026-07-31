@@ -980,6 +980,13 @@ export async function computeSessionTipPoolCore(
     staffDepartments,
     staffParticipates,
     minHoursPerDay: settings.tipPoolMinHours,
+    // TG4 — einziger Auflösungspunkt: Stichtag gegen den Geschäftstag der
+    // Session. Vor dem Stichtag (oder ohne) bleibt es bei "hours".
+    distributionMode: resolveTipDistributionMode(
+      session.business_date,
+      settings.distributionMode,
+      settings.distributionModeFrom,
+    ),
   });
 
   // Bei deaktivertem Service-Pool: keine Service-Shares ausweisen und

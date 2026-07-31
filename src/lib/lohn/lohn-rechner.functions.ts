@@ -74,6 +74,12 @@ function isoMinusDays(iso: string, days: number): string {
 interface UkRateResolution {
   rateCents: number;
   missingDepartments: readonly Department[];
+  /**
+   * UK1/K2 — Satz kommt aus dem Vertragssatz des Hauptbereichs, weil im
+   * 91-Tage-Fenster keine bezahlten Stunden lagen. Dann entfällt die
+   * Zuschlagszeile (3M-Ø) und die Basis-Zeilen tragen „(ohne 3M-Basis)".
+   */
+  ohneDreiMonatsBasis: boolean;
 }
 async function resolveUkHourlyRateCents(
   supabaseAdmin: SupabaseClient<Database>,
@@ -85,7 +91,11 @@ async function resolveUkHourlyRateCents(
   },
 ): Promise<UkRateResolution> {
   if (args.usedDepts.length <= 1) {
-    return { rateCents: args.fallbackRateCents ?? 0, missingDepartments: [] };
+    return {
+      rateCents: args.fallbackRateCents ?? 0,
+      missingDepartments: [],
+      ohneDreiMonatsBasis: false,
+    };
   }
 
   // Rates zum Periodenbeginn (jüngstes valid_from ≤ fromDate).
@@ -112,18 +122,29 @@ async function resolveUkHourlyRateCents(
   }));
   const weighted = computeWeightedUkRate(slots);
   if (weighted.rateCents != null) {
-    return { rateCents: weighted.rateCents, missingDepartments: [] };
+    return { rateCents: weighted.rateCents, missingDepartments: [], ohneDreiMonatsBasis: false };
   }
   if (weighted.reason === "missing_rate") {
     // LG-9-c: Anzeige 0 € + Export-Blocker über die zurückgemeldeten
     // Bereiche. Kein stiller Fallback — die fehlenden Bereiche werden
     // sichtbar gemacht.
-    return { rateCents: 0, missingDepartments: weighted.missingDepartments ?? [] };
+    return {
+      rateCents: 0,
+      missingDepartments: weighted.missingDepartments ?? [],
+      ohneDreiMonatsBasis: false,
+    };
   }
-  // no_hours — Bauherren-Entscheidung ausstehend. §104-Halt: klar fehlschlagen.
-  throw new Error(
-    "U/K-Satz nicht bestimmbar: keine bezahlten Stunden im Referenzfenster — Bauherren-Entscheidung ausstehend",
-  );
+  // UK1 — `no_hours` (Neueintritt, Langzeit-Abwesenheit): Rückfall auf den
+  // VERTRAGSSATZ des Hauptbereichs (WZ1-Priorität gl > kitchen > service),
+  // aufgelöst zum Periodenbeginn. Kein §104-Halt mehr, aber auch kein
+  // stiller 0-€-Wert: fehlt auch dieser Satz, bleibt es beim Blocker
+  // `missing_rate` über `missingDepartments`.
+  const hauptbereich = primaryDepartment(args.usedDepts);
+  const vertragssatz = resolveRateCents(rates, hauptbereich, args.fromDate);
+  if (vertragssatz == null) {
+    return { rateCents: 0, missingDepartments: [hauptbereich], ohneDreiMonatsBasis: true };
+  }
+  return { rateCents: vertragssatz, missingDepartments: [], ohneDreiMonatsBasis: true };
 }
 
 /**

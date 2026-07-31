@@ -103,11 +103,10 @@ export const setStaffEdlohnSlot = createServerFn({ method: "POST" })
             .eq("organization_id", caller.organizationId);
           if (error) throw new Error(error.message);
           return {
-            result: { ok: true as const },
+            result: { ok: true as const, id: undefined as string | undefined },
             audit: {
               action: "staff_edlohn_slot.delete",
               entity: "staff_edlohn_slots",
-              entityId: null,
               meta: { staff_id: data.staffId, department: data.department },
             },
           };

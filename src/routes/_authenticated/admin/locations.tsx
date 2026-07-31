@@ -669,6 +669,13 @@ function LocationSectionPanel(props: {
             loc.kitchen_manual_only_override == null
               ? null
               : Boolean(loc.kitchen_manual_only_override),
+          tipDistributionModeOverride:
+            loc.tip_distribution_mode_override === "headcount"
+              ? "headcount"
+              : loc.tip_distribution_mode_override === "hours"
+                ? "hours"
+                : null,
+          tipDistributionModeFromOverride: loc.tip_distribution_mode_from_override ?? null,
         }}
         onSaved={props.onGeoChanged}
       />

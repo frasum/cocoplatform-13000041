@@ -535,6 +535,7 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
       )}
 
       {canEdit && <CompensationRatesSection staffId={staffId} />}
+      {canEdit && <EdlohnSlotsSection staffId={staffId} />}
     </div>
   );
 }

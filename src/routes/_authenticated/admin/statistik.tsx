@@ -480,6 +480,17 @@ function StatistikPage() {
       dailyRevenue: rev.daily.map((d) => ({
         businessDate: d.businessDate,
         totalCents: d.totalCents,
+        // STAT3c — im Gesamt-Scope die Standort-Anteile je Geschäftstag für die
+        // gestapelten Balken; die Tageswerte je Standort liegen bereits vor
+        // (revQueries), keine neue Abfrage. Fehlender Tag je Standort = 0.
+        ...(locationFilter === "all" && dailyByLocation.length > 0
+          ? {
+              byLocation: dailyByLocation.map((s) => ({
+                name: s.name,
+                cents: s.byDate.get(d.businessDate) ?? 0,
+              })),
+            }
+          : {}),
       })),
       // STAT2 — gleiche Quelle wie die Kacheln/das Panel; keine eigene Summierung.
       guestHours: {

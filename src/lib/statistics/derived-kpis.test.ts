@@ -22,7 +22,8 @@ describe("derivedKpis (STAT2)", () => {
       workMinutes: 600,
     });
     expect(k.revenuePerGuestCents).toBeNull();
-    expect(k.revenuePerWorkHourCents).toBe(2_000_00);
+    // 200.000 Cent auf 10 h ⇒ 20.000 Cent je Stunde
+    expect(k.revenuePerWorkHourCents).toBe(20_000);
   });
 
   it("0 Arbeitsminuten ⇒ null", () => {

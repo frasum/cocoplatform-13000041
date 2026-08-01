@@ -1701,34 +1701,14 @@ function LeadDeltaLine({ text, tone }: { text: string; tone: "up" | "down" | "ne
   );
 }
 
-function ShareBar({ a, b, aPct, bPct }: { a: string; b: string; aPct: number; bPct: number }) {
-  return (
-    <div>
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className="h-full bg-chart-1"
-          style={{ width: `${aPct}%` }}
-          aria-label={`${a} Anteil ${aPct} %`}
-        />
-        <div
-          className="h-full bg-chart-2"
-          style={{ width: `${bPct}%` }}
-          aria-label={`${b} Anteil ${bPct} %`}
-        />
-      </div>
-      <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-        <span>{aPct} %</span>
-        <span>{bPct} %</span>
-      </div>
-    </div>
-  );
-}
-
 /**
  * Niveau-Balken für Verhältniszahlen (€ je Gast, € je Arbeitsstunde):
  * zwei getrennte Balken, jeweils skaliert am größeren der beiden Werte.
  * Bewusst KEIN Anteils-Balken — ein „Anteil" wäre bei Dichte-Kennzahlen
  * irreführend. Fehlende Werte (null) ⇒ leerer Balken.
+ *
+ * Bei Summen-Kacheln wird zusätzlich der Anteil je Zeile eingeblendet
+ * (`aPct`/`bPct`) — dort ist ein Anteil sachlich zulässig.
  */
 function LevelBar({
   a,
@@ -1736,18 +1716,22 @@ function LevelBar({
   aValue,
   bValue,
   format,
+  aPct,
+  bPct,
 }: {
   a: string;
   b: string;
   aValue: number | null;
   bValue: number | null;
   format: (value: number) => string;
+  aPct?: number;
+  bPct?: number;
 }) {
   const max = Math.max(aValue ?? 0, bValue ?? 0);
   const widthOf = (v: number | null) => (max > 0 && v !== null ? (v / max) * 100 : 0);
-  const rows: Array<{ name: string; value: number | null; cls: string }> = [
-    { name: a, value: aValue, cls: "bg-chart-1" },
-    { name: b, value: bValue, cls: "bg-chart-2" },
+  const rows: Array<{ name: string; value: number | null; cls: string; pct?: number }> = [
+    { name: a, value: aValue, cls: "bg-chart-1", pct: aPct },
+    { name: b, value: bValue, cls: "bg-chart-2", pct: bPct },
   ];
   return (
     <div className="space-y-1.5">
@@ -1760,6 +1744,11 @@ function LevelBar({
               aria-label={`${row.name}: ${row.value === null ? "—" : format(row.value)}`}
             />
           </div>
+          {row.pct !== undefined ? (
+            <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+              {row.pct} %
+            </span>
+          ) : null}
           <span className="w-20 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
             {row.value === null ? "—" : format(row.value)}
           </span>
@@ -1883,7 +1872,15 @@ function SumCompareCard({
           />
         </div>
         <LeadDeltaLine text={lead.text} tone={lead.tone} />
-        <ShareBar a={a.name} b={b.name} aPct={aPct} bPct={100 - aPct} />
+        <LevelBar
+          a={a.name}
+          b={b.name}
+          aValue={av}
+          bValue={bv}
+          format={format}
+          aPct={aPct}
+          bPct={100 - aPct}
+        />
       </CardContent>
     </Card>
   );

@@ -4,6 +4,12 @@
 // Fehlende / leere Datenfelder werden NICHT als leerer String eingesetzt,
 // sondern lassen den Platzhalter im Text sichtbar (und listen ihn als
 // unresolved). Cents → "13,50 €"; Datum "1995-03-07" → "07.03.1995".
+//
+// DL2 — zwei Platzhalter-Kategorien:
+//   * "stammdaten" (Default): kommt aus DB-Daten (staff/details/org/location).
+//   * "vorgang": gehört zum Einzelfall, nicht zur Person (z. B. Fehltag einer
+//     Abmahnung). Wird beim Generieren im Dialog erfasst und als Wert in die
+//     Auflösung injiziert. Der Kern bleibt pure — keine Eingabe-Logik hier.
 
 export type PlaceholderKey =
   | "vorname"
@@ -26,7 +32,21 @@ export type PlaceholderKey =
   | "arbeitgeber_adresse"
   | "arbeitgeber_vertreter"
   | "standort"
-  | "heute";
+  | "heute"
+  | "fehltag";
+
+export type PlaceholderCategory = "stammdaten" | "vorgang";
+export type PlaceholderInputKind = "date" | "text";
+
+export type PlaceholderCatalogEntry = {
+  key: PlaceholderKey;
+  label: string;
+  description: string;
+  /** Default "stammdaten", wenn nicht gesetzt. */
+  category?: PlaceholderCategory;
+  /** Nur für Kategorie "vorgang" relevant; Default "text". */
+  input?: PlaceholderInputKind;
+};
 
 export const PLACEHOLDER_CATALOG = [
   { key: "vorname", label: "Vorname", description: "Vorname des Mitarbeiters" },
@@ -67,7 +87,61 @@ export const PLACEHOLDER_CATALOG = [
   },
   { key: "standort", label: "Standort", description: "Name des Haupt-Standorts (falls eindeutig)" },
   { key: "heute", label: "Heutiges Datum", description: "Aktuelles Datum, dd.MM.yyyy" },
-] as const satisfies ReadonlyArray<{ key: PlaceholderKey; label: string; description: string }>;
+  {
+    key: "fehltag",
+    label: "Fehltag",
+    description: "Datum des unentschuldigten Fehlens — Eingabe beim Generieren, dd.MM.yyyy",
+    category: "vorgang",
+    input: "date",
+  },
+] as const satisfies ReadonlyArray<PlaceholderCatalogEntry>;
+
+export function placeholderCategory(entry: PlaceholderCatalogEntry): PlaceholderCategory {
+  return entry.category ?? "stammdaten";
+}
+
+/** Alle Vorgangs-Platzhalter des Katalogs (Reihenfolge = Katalog-Reihenfolge). */
+export const VORGANG_PLACEHOLDERS: ReadonlyArray<PlaceholderCatalogEntry> =
+  PLACEHOLDER_CATALOG.filter((p) => placeholderCategory(p) === "vorgang");
+
+/** Vorgangs-Platzhalter, die im übergebenen Template-Text vorkommen. */
+export function vorgangPlaceholdersInTemplate(
+  content: string,
+): ReadonlyArray<PlaceholderCatalogEntry> {
+  const used = new Set(listPlaceholdersInTemplate(content));
+  return VORGANG_PLACEHOLDERS.filter((p) => used.has(p.key));
+}
+
+/**
+ * Formatiert erfasste Vorgangswerte für die Auflösung. Datums-Platzhalter
+ * kommen als ISO ("2026-07-18") und werden zu "18.07.2026". Leere oder
+ * unparsbare Werte landen in `missing` (→ Aufrufer blockiert das Generieren).
+ */
+export function resolveVorgangValues(
+  raw: Readonly<Record<string, string | null | undefined>>,
+  required: ReadonlyArray<PlaceholderCatalogEntry>,
+): { values: Record<string, string>; missing: string[] } {
+  const values: Record<string, string> = {};
+  const missing: string[] = [];
+  for (const entry of required) {
+    const v = nonEmpty(raw[entry.key]);
+    if (v === null) {
+      missing.push(entry.key);
+      continue;
+    }
+    if ((entry.input ?? "text") === "date") {
+      const formatted = formatDateDe(v);
+      if (formatted === null) {
+        missing.push(entry.key);
+        continue;
+      }
+      values[entry.key] = formatted;
+      continue;
+    }
+    values[entry.key] = v;
+  }
+  return { values, missing };
+}
 
 function formatDateDe(iso: string | null | undefined): string | null {
   if (!iso) return null;
@@ -120,6 +194,8 @@ export type PlaceholderInput = {
   } | null;
   location: { name?: string | null } | null;
   today: string; // ISO YYYY-MM-DD; injiziert vom Aufrufer
+  /** DL2 — bereits formatierte Vorgangswerte (siehe resolveVorgangValues). */
+  vorgang?: Readonly<Record<string, string>>;
 };
 
 export function buildPlaceholderData(input: PlaceholderInput): Record<string, string> {
@@ -162,7 +238,12 @@ export function buildPlaceholderData(input: PlaceholderInput): Record<string, st
   put("standort", nonEmpty(input.location?.name));
   put("heute", formatDateDe(input.today));
 
-  return out as Record<string, string>;
+  const merged: Record<string, string> = { ...(out as Record<string, string>) };
+  for (const [k, v] of Object.entries(input.vorgang ?? {})) {
+    const clean = nonEmpty(v);
+    if (clean !== null) merged[k] = clean;
+  }
+  return merged;
 }
 
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;

@@ -3,6 +3,9 @@ import {
   buildPlaceholderData,
   fillTemplate,
   listPlaceholdersInTemplate,
+  resolveVorgangValues,
+  vorgangPlaceholdersInTemplate,
+  VORGANG_PLACEHOLDERS,
   type PlaceholderInput,
 } from "./document-placeholders";
 
@@ -85,5 +88,54 @@ describe("fillTemplate", () => {
 describe("listPlaceholdersInTemplate", () => {
   it("liefert deduplizierte Keys in Reihenfolge", () => {
     expect(listPlaceholdersInTemplate("{{a}} {{b}} {{a}}")).toEqual(["a", "b"]);
+  });
+});
+
+// ── DL2 — Vorgangsbezogene Platzhalter ─────────────────────────────────────
+
+describe("DL2 Vorgangs-Platzhalter", () => {
+  const baseInput = {
+    staff: { first_name: "Ada", last_name: "Lovelace" },
+    details: null,
+    compensation: null,
+    organization: null,
+    location: null,
+    today: "2026-08-01",
+  } as const;
+
+  it("kategorisiert fehltag als Vorgang und findet ihn im Template", () => {
+    expect(VORGANG_PLACEHOLDERS.map((p) => p.key)).toEqual(["fehltag"]);
+    const found = vorgangPlaceholdersInTemplate("am {{fehltag}} gefehlt, {{nachname}}");
+    expect(found.map((p) => p.key)).toEqual(["fehltag"]);
+    expect(found[0].input).toBe("date");
+  });
+
+  it("löst {{fehltag}} mit injiziertem Wert im dd.MM.yyyy-Format auf", () => {
+    const required = vorgangPlaceholdersInTemplate("am {{fehltag}}");
+    const { values, missing } = resolveVorgangValues({ fehltag: "2026-07-18" }, required);
+    expect(missing).toEqual([]);
+    expect(values.fehltag).toBe("18.07.2026");
+    const data = buildPlaceholderData({ ...baseInput, vorgang: values });
+    const res = fillTemplate("am {{fehltag}} ({{nachname}})", data);
+    expect(res.text).toBe("am 18.07.2026 (Lovelace)");
+    expect(res.unresolved).toEqual([]);
+  });
+
+  it("meldet fehlende/unparsbare Vorgangswerte und listet den Platzhalter als unresolved", () => {
+    const required = vorgangPlaceholdersInTemplate("am {{fehltag}}");
+    expect(resolveVorgangValues({}, required).missing).toEqual(["fehltag"]);
+    expect(resolveVorgangValues({ fehltag: "   " }, required).missing).toEqual(["fehltag"]);
+    expect(resolveVorgangValues({ fehltag: "18.07.2026" }, required).missing).toEqual(["fehltag"]);
+    const data = buildPlaceholderData(baseInput);
+    expect(fillTemplate("am {{fehltag}}", data).unresolved).toEqual(["fehltag"]);
+  });
+
+  it("Regressionsschutz: Auflösung ohne Vorgangswerte bleibt unverändert", () => {
+    const withUndef = buildPlaceholderData({ ...baseInput, vorgang: undefined });
+    const without = buildPlaceholderData(baseInput);
+    expect(withUndef).toEqual(without);
+    expect(fillTemplate("{{vorname}} {{nachname}}, {{heute}}", without).text).toBe(
+      "Ada Lovelace, 01.08.2026",
+    );
   });
 });

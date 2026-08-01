@@ -22,16 +22,19 @@ import {
   type GeneratedDocumentRow,
 } from "@/lib/dokumente/dokumente.functions";
 import { AdminDocumentUpload } from "@/components/admin/AdminDocumentUpload";
+import { vorgangPlaceholdersInTemplate } from "@/lib/dokumente/document-placeholders";
 
 const DOC_TYPE_LABEL: Record<DocType, string> = {
   arbeitsvertrag: "Arbeitsvertrag",
   arbeitszeugnis_einfach: "Arbeitszeugnis (einfach)",
   arbeitsbescheinigung: "Arbeitsbescheinigung",
+  abmahnung: "Abmahnung",
 };
 const DOC_TYPE_ORDER: DocType[] = [
   "arbeitsvertrag",
   "arbeitszeugnis_einfach",
   "arbeitsbescheinigung",
+  "abmahnung",
 ];
 
 function escapeHtml(s: string): string {
@@ -172,18 +175,33 @@ function GenerationAssistent({
   const [forceSave, setForceSave] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  // DL2 — vorgangsbezogene Eingaben (generisch, je Katalog-Eintrag).
+  const [vorgang, setVorgang] = useState<Record<string, string>>({});
+  const selectedTemplate = useMemo(
+    () => templatesForType.find((t) => t.id === templateId) ?? null,
+    [templatesForType, templateId],
+  );
+  const vorgangFields = useMemo(
+    () => (selectedTemplate ? vorgangPlaceholdersInTemplate(selectedTemplate.content) : []),
+    [selectedTemplate],
+  );
+  const vorgangMissing = useMemo(
+    () => vorgangFields.filter((f) => (vorgang[f.key] ?? "").trim() === ""),
+    [vorgangFields, vorgang],
+  );
 
   useEffect(() => {
     setPreview(null);
     setForceSave(false);
     setErr(null);
     setMsg(null);
+    setVorgang({});
     const tpl = templatesForType.find((t) => t.id === templateId);
     setTitle(tpl ? `${tpl.name} — ${staffName}` : "");
   }, [templateId, templatesForType, staffName]);
 
   const previewMut = useMutation({
-    mutationFn: () => callPreview({ data: { staffId, templateId } }),
+    mutationFn: () => callPreview({ data: { staffId, templateId, vorgang } }),
     onSuccess: (res) => {
       setPreview(res);
       setErr(null);
@@ -197,7 +215,7 @@ function GenerationAssistent({
       if (!preview) throw new Error("Keine Vorschau vorhanden.");
       if (!title.trim()) throw new Error("Titel ist Pflicht.");
       return callSave({
-        data: { staffId, templateId, title: title.trim(), content: preview.text },
+        data: { staffId, templateId, title: title.trim(), content: preview.text, vorgang },
       });
     },
     onSuccess: async () => {
@@ -220,7 +238,8 @@ function GenerationAssistent({
   }
 
   const unresolvedCount = preview?.unresolved.length ?? 0;
-  const canSave = preview !== null && (unresolvedCount === 0 || forceSave);
+  const canSave =
+    preview !== null && vorgangMissing.length === 0 && (unresolvedCount === 0 || forceSave);
 
   return (
     <div className="space-y-4">
@@ -255,6 +274,29 @@ function GenerationAssistent({
         </label>
       </div>
 
+      {vorgangFields.length > 0 && (
+        <div className="grid gap-3 rounded-md border border-border bg-background p-3 sm:grid-cols-2">
+          {vorgangFields.map((f) => (
+            <label key={f.key} className="block space-y-1">
+              <span className="text-xs font-medium text-muted-foreground">
+                {f.label} <span className="text-destructive">*</span>
+              </span>
+              <input
+                type={f.input === "date" ? "date" : "text"}
+                value={vorgang[f.key] ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setVorgang((prev) => ({ ...prev, [f.key]: v }));
+                  setPreview(null);
+                }}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+              <span className="text-[10px] text-muted-foreground">{f.description}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -263,11 +305,16 @@ function GenerationAssistent({
             setMsg(null);
             previewMut.mutate();
           }}
-          disabled={!templateId || previewMut.isPending}
+          disabled={!templateId || vorgangMissing.length > 0 || previewMut.isPending}
           className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent disabled:opacity-50"
         >
           {previewMut.isPending ? "Erzeuge…" : "Vorschau"}
         </button>
+        {vorgangMissing.length > 0 && (
+          <p className="self-center text-xs text-muted-foreground">
+            Pflichtangabe fehlt: {vorgangMissing.map((f) => f.label).join(", ")}
+          </p>
+        )}
       </div>
 
       {err && <p className="text-sm text-destructive">{err}</p>}

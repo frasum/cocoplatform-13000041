@@ -14,13 +14,20 @@ import {
   buildPlaceholderData,
   fillTemplate,
   listPlaceholdersInTemplate,
+  resolveVorgangValues,
+  vorgangPlaceholdersInTemplate,
   type PlaceholderInput,
 } from "./document-placeholders";
 import { formatWageLines, resolveWageLines } from "./wage-lines";
 import type { RateRow } from "@/lib/lohn/rate-resolution";
 import type { Department } from "@/lib/time/primary-department";
 
-const DOC_TYPES = ["arbeitsvertrag", "arbeitszeugnis_einfach", "arbeitsbescheinigung"] as const;
+const DOC_TYPES = [
+  "arbeitsvertrag",
+  "arbeitszeugnis_einfach",
+  "arbeitsbescheinigung",
+  "abmahnung",
+] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 
 export type DocumentTemplateRow = {
@@ -185,6 +192,28 @@ export const updateTemplate = createServerFn({ method: "POST" })
 
 // ── Data-Loading + Preview + Save ──────────────────────────────────────────
 
+// DL2 — Vorgangswerte (Einzelfall-Eingaben aus dem Generieren-Dialog).
+const vorgangSchema = z.record(z.string(), z.string()).optional();
+
+/**
+ * Prüft die Vorgangs-Platzhalter des Templates und liefert die formatierten
+ * Werte. Fehlt eine Pflicht-Eingabe, wird abgelehnt — ein Dokument mit
+ * sichtbarem {{fehltag}} darf nie entstehen.
+ */
+function resolveVorgangOrThrow(
+  templateContent: string,
+  raw: Record<string, string> | undefined,
+): Record<string, string> {
+  const required = vorgangPlaceholdersInTemplate(templateContent);
+  if (required.length === 0) return {};
+  const { values, missing } = resolveVorgangValues(raw ?? {}, required);
+  if (missing.length > 0) {
+    const labels = missing.map((k) => required.find((p) => p.key === k)?.label ?? k);
+    throw new Error(`Pflichtangabe fehlt: ${labels.join(", ")}`);
+  }
+  return values;
+}
+
 async function loadPlaceholderInput(
   organizationId: string,
   staffId: string,
@@ -264,7 +293,13 @@ async function loadPlaceholderInput(
 export const previewDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ staffId: z.string().uuid(), templateId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        staffId: z.string().uuid(),
+        templateId: z.string().uuid(),
+        vorgang: vorgangSchema,
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }): Promise<DocumentPreview> => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
@@ -280,7 +315,8 @@ export const previewDocument = createServerFn({ method: "POST" })
     if (!tpl) throw new Error("Template nicht gefunden.");
 
     const input = await loadPlaceholderInput(caller.organizationId, data.staffId);
-    const values = buildPlaceholderData(input);
+    const vorgang = resolveVorgangOrThrow(tpl.content, data.vorgang);
+    const values = buildPlaceholderData({ ...input, vorgang });
     return fillTemplate(tpl.content, values);
   });
 
@@ -306,12 +342,21 @@ export const saveGeneratedDocument = createServerFn({ method: "POST" })
 
       const { data: tpl, error: tErr } = await supabaseAdmin
         .from("document_templates")
-        .select("id, doc_type")
+        .select("id, doc_type, content")
         .eq("id", data.templateId)
         .eq("organization_id", caller.organizationId)
         .maybeSingle();
       if (tErr) throw tErr;
       if (!tpl) throw new Error("Template nicht gefunden.");
+
+      // DL2 — Vorgangs-Platzhalter sind Pflicht: ohne Wert kein Dokument.
+      const requiredVorgang = vorgangPlaceholdersInTemplate(tpl.content);
+      if (requiredVorgang.length > 0) {
+        const stillOpen = requiredVorgang.filter((p) => data.content.includes(`{{${p.key}}}`));
+        if (stillOpen.length > 0) {
+          throw new Error(`Pflichtangabe fehlt: ${stillOpen.map((p) => p.label).join(", ")}`);
+        }
+      }
 
       const { data: staff, error: sErr } = await supabaseAdmin
         .from("staff")

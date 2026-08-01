@@ -16,17 +16,21 @@ import {
 import {
   PLACEHOLDER_CATALOG,
   listPlaceholdersInTemplate,
+  placeholderCategory,
 } from "@/lib/dokumente/document-placeholders";
+import { DEFAULT_TEMPLATE_CONTENT } from "@/lib/dokumente/default-templates";
 
 const DOC_TYPE_LABEL: Record<DocType, string> = {
   arbeitsvertrag: "Arbeitsvertrag",
   arbeitszeugnis_einfach: "Arbeitszeugnis (einfach)",
   arbeitsbescheinigung: "Arbeitsbescheinigung",
+  abmahnung: "Abmahnung",
 };
 const DOC_TYPE_ORDER: DocType[] = [
   "arbeitsvertrag",
   "arbeitszeugnis_einfach",
   "arbeitsbescheinigung",
+  "abmahnung",
 ];
 
 const CATALOG_KEYS = new Set<string>(PLACEHOLDER_CATALOG.map((p) => p.key));
@@ -175,7 +179,9 @@ function TemplateEditor({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [name, setName] = useState(initial?.name ?? "");
   const [docType, setDocType] = useState<DocType>(initial?.docType ?? "arbeitsvertrag");
-  const [content, setContent] = useState(initial?.content ?? "");
+  const [content, setContent] = useState(
+    initial?.content ?? DEFAULT_TEMPLATE_CONTENT[initial?.docType ?? "arbeitsvertrag"] ?? "",
+  );
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
   const [err, setErr] = useState<string | null>(null);
 
@@ -254,7 +260,14 @@ function TemplateEditor({
               <span className="text-xs font-medium text-muted-foreground">Typ</span>
               <select
                 value={docType}
-                onChange={(e) => setDocType(e.target.value as DocType)}
+                onChange={(e) => {
+                  const next = e.target.value as DocType;
+                  setDocType(next);
+                  // Starter-Text nur bei NEUER Vorlage und leerem Inhaltsfeld.
+                  if (!initial && content.trim() === "") {
+                    setContent(DEFAULT_TEMPLATE_CONTENT[next] ?? "");
+                  }
+                }}
                 disabled={!!initial}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60"
               >
@@ -365,6 +378,11 @@ function TemplateEditor({
                   >
                     <span className="text-foreground">{p.label}</span>
                     <span className="ml-1 text-muted-foreground">{`{{${p.key}}}`}</span>
+                    {placeholderCategory(p) === "vorgang" && (
+                      <span className="ml-1 rounded bg-accent px-1 text-[10px] text-muted-foreground">
+                        Vorgang
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}

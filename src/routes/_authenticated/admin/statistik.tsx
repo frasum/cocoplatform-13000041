@@ -1344,6 +1344,21 @@ function LocationCompareSection({
         guestCount: rev.guestTotal,
         workMinutes: rev.workMinutesTotal,
       });
+      // STAT2c — Vormonat: Summen kommen fertig aus den Server-Fns
+      // (`previous`, `previousDerived`, `previous.daysWithRevenue`).
+      const prevRev = rev.previous;
+      const prevDays = prevRev?.daysWithRevenue ?? 0;
+      const prevTip = tip.previous;
+      const prevTipTotal = prevTip?.totalCents ?? null;
+      const prevKpis =
+        prevRev && rev.previousDerived
+          ? derivedKpis({
+              houseCents: prevRev.houseCents,
+              totalCents: prevRev.totalCents,
+              guestCount: rev.previousDerived.guestTotal,
+              workMinutes: rev.previousDerived.workMinutesTotal,
+            })
+          : null;
       list.push({
         id: loc.id,
         name: loc.name,
@@ -1359,6 +1374,20 @@ function LocationCompareSection({
         workMinutesTotal: rev.workMinutesTotal,
         revenuePerGuestCents: kpis.revenuePerGuestCents,
         revenuePerWorkHourCents: kpis.revenuePerWorkHourCents,
+        previousRange: rev.previousRange,
+        previousPartial: rev.coverage.isPartial,
+        prevTotalCents: prevRev?.totalCents ?? null,
+        prevAvgDailyCents:
+          prevRev && prevDays > 0 ? Math.round(prevRev.totalCents / prevDays) : null,
+        prevTakeawayCents: prevRev?.takeawayCents ?? null,
+        prevKitchenTipCents: prevTip?.kitchenCents ?? null,
+        prevServiceTipCents: prevTip?.serviceCents ?? null,
+        prevAvgTipPerDayCents:
+          prevTipTotal !== null && prevDays > 0 ? Math.round(prevTipTotal / prevDays) : null,
+        prevGuestTotal: rev.previousDerived?.guestTotal ?? null,
+        prevWorkMinutesTotal: rev.previousDerived?.workMinutesTotal ?? null,
+        prevRevenuePerGuestCents: prevKpis?.revenuePerGuestCents ?? null,
+        prevRevenuePerWorkHourCents: prevKpis?.revenuePerWorkHourCents ?? null,
       });
     });
     return list;

@@ -3,13 +3,14 @@
 // `berechneLohnFuerMitarbeiter` (read-only) und zeigt Zeilen, Person und
 // Ergebnis tabellarisch an, damit Frank Zeile für Zeile gegen edlohn vergleichen kann.
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { todayIso } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,6 +32,9 @@ import {
   berechneLohnFuerMitarbeiter,
   berechneLohnUebersicht,
 } from "@/lib/lohn/lohn-rechner.functions";
+import { saveAbsenceDays } from "@/lib/lohn/lohn-absence.functions";
+import { MAX_ABSENCE_TAGE } from "@/lib/lohn/absence-days";
+import { useAuth } from "@/hooks/use-auth";
 import { buildLohnFileName, buildLohnXlsx, downloadBlob } from "@/lib/lohn/lohn-excel-export";
 import {
   buildLohnZip,
@@ -74,6 +78,10 @@ function defaultFromTo(): { from: string; to: string } {
 
 export function LohnrechnerPanel() {
   const def = useMemo(defaultFromTo, []);
+  const qc = useQueryClient();
+  const { identity } = useAuth();
+  // UK2 — Schreibrecht wie in der Server-Function: admin + payroll.
+  const canEditAbsence = identity?.role === "admin" || identity?.role === "payroll";
   const periodsCallFn = useServerFn(listPeriods);
   const periodsQ = useQuery({
     queryKey: ["lohn-periods"],
@@ -494,6 +502,21 @@ export function LohnrechnerPanel() {
             </div>
           </Card>
 
+          {canEditAbsence && (
+            <AbsenceDaysCard
+              staffId={staffId}
+              periodStart={fromDate}
+              usedUrlaubTage={result.usedUrlaubTage}
+              usedKrankTage={result.usedKrankTage}
+              estUrlaubTage={result.diagnose.urlaubTage}
+              estKrankTage={result.diagnose.krankTage}
+              onSaved={() => {
+                void qc.invalidateQueries({ queryKey: ["lohn-uebersicht"] });
+                mut.mutate(staffId);
+              }}
+            />
+          )}
+
           <Card className="p-4">
             <h2 className="mb-3 text-base font-semibold">Entgeltzeilen</h2>
             <Table>
@@ -553,6 +576,109 @@ function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
       <span className="text-muted-foreground">{k}</span>
       <span className={"tabular-nums " + (strong ? "font-semibold text-foreground" : "")}>{v}</span>
     </div>
+  );
+}
+
+/**
+ * UK2 — Erfassung der harten U/K-Tage der gewählten Periode. Die Felder sind
+ * mit den gespeicherten Werten vorbelegt; der Kalender-Vorschlag füllt nur
+ * die Felder (gespeichert wird erst per Knopf). 0/0 speichern = löschen.
+ */
+function AbsenceDaysCard({
+  staffId,
+  periodStart,
+  usedUrlaubTage,
+  usedKrankTage,
+  estUrlaubTage,
+  estKrankTage,
+  onSaved,
+}: {
+  staffId: string;
+  periodStart: string;
+  usedUrlaubTage: number;
+  usedKrankTage: number;
+  estUrlaubTage: number;
+  estKrankTage: number;
+  onSaved: () => void;
+}) {
+  const [urlaub, setUrlaub] = useState<string>(String(usedUrlaubTage));
+  const [krank, setKrank] = useState<string>(String(usedKrankTage));
+
+  useEffect(() => {
+    setUrlaub(String(usedUrlaubTage));
+    setKrank(String(usedKrankTage));
+  }, [staffId, periodStart, usedUrlaubTage, usedKrankTage]);
+
+  const saveFn = useServerFn(saveAbsenceDays);
+  const save = useMutation({
+    mutationFn: () =>
+      saveFn({
+        data: {
+          staffId,
+          periodStart,
+          urlaubTage: Number(urlaub || 0),
+          krankTage: Number(krank || 0),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("U/K-Tage gespeichert.");
+      onSaved();
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen."),
+  });
+
+  return (
+    <Card className="space-y-3 p-4">
+      <h2 className="text-base font-semibold">U/K-Tage (Abrechnung)</h2>
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="uk-urlaub">Urlaubstage</Label>
+          <Input
+            id="uk-urlaub"
+            type="number"
+            min={0}
+            max={MAX_ABSENCE_TAGE}
+            step={1}
+            className="w-28"
+            value={urlaub}
+            onChange={(e) => setUrlaub(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="uk-krank">Kranktage</Label>
+          <Input
+            id="uk-krank"
+            type="number"
+            min={0}
+            max={MAX_ABSENCE_TAGE}
+            step={1}
+            className="w-28"
+            value={krank}
+            onChange={(e) => setKrank(e.target.value)}
+          />
+        </div>
+        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? "Speichere…" : "Speichern"}
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>
+          Vorschlag aus Kalender: U {estUrlaubTage} / K {estKrankTage}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setUrlaub(String(estUrlaubTage));
+            setKrank(String(estKrankTage));
+          }}
+        >
+          Übernehmen
+        </Button>
+        <span>0 / 0 speichern entfernt die Vorgabe.</span>
+      </div>
+    </Card>
   );
 }
 

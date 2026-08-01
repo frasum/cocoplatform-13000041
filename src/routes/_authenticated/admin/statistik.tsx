@@ -7,6 +7,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   Area,
+  Bar,
   CartesianGrid,
   Cell,
   ComposedChart,
@@ -39,6 +40,7 @@ import { personnelRatioPct } from "@/lib/statistics/personnel-core";
 import {
   checkDonutSegments,
   computeChannelPercents,
+  derivedKpis,
   takeawayDonutSegments,
 } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
@@ -554,6 +556,31 @@ function StatsView({ data }: { data: RevenueStats }) {
   const cmp = formatComparisonRange(data.previousRange, { partial: data.coverage.isPartial });
   const hasDaily = data.daily.length > 0;
   const hasTakeaway = data.takeawayByChannel.length > 0 && data.summary.takeawayCents > 0;
+  // STAT2 — Kennzahlen kommen aus der reinen Funktion; die UI rechnet nicht.
+  const kpis = derivedKpis({
+    houseCents: data.summary.houseCents,
+    totalCents: data.summary.totalCents,
+    guestCount: data.guestTotal,
+    workMinutes: data.workMinutesTotal,
+  });
+  const prevKpis =
+    data.previous && data.previousDerived
+      ? derivedKpis({
+          houseCents: data.previous.houseCents,
+          totalCents: data.previous.totalCents,
+          guestCount: data.previousDerived.guestTotal,
+          workMinutes: data.previousDerived.workMinutesTotal,
+        })
+      : null;
+  // Trend nur, wenn BEIDE Fenster einen validen Nenner haben.
+  const guestTrend =
+    kpis.revenuePerGuestCents !== null && prevKpis?.revenuePerGuestCents != null
+      ? computeTrendClient(kpis.revenuePerGuestCents, prevKpis.revenuePerGuestCents)
+      : null;
+  const hourTrend =
+    kpis.revenuePerWorkHourCents !== null && prevKpis?.revenuePerWorkHourCents != null
+      ? computeTrendClient(kpis.revenuePerWorkHourCents, prevKpis.revenuePerWorkHourCents)
+      : null;
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
@@ -577,11 +604,45 @@ function StatsView({ data }: { data: RevenueStats }) {
         />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <KpiCard
+          title="Ø Umsatz je Gast"
+          unit="eurOrDash"
+          value={kpis.revenuePerGuestCents}
+          trend={guestTrend}
+          comparisonLabel={cmp}
+          caption={`${data.guestTotal.toLocaleString("de-DE")} Gäste`}
+        />
+        <KpiCard
+          title="Umsatz je Arbeitsstunde"
+          unit="eurOrDash"
+          value={kpis.revenuePerWorkHourCents}
+          trend={hourTrend}
+          comparisonLabel={cmp}
+          caption={`${kpis.workHours.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h erfasst`}
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Umsatzverlauf</CardTitle>
         </CardHeader>
         <CardContent>{hasDaily ? <RevenueChart daily={data.daily} /> : <EmptyChart />}</CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Gäste &amp; Arbeitsstunden</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasDaily ? (
+            <GuestHoursChart daily={data.daily} />
+          ) : (
+            <div className="flex h-[280px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
+              Keine Daten in diesem Zeitraum.
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       <Card>

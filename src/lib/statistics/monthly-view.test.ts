@@ -91,3 +91,25 @@ describe("viewHeadline", () => {
     expect(projectCells(cells, "total")).toEqual(cells);
   });
 });
+
+describe("MB3 — chartValues blenden laufende Monate aus", () => {
+  const cells = [
+    cell(2026, 7, 300_000, 40_000),
+    cell(2026, 8, 5_000, 1_000, /* partial */ true),
+  ];
+  const years = toYearRows(cells);
+
+  it("Gesamt-Modus: values behält den laufenden Monat, chartValues nicht", () => {
+    const row = viewYearRows(years, "total")[0]!;
+    expect(row.values[7]).toBe(5_000);
+    expect(row.chartValues[7]).toBeNull();
+    expect(row.chartValues[6]).toBe(300_000);
+  });
+
+  it("Takeaway-Modus: gleiche Regel", () => {
+    const row = viewYearRows(years, "takeaway")[0]!;
+    expect(row.values[7]).toBe(1_000);
+    expect(row.chartValues[7]).toBeNull();
+    expect(row.chartValues[6]).toBe(40_000);
+  });
+});

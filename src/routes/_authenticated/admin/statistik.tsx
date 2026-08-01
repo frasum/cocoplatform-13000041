@@ -176,6 +176,9 @@ function StatistikPage() {
   const [mode, setMode] = useState<"month" | "range">("month");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  // MB3b — Tab kontrolliert, damit die globale Filterleiste im Monats-Tab
+  // ausgeblendet werden kann (Filter-State bleibt erhalten).
+  const [activeTab, setActiveTab] = useState<string>("umsatz");
 
   function handleModeChange(next: "month" | "range") {
     if (next === "range" && (startDate === "" || endDate === "")) {
@@ -418,120 +421,122 @@ function StatistikPage() {
         </p>
       </div>
 
-      <Card className="p-3">
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-          <div className="space-y-1">
-            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Ansicht
-            </Label>
-            <div className="inline-flex h-10 items-center rounded-md border border-input p-0.5">
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === "month" ? "default" : "ghost"}
-                onClick={() => handleModeChange("month")}
-              >
-                Monat
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === "range" ? "default" : "ghost"}
-                onClick={() => handleModeChange("range")}
-              >
-                Zeitraum
-              </Button>
-            </div>
-          </div>
-          {mode === "month" ? (
+      {activeTab === "monat" ? null : (
+        <Card className="p-3">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
             <div className="space-y-1">
               <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Monat
+                Ansicht
               </Label>
-              <div className="flex h-10 items-center gap-2">
-                <MonthNav value={month} onChange={setMonth} />
-                {statsQ.data?.coverage?.isPartial && month === currentMonth() ? (
-                  <span
-                    className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs text-amber-700"
-                    title="Der laufende Monat enthält erst Daten bis zum letzten Abrechnungstag."
+              <div className="inline-flex h-10 items-center rounded-md border border-input p-0.5">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mode === "month" ? "default" : "ghost"}
+                  onClick={() => handleModeChange("month")}
+                >
+                  Monat
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={mode === "range" ? "default" : "ghost"}
+                  onClick={() => handleModeChange("range")}
+                >
+                  Zeitraum
+                </Button>
+              </div>
+            </div>
+            {mode === "month" ? (
+              <div className="space-y-1">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Monat
+                </Label>
+                <div className="flex h-10 items-center gap-2">
+                  <MonthNav value={month} onChange={setMonth} />
+                  {statsQ.data?.coverage?.isPartial && month === currentMonth() ? (
+                    <span
+                      className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 text-xs text-amber-700"
+                      title="Der laufende Monat enthält erst Daten bis zum letzten Abrechnungstag."
+                    >
+                      unvollständig · Stand{" "}
+                      {statsQ.data.coverage.lastDataDay
+                        ? statsQ.data.coverage.lastDataDay.slice(8, 10) + "."
+                        : "—"}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="stat-from"
+                    className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
                   >
-                    unvollständig · Stand{" "}
-                    {statsQ.data.coverage.lastDataDay
-                      ? statsQ.data.coverage.lastDataDay.slice(8, 10) + "."
-                      : "—"}
-                  </span>
-                ) : null}
+                    Von
+                  </Label>
+                  <Input
+                    id="stat-from"
+                    type="date"
+                    value={startDate}
+                    max={endDate || undefined}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="h-10 w-[160px]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="stat-to"
+                    className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
+                    Bis
+                  </Label>
+                  <Input
+                    id="stat-to"
+                    type="date"
+                    value={endDate}
+                    min={startDate || undefined}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className={`h-10 w-[160px] ${rangeInvalid ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                    aria-invalid={rangeInvalid || undefined}
+                    title={rangeInvalid ? "Bis muss ≥ Von sein." : undefined}
+                  />
+                </div>
+              </>
+            )}
+            <div className="space-y-1">
+              <Label
+                htmlFor="stat-loc"
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                Standort
+              </Label>
+              <div id="stat-loc" className="flex h-10 items-center">
+                <LocationPills
+                  locations={locations}
+                  value={locationFilter}
+                  onChange={setLocationFilter}
+                  includeAll
+                  allValue="all"
+                />
               </div>
             </div>
-          ) : (
-            <>
-              <div className="space-y-1">
-                <Label
-                  htmlFor="stat-from"
-                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                >
-                  Von
-                </Label>
-                <Input
-                  id="stat-from"
-                  type="date"
-                  value={startDate}
-                  max={endDate || undefined}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-10 w-[160px]"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label
-                  htmlFor="stat-to"
-                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                >
-                  Bis
-                </Label>
-                <Input
-                  id="stat-to"
-                  type="date"
-                  value={endDate}
-                  min={startDate || undefined}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={`h-10 w-[160px] ${rangeInvalid ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                  aria-invalid={rangeInvalid || undefined}
-                  title={rangeInvalid ? "Bis muss ≥ Von sein." : undefined}
-                />
-              </div>
-            </>
-          )}
-          <div className="space-y-1">
-            <Label
-              htmlFor="stat-loc"
-              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+            <Button
+              type="button"
+              variant="outline"
+              className="ml-auto h-10"
+              onClick={handleExport}
+              disabled={exportDisabled}
             >
-              Standort
-            </Label>
-            <div id="stat-loc" className="flex h-10 items-center">
-              <LocationPills
-                locations={locations}
-                value={locationFilter}
-                onChange={setLocationFilter}
-                includeAll
-                allValue="all"
-              />
-            </div>
+              <Download className="h-4 w-4" />
+              PDF
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="ml-auto h-10"
-            onClick={handleExport}
-            disabled={exportDisabled}
-          >
-            <Download className="h-4 w-4" />
-            PDF
-          </Button>
-        </div>
-      </Card>
+        </Card>
+      )}
 
-      <Tabs defaultValue="umsatz" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex h-auto flex-wrap">
           <TabsTrigger value="umsatz">Umsatz</TabsTrigger>
           <TabsTrigger value="trinkgeld">Trinkgeld</TabsTrigger>
@@ -577,7 +582,8 @@ function StatistikPage() {
         </TabsContent>
         <TabsContent value="monat">
           {/* MB1 — eigener Datenpfad (24-Jahre-Historie), unabhängig vom
-              Monats-/Zeitraum-Filter oben. */}
+              Monats-/Zeitraum-Filter oben; deshalb ist die globale Filterleiste
+              in diesem Tab ausgeblendet (MB3b). */}
           <MonatsentwicklungTab />
         </TabsContent>
       </Tabs>

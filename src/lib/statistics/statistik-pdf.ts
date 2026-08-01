@@ -16,6 +16,7 @@ import {
   barChartGeometry,
   formatTsd,
   lineChartGeometry,
+  stackedBarChartGeometry,
   type ChartArea,
 } from "./statistik-pdf-charts";
 import type { TakeawayMatrix } from "./takeaway-channels";
@@ -68,8 +69,17 @@ export type StatistikPdfData = {
     ratioPct: number | null;
     staffWithoutRateNames: string[];
   };
-  /** Grafik A — Tagesumsätze des Berichtszeitraums (Gesamt je Geschäftstag). */
-  dailyRevenue: Array<{ businessDate: string; totalCents: number }>;
+  /**
+   * Grafik A — Tagesumsätze des Berichtszeitraums (Gesamt je Geschäftstag).
+   * STAT3c: im Scope „Alle Standorte" trägt jeder Tag zusätzlich die
+   * Standort-Anteile (`byLocation`); daraus werden gestapelte Balken. Fehlt das
+   * Feld (Einzelstandort), bleibt der Balken einfarbig.
+   */
+  dailyRevenue: Array<{
+    businessDate: string;
+    totalCents: number;
+    byLocation?: Array<{ name: string; cents: number }>;
+  }>;
   /** STAT2 — Kennzahlen der Kacheln; Werte kommen fertig aus `derivedKpis`. */
   guestHours?: {
     guestTotal: number;
@@ -106,6 +116,16 @@ export type StatistikPdfData = {
 function fmtEur(cents: number): string {
   return `${fmtCents(cents)} €`;
 }
+
+/**
+ * STAT3c — eine Farbzuordnung für Grafik A (gestapelte Tagesbalken) und
+ * Grafik B (13-Monats-Verlauf), damit EINE Legende beide Grafiken erklärt.
+ */
+const SERIES_PALETTE: Array<[number, number, number]> = [
+  [60, 90, 140],
+  [190, 110, 60],
+  [90, 140, 100],
+];
 
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
@@ -398,6 +418,40 @@ export async function generateStatistikPdf(
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.text("Tagesumsatz", marginX, cursorY);
+  // STAT3c — Farbindex reihenübergreifend: erst die Monatsreihen (Grafik B),
+  // dann etwaige weitere Standorte der Tagesbalken. Gleicher Standort ⇒ gleiche
+  // Farbe in beiden Grafiken.
+  const seriesColorIndex = new Map<string, number>();
+  const registerSeries = (name: string) => {
+    if (!seriesColorIndex.has(name)) seriesColorIndex.set(name, seriesColorIndex.size);
+  };
+  (data.monthly?.series ?? []).forEach((s) => registerSeries(s.name));
+  // Standortnamen der Tagesbalken in Reihenfolge des ersten Auftretens.
+  const stackNames: string[] = [];
+  for (const day of data.dailyRevenue) {
+    for (const entry of day.byLocation ?? []) {
+      if (!stackNames.includes(entry.name)) stackNames.push(entry.name);
+    }
+  }
+  stackNames.forEach(registerSeries);
+  const colorOf = (name: string): [number, number, number] =>
+    SERIES_PALETTE[(seriesColorIndex.get(name) ?? 0) % SERIES_PALETTE.length]!;
+  const stacked = stackNames.length > 0;
+  if (stacked) {
+    // Kleine Legende in der Titelzeile (wie beim 13-Monats-Verlauf).
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
+    let legendX = marginX + 62;
+    for (const name of stackNames) {
+      const c = colorOf(name);
+      doc.setFillColor(c[0], c[1], c[2]);
+      doc.rect(legendX, cursorY - 5, 4, 4, "F");
+      doc.setTextColor(60);
+      doc.text(name, legendX + 6, cursorY - 2);
+      legendX += 16 + doc.getTextWidth(name);
+    }
+    doc.setTextColor(20);
+  }
   cursorY += 6;
   const axisW = 42;
   const chartA: ChartArea = {
@@ -412,32 +466,63 @@ export async function generateStatistikPdf(
     doc.text("Keine Umsätze im gewählten Zeitraum.", marginX, cursorY + 12);
     cursorY += 24;
   } else {
-    const geo = barChartGeometry(
-      data.dailyRevenue.map((d) => d.totalCents),
-      chartA,
-      { gapRatio: 0.25, tickCount: 3 },
-    );
+    const stackedGeo = stacked
+      ? stackedBarChartGeometry(
+          stackNames.map((name) => ({
+            name,
+            values: data.dailyRevenue.map(
+              (d) => (d.byLocation ?? []).find((e) => e.name === name)?.cents ?? 0,
+            ),
+          })),
+          chartA,
+          { gapRatio: 0.25, tickCount: 3 },
+        )
+      : null;
+    const flatGeo = stackedGeo
+      ? null
+      : barChartGeometry(
+          data.dailyRevenue.map((d) => d.totalCents),
+          chartA,
+          { gapRatio: 0.25, tickCount: 3 },
+        );
+    const ticks = stackedGeo ? stackedGeo.ticks : flatGeo!.ticks;
+    const slots = stackedGeo
+      ? stackedGeo.stacks.map((s) => ({ index: s.index, x: s.x, width: s.width }))
+      : flatGeo!.bars.map((b) => ({ index: b.index, x: b.x, width: b.width }));
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
-    for (const t of geo.ticks) {
+    for (const t of ticks) {
       doc.setDrawColor(225);
       doc.line(chartA.x, t.y, chartA.x + chartA.width, t.y);
       doc.setTextColor(120);
       doc.text(formatTsd(t.value), chartA.x - 4, t.y + 2, { align: "right" });
     }
     doc.setTextColor(20);
-    for (const bar of geo.bars) {
-      const sunday = isSunday(data.dailyRevenue[bar.index]!.businessDate);
-      if (sunday) doc.setFillColor(120, 140, 175);
-      else doc.setFillColor(60, 90, 140);
-      if (bar.height > 0) doc.rect(bar.x, bar.y, bar.width, bar.height, "F");
+    if (stackedGeo) {
+      // Nur die Verteilung zeigen: Segmentfarbe je Standort, KEINE Beschriftung.
+      // Die Sonntags-Aufhellung entfällt hier (die fette Tagesnummer bleibt).
+      for (const stack of stackedGeo.stacks) {
+        for (const seg of stack.segments) {
+          if (seg.height <= 0) continue;
+          const c = colorOf(seg.name);
+          doc.setFillColor(c[0], c[1], c[2]);
+          doc.rect(seg.x, seg.y, seg.width, seg.height, "F");
+        }
+      }
+    } else {
+      for (const bar of flatGeo!.bars) {
+        const sunday = isSunday(data.dailyRevenue[bar.index]!.businessDate);
+        if (sunday) doc.setFillColor(120, 140, 175);
+        else doc.setFillColor(60, 90, 140);
+        if (bar.height > 0) doc.rect(bar.x, bar.y, bar.width, bar.height, "F");
+      }
     }
     // Tagesachse: jeder Tag als Nummer, Sonntage fett markiert.
     doc.setFontSize(5.5);
-    for (const bar of geo.bars) {
-      const iso = data.dailyRevenue[bar.index]!.businessDate;
+    for (const slot of slots) {
+      const iso = data.dailyRevenue[slot.index]!.businessDate;
       doc.setFont("helvetica", isSunday(iso) ? "bold" : "normal");
-      doc.text(iso.slice(8, 10), bar.x + bar.width / 2, chartA.y + chartA.height + 8, {
+      doc.text(iso.slice(8, 10), slot.x + slot.width / 2, chartA.y + chartA.height + 8, {
         align: "center",
       });
     }
@@ -468,13 +553,8 @@ export async function generateStatistikPdf(
       doc.text(formatTsd(t.value), chartB.x - 4, t.y + 2, { align: "right" });
     }
     doc.setTextColor(20);
-    const palette: Array<[number, number, number]> = [
-      [60, 90, 140],
-      [190, 110, 60],
-      [90, 140, 100],
-    ];
-    geo.series.forEach((s, si) => {
-      const color = palette[si % palette.length]!;
+    geo.series.forEach((s) => {
+      const color = colorOf(s.name);
       doc.setDrawColor(color[0], color[1], color[2]);
       doc.setFillColor(color[0], color[1], color[2]);
       doc.setLineWidth(1);
@@ -493,8 +573,8 @@ export async function generateStatistikPdf(
     // Legende in der Titelzeile (Punkt + Name), damit sie die Fläche nicht überdeckt.
     doc.setFontSize(6.5);
     let legendX = marginX + 90;
-    geo.series.forEach((s, si) => {
-      const color = palette[si % palette.length]!;
+    geo.series.forEach((s) => {
+      const color = colorOf(s.name);
       doc.setFillColor(color[0], color[1], color[2]);
       doc.circle(legendX, chartB.y - 8, 1.8, "F");
       doc.setTextColor(60);

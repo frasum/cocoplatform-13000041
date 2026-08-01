@@ -78,8 +78,8 @@ describe("monatsbericht-pdf — Werte kommen aus monthly-core", () => {
     expect(findRow("Monatsumsatz")[1]).toBe(`${fmtCents(18_000_000)} €`);
     expect(findRow("Vorjahresmonat")[1]).toBe(`${fmtCents(15_000_000)} €`);
     expect(findRow("Veränderung ggü. Vorjahresmonat")[1]).toBe("+20.0 %");
-    expect(findRow("Jahressumme bis Monat (YTD)")[1]).toBe(`${fmtCents(42_000_000)} €`);
-    expect(findRow("Vorjahres-YTD")[1]).toBe(`${fmtCents(15_000_000)} €`);
+    expect(findRow("Jahressumme bis Mär (YTD)")[1]).toBe(`${fmtCents(42_000_000)} €`);
+    expect(findRow("Vorjahres-YTD (bis Mär)")[1]).toBe(`${fmtCents(15_000_000)} €`);
     expect(findRow("Bestes Jahr für diesen Monat")[1]).toBe(`2026 · ${fmtCents(18_000_000)} €`);
 
     // Matrix: Jahreszeile 2026 in T€ (Jan 110, Feb 130, Mär 180, Gesamt 420).

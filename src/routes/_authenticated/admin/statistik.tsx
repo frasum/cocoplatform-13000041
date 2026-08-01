@@ -403,6 +403,8 @@ function StatistikPage() {
         perHourCents: k.revenuePerWorkHourCents,
         prevYearTotalCents: matrixCents(loc.id, focusYear - 1, focusMonthNo),
         prevTotalCents: r.previous?.totalCents ?? null,
+        // STAT2d — Quote aus derselben reinen Funktion wie die Kachel.
+        tipRatePct: tipRatePct(t.totals.totalCents, r.summary.houseCents),
       });
     });
 

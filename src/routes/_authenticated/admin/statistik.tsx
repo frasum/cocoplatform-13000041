@@ -566,7 +566,6 @@ function StatsView({ data }: { data: RevenueStats }) {
         <CardContent>
           {hasTakeaway ? (
             <TakeawayChannelsDonut
-              channels={data.takeawayByChannel}
               totalCents={data.summary.takeawayCents}
               woltInfoCents={data.summary.woltInfoCents}
               components={data.takeawayComponents}

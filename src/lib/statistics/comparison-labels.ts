@@ -78,6 +78,34 @@ export function leadDelta(input: {
 export type TrendLabel = { pct: number | null; text: string; tone: Tone };
 
 /**
+ * STAT2d (Mikro-Nachtrag) — zentrales Delta einer QUOTEN-Vergleichskarte.
+ * Punktdifferenz der ungerundeten Quoten („YUM +0,1 pp vs. spicery"), damit in
+ * einer Kachel nur EINE Delta-Sprache vorkommt. Gleichstand ⇒ „±0,0 pp".
+ */
+export function ppLeadDelta(input: {
+  aName: string;
+  bName: string;
+  aValue: number | null;
+  bValue: number | null;
+}): LeadDelta {
+  const { aName, bName, aValue, bValue } = input;
+  const delta = ppDelta(aValue, bValue);
+  if (delta === null) return { leader: null, pct: null, text: "—", tone: "neutral" };
+  if (delta === 0) {
+    return { leader: null, pct: 0, text: "Gleichstand (±0,0 pp)", tone: "neutral" };
+  }
+  const aLeads = delta > 0;
+  const leadName = aLeads ? aName : bName;
+  const otherName = aLeads ? bName : aName;
+  return {
+    leader: aLeads ? "a" : "b",
+    pct: Math.abs(delta),
+    text: `${leadName} +${formatPctDe(Math.abs(delta))} pp vs. ${otherName}`,
+    tone: "up",
+  };
+}
+
+/**
  * Trendzeile eines Standortwerts gegen sein eigenes Vormonatsfenster.
  * Fehlender Vormonatswert oder Vormonatswert 0 ⇒ „—".
  */

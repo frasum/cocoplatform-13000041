@@ -93,10 +93,7 @@ describe("viewHeadline", () => {
 });
 
 describe("MB3 — chartValues blenden laufende Monate aus", () => {
-  const cells = [
-    cell(2026, 7, 300_000, 40_000),
-    cell(2026, 8, 5_000, 1_000, /* partial */ true),
-  ];
+  const cells = [cell(2026, 7, 300_000, 40_000), cell(2026, 8, 5_000, 1_000, /* partial */ true)];
   const years = toYearRows(cells);
 
   it("Gesamt-Modus: values behält den laufenden Monat, chartValues nicht", () => {

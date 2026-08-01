@@ -207,7 +207,7 @@ describe("MB3 — YTD klemmt auf gleiche Monatsabdeckung", () => {
     expect(h.ytdCents).toBe(7 * 1_990_000);
     // Der Vorjahres-August (19.051 €) fällt aus der Vorjahressumme heraus.
     expect(h.previousYearYtdCents).toBe(7 * 2_000_000);
-    expect(h.ytdPct).toBeCloseTo((7 * 1_990_000) / (7 * 2_000_000) * 100 - 100, 6);
+    expect(h.ytdPct).toBeCloseTo(((7 * 1_990_000) / (7 * 2_000_000)) * 100 - 100, 6);
   });
 
   it("Fokusmonat läuft ohne eigene Zelle (YUM-Fall): Klemmen greift trotzdem", () => {

@@ -25,6 +25,7 @@ import {
   computeTrend,
   groupTakeawayByChannel,
   summarize,
+  sumGuestsByDate,
   type DailyRevenue,
   type TakeawayChannel,
   type PeriodSummary,
@@ -140,14 +141,12 @@ export const getRevenueStats = createServerFn({ method: "GET" })
 
       // STAT2 — Gäste je Geschäftstag: Σ über alle Sessions des Tages
       // (mehrere Standorte im Filter „alle" summieren korrekt auf).
-      const guestsByDate = new Map<string, number>();
-      let guestTotal = 0;
-      for (const r of sessRows ?? []) {
-        const day = r.business_date as string;
-        const guests = (r.guest_count as number | null) ?? 0;
-        guestsByDate.set(day, (guestsByDate.get(day) ?? 0) + guests);
-        guestTotal += guests;
-      }
+      const { byDate: guestsByDate, total: guestTotal } = sumGuestsByDate(
+        (sessRows ?? []).map((r) => ({
+          businessDate: r.business_date as string,
+          guestCount: (r.guest_count as number | null) ?? 0,
+        })),
+      );
 
       let channels: ChannelAmountRow[] = [];
       const takeawayRaw: { name: string; amountCents: number }[] = [];

@@ -14,7 +14,19 @@ import { test, expect, type Page } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { seedKasseFinalize, type E2ESeed } from "./seed";
 
-const WORKER_RE = /pdf\.worker(?:\.min)?-[^/]*\.m?js(?:\?|$)/;
+// Muss BEIDE Namensformen treffen: der Produktionsbuild hängt einen
+// Content-Hash an (`pdf.worker.min-XYZ.mjs`), der Dev-Server (die Suite läuft
+// per `bun run dev`, siehe playwright.config.ts) liefert die Datei ohne Hash
+// aus (`/node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs`). Die
+// frühere Fassung verlangte den Bindestrich und traf im Dev-Lauf NICHTS —
+// daher „erwartet 1, geladen 0".
+const WORKER_RE = /pdf\.worker(?:\.min)?(?:-[^/]*)?\.m?js(?:\?|$)/;
+
+/** Dateiname ohne Query/Hash — Dev und Build sollen gleich gezählt werden. */
+function workerKey(url: string): string {
+  const file = url.split("?")[0].split("/").pop() ?? url;
+  return file.replace(/-[^.]*(?=\.m?js$)/, "");
+}
 
 async function loginAsAdmin(page: Page, seed: E2ESeed): Promise<void> {
   await page.goto("/auth");
@@ -61,7 +73,7 @@ test.describe("Lohn-Verteilung: Sammel-PDF splitten (Bundle-Diet)", () => {
     const workerUrls = new Set<string>();
     page.on("response", (res) => {
       const url = res.url();
-      if (WORKER_RE.test(url)) workerUrls.add(url.split("?")[0]);
+      if (WORKER_RE.test(url)) workerUrls.add(workerKey(url));
     });
 
     await page.goto("/admin/lohn-verteilung");

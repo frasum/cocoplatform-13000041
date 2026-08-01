@@ -105,6 +105,7 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       daily: DailyRevenue[];
       summary: PeriodSummary;
       takeawayByChannel: TakeawayChannel[];
+      takeawayComponents: { markerSumCents: number; souseSumCents: number };
     }> {
       let sessionQuery = supabaseAdmin
         .from("sessions")
@@ -127,6 +128,8 @@ export const getRevenueStats = createServerFn({ method: "GET" })
 
       let channels: ChannelAmountRow[] = [];
       const takeawayRaw: { name: string; amountCents: number }[] = [];
+      let markerSumCents = 0;
+      let souseSumCents = 0;
       const cardBySession = new Map<string, number>();
       if (sessions.length > 0) {
         const ids = sessions.map((s) => s.id);
@@ -151,6 +154,8 @@ export const getRevenueStats = createServerFn({ method: "GET" })
               name: r.revenue_channels?.label ?? kind,
               amountCents: r.amount_cents,
             });
+            if (kind === "delivery_vectron") markerSumCents += r.amount_cents;
+            else souseSumCents += r.amount_cents;
           }
         }
 
@@ -177,6 +182,7 @@ export const getRevenueStats = createServerFn({ method: "GET" })
         daily,
         summary: summarize(daily),
         takeawayByChannel: groupTakeawayByChannel(takeawayRaw),
+        takeawayComponents: { markerSumCents, souseSumCents },
       };
     }
 
@@ -214,6 +220,7 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       daily: cur.daily,
       summary: cur.summary,
       takeawayByChannel: cur.takeawayByChannel,
+      takeawayComponents: cur.takeawayComponents,
       previous: prev ? prev.summary : null,
       trend,
       coverage: { lastDataDay, isPartial },

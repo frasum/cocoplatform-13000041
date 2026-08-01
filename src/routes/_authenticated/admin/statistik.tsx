@@ -36,7 +36,7 @@ import { getRevenueStats } from "@/lib/statistics/revenue-stats.functions";
 import { getTipStats } from "@/lib/statistics/tip-stats.functions";
 import { getPersonnelStats } from "@/lib/statistics/personnel-stats.functions";
 import { personnelRatioPct } from "@/lib/statistics/personnel-core";
-import { computeChannelPercents } from "@/lib/statistics/revenue-core";
+import { checkDonutSegments, computeChannelPercents } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
@@ -565,6 +565,7 @@ function StatsView({ data }: { data: RevenueStats }) {
               channels={data.takeawayByChannel}
               totalCents={data.summary.takeawayCents}
               woltInfoCents={data.summary.woltInfoCents}
+              components={data.takeawayComponents}
             />
           ) : (
             <div className="flex h-[220px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
@@ -692,12 +693,22 @@ function TakeawayChannelsDonut({
   channels,
   totalCents,
   woltInfoCents,
+  components,
 }: {
   channels: RevenueStats["takeawayByChannel"];
   totalCents: number;
   woltInfoCents: number;
+  components: RevenueStats["takeawayComponents"];
 }) {
   const withPct = computeChannelPercents(channels);
+  // STAT1 — Segmentsumme automatisch gegen Marker + SoUse prüfen.
+  const segmentSumCents = channels.reduce((s, c) => s + c.amountCents, 0);
+  const check = checkDonutSegments({
+    segmentSumCents,
+    markerSumCents: components.markerSumCents,
+    souseSumCents: components.souseSumCents,
+    takeawayCents: totalCents,
+  });
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center">
       <div className="h-[240px] w-full md:w-1/2">
@@ -727,6 +738,18 @@ function TakeawayChannelsDonut({
         </ResponsiveContainer>
       </div>
       <div className="flex-1 space-y-2 text-sm">
+        {!check.ok ? (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          >
+            {check.message}
+          </div>
+        ) : check.message ? (
+          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+            {check.message}
+          </div>
+        ) : null}
         <ul className="space-y-1.5">
           {withPct.map((c, i) => (
             <li key={c.name} className="flex items-center gap-2">

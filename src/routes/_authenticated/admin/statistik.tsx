@@ -2102,6 +2102,78 @@ function KpiCompareCard({
 
 // ============ STAT2b — Gäste & Personal ============
 
+/** STAT2d — Quotenformat: „8,9 %", eine Nachkommastelle; null ⇒ „—". */
+function fmtQuotePct(pct: number | null): string {
+  if (pct === null || !Number.isFinite(pct)) return "—";
+  return `${pct.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+}
+
+/**
+ * STAT2d — Vergleichskachel für eine QUOTEN-Kennzahl (Trinkgeld-Quote).
+ * Aufbau wie `KpiCompareCard` (Niveau-Balken, skaliert auf die größere Quote),
+ * aber die Vorperioden-Zeile zeigt PROZENTPUNKTE („+0,2 pp"), nicht relatives
+ * Wachstum. Die Bezugsbasis steht als Untertitel auf der Karte.
+ */
+function RateCompareCard({
+  title,
+  subtitle,
+  a,
+  b,
+  valueOf,
+  prevOf,
+}: {
+  title: string;
+  subtitle: string;
+  a: CompareLocation;
+  b: CompareLocation;
+  valueOf: (row: CompareLocation) => number | null;
+  prevOf: (row: CompareLocation) => number | null;
+}) {
+  const c = compareKpi(valueOf(a), valueOf(b));
+  const lead = leadDelta({ aName: a.name, bName: b.name, aValue: c.aValue, bValue: c.bValue });
+  const aTrend = ppTrendLabel(c.aValue, prevOf(a), a.previousRange, { partial: a.previousPartial });
+  const bTrend = ppTrendLabel(c.bValue, prevOf(b), b.previousRange, { partial: b.previousPartial });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <div className="text-[11px] text-muted-foreground">{subtitle}</div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <CompareSide
+            name={a.name}
+            text={fmtQuotePct(c.aValue)}
+            trendText={aTrend.text}
+            trendTone={aTrend.tone}
+            align="left"
+            tone="a"
+          />
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            VS
+          </div>
+          <CompareSide
+            name={b.name}
+            text={fmtQuotePct(c.bValue)}
+            trendText={bTrend.text}
+            trendTone={bTrend.tone}
+            align="right"
+            tone="b"
+          />
+        </div>
+        <LeadDeltaLine text={lead.text} tone={lead.tone} />
+        <LevelBar
+          a={a.name}
+          b={b.name}
+          aValue={c.aValue}
+          bValue={c.bValue}
+          format={(v) => fmtQuotePct(v)}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 /** Arbeitsminuten als Stunden („h"-Format wie im Umsatz-Tab-Panel). */
 function fmtMinutesAsHours(minutes: number): string {
   return `${(minutes / 60).toFixed(1)} h`;

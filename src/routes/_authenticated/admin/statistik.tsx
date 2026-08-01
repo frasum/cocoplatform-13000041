@@ -1509,31 +1509,47 @@ function LocationCompareSection({
 
               {/* Sechs Vergleichskarten */}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <ComparisonCard title="Gesamtumsatz" a={a} b={b} valueOf={(r) => r.totalCents} />
+                <ComparisonCard
+                  title="Gesamtumsatz"
+                  a={a}
+                  b={b}
+                  valueOf={(r) => r.totalCents}
+                  prevOf={(r) => r.prevTotalCents}
+                />
                 <ComparisonCard
                   title="Ø Tagesumsatz"
                   a={a}
                   b={b}
                   valueOf={(r) => r.avgDailyCents}
+                  prevOf={(r) => r.prevAvgDailyCents}
                 />
-                <ComparisonCard title="Lieferumsatz" a={a} b={b} valueOf={(r) => r.takeawayCents} />
+                <ComparisonCard
+                  title="Lieferumsatz"
+                  a={a}
+                  b={b}
+                  valueOf={(r) => r.takeawayCents}
+                  prevOf={(r) => r.prevTakeawayCents}
+                />
                 <ComparisonCard
                   title="Service-Trinkgeld"
                   a={a}
                   b={b}
                   valueOf={(r) => r.serviceTipCents}
+                  prevOf={(r) => r.prevServiceTipCents}
                 />
                 <ComparisonCard
                   title="Küchen-Trinkgeld"
                   a={a}
                   b={b}
                   valueOf={(r) => r.kitchenTipCents}
+                  prevOf={(r) => r.prevKitchenTipCents}
                 />
                 <ComparisonCard
                   title="Ø Trinkgeld / Tag"
                   a={a}
                   b={b}
                   valueOf={(r) => r.avgTipPerDayCents}
+                  prevOf={(r) => r.prevAvgTipPerDayCents}
                 />
               </div>
 
@@ -1549,6 +1565,7 @@ function LocationCompareSection({
                     a={a}
                     b={b}
                     valueOf={(r) => r.guestTotal}
+                    prevOf={(r) => r.prevGuestTotal}
                     format={(v) => v.toLocaleString("de-DE")}
                   />
                   <SumCompareCard
@@ -1556,6 +1573,7 @@ function LocationCompareSection({
                     a={a}
                     b={b}
                     valueOf={(r) => r.workMinutesTotal}
+                    prevOf={(r) => r.prevWorkMinutesTotal}
                     format={fmtMinutesAsHours}
                   />
                   <KpiCompareCard
@@ -1563,12 +1581,14 @@ function LocationCompareSection({
                     a={a}
                     b={b}
                     valueOf={(r) => r.revenuePerGuestCents}
+                    prevOf={(r) => r.prevRevenuePerGuestCents}
                   />
                   <KpiCompareCard
                     title="Umsatz je Arbeitsstunde"
                     a={a}
                     b={b}
                     valueOf={(r) => r.revenuePerWorkHourCents}
+                    prevOf={(r) => r.prevRevenuePerWorkHourCents}
                   />
                 </div>
               </div>

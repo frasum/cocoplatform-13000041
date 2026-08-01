@@ -72,9 +72,14 @@ describe("previousTrendLabel", () => {
 
   it("Teilmonat wird im Fensterlabel markiert", () => {
     expect(
-      previousTrendLabel(11_200, 10_000, { startDate: "2026-06-01", endDate: "2026-06-18" }, {
-        partial: true,
-      }).text,
+      previousTrendLabel(
+        11_200,
+        10_000,
+        { startDate: "2026-06-01", endDate: "2026-06-18" },
+        {
+          partial: true,
+        },
+      ).text,
     ).toBe("+12,0 % vs. 01.–18.06.2026 (gleicher Tagesausschnitt)");
   });
 });

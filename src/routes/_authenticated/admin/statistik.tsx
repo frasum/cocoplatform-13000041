@@ -753,6 +753,114 @@ type TipPayload = {
   }>;
 };
 
+// STAT2 — Gäste (Balken, linke Achse) und Arbeitsstunden (Linie, rechte
+// Achse) auf derselben X-Achse wie der Umsatzverlauf (gleiche Fill-Logik,
+// kein Interpolieren). Die €-Kennzahlen je Tag kommen aus `derivedKpis`.
+type GuestHoursRow = {
+  day: string;
+  fullDate: string;
+  guests: number;
+  hours: number;
+  perGuestCents: number | null;
+  perHourCents: number | null;
+};
+
+function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
+  const rows: GuestHoursRow[] = fillDailyGaps(daily).map((d) => {
+    const k = derivedKpis({
+      houseCents: d.houseCents,
+      totalCents: d.totalCents,
+      guestCount: d.guestCount ?? 0,
+      workMinutes: d.workMinutes ?? 0,
+    });
+    return {
+      day: d.businessDate.slice(8, 10),
+      fullDate: d.businessDate,
+      guests: d.guestCount ?? 0,
+      hours: k.workHours,
+      perGuestCents: k.revenuePerGuestCents,
+      perHourCents: k.revenuePerWorkHourCents,
+    };
+  });
+
+  return (
+    <div className="h-[300px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+          <YAxis
+            yAxisId="guests"
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+            width={48}
+            tickFormatter={(v: number) => String(Math.round(v))}
+          />
+          <YAxis
+            yAxisId="hours"
+            orientation="right"
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+            width={56}
+            tickFormatter={(v: number) => `${Math.round(v)} h`}
+          />
+          <Tooltip content={<GuestHoursTip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar
+            yAxisId="guests"
+            dataKey="guests"
+            name="Gäste"
+            fill="#2563eb"
+            fillOpacity={0.35}
+            radius={[2, 2, 0, 0]}
+          />
+          <Line
+            yAxisId="hours"
+            type="monotone"
+            dataKey="hours"
+            name="Arbeitsstunden"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            dot={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function GuestHoursTip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: GuestHoursRow }>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0].payload;
+  return (
+    <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
+      <div className="font-medium">{row.fullDate}</div>
+      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
+        <span className="text-muted-foreground">Gäste</span>
+        <span className="text-right">{row.guests.toLocaleString("de-DE")}</span>
+        <span className="text-muted-foreground">Stunden</span>
+        <span className="text-right">{row.hours.toFixed(2)}</span>
+        <span className="text-muted-foreground">€/Gast</span>
+        <span className="text-right">
+          {row.perGuestCents === null ? "—" : fmtEuro(row.perGuestCents)}
+        </span>
+        <span className="text-muted-foreground">€/Std</span>
+        <span className="text-right">
+          {row.perHourCents === null ? "—" : fmtEuro(row.perHourCents)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ChartTip({ active, payload }: TipPayload) {
   if (!active || !payload || payload.length === 0) return null;
   const row = payload[0].payload;

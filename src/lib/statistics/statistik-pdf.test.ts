@@ -5,7 +5,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { fmtCents } from "@/lib/format";
-import { aggregateByBusinessDate, summarize, type SessionRevenueInput } from "./revenue-core";
+import {
+  aggregateByBusinessDate,
+  summarize,
+  takeawayDonutSegments,
+  type SessionRevenueInput,
+} from "./revenue-core";
 import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
 
 type Cell = string | { content: string };
@@ -75,6 +80,7 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
     captured.length = 0;
     const daily = aggregateByBusinessDate(sessions);
     const sum = summarize(daily);
+    const segs = takeawayDonutSegments(36_510, 0, sum.woltInfoCents);
 
     const data: StatistikPdfData = {
       monthLabel: "Juli 2026",
@@ -85,6 +91,8 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
         totalCents: sum.totalCents,
         daysWithRevenue: sum.daysWithRevenue,
       },
+      takeawaySegments: segs.segments,
+      takeawaySegmentsWarning: segs.warning,
       tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perStaff: [] },
       personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
       dailyRevenue: daily.map((d) => ({

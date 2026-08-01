@@ -36,6 +36,20 @@ export type StatistikPdfData = {
     takeawayCents: number;
     totalCents: number;
   }>;
+  /** STAT2 — Gäste/Stunden je Tag + Kennzahlen; Werte kommen fertig aus derivedKpis. */
+  guestHours: {
+    guestTotal: number;
+    workHours: number;
+    revenuePerGuestCents: number | null;
+    revenuePerWorkHourCents: number | null;
+    daily: Array<{
+      businessDate: string;
+      guestCount: number;
+      workHours: number;
+      perGuestCents: number | null;
+      perHourCents: number | null;
+    }>;
+  };
   comparison: Array<{
     locationName: string;
     totalCents: number;
@@ -262,6 +276,51 @@ export async function generateStatistikPdf(
         fmtEur(d.houseCents),
         fmtEur(d.takeawayCents),
         fmtEur(d.totalCents),
+      ]),
+      theme: "grid",
+    });
+    cursorY = lastY(doc) + 18;
+  }
+
+  // 4b) Gäste & Arbeitsstunden (STAT2 — gleiche Quelle wie die Kacheln)
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Gäste & Arbeitsstunden", marginX, cursorY);
+  autoTable(doc, {
+    startY: cursorY + 6,
+    margin: { left: marginX, right: marginX },
+    styles: { fontSize: 9, cellPadding: 4 },
+    headStyles: { fillColor: [230, 230, 230], textColor: 20 },
+    columnStyles: { 1: { halign: "right" } },
+    head: [["Position", "Wert"]],
+    body: [
+      ["Gäste", String(data.guestHours.guestTotal)],
+      ["Erfasste Arbeitsstunden", fmtHours(data.guestHours.workHours)],
+      ["Ø Umsatz je Gast (Haus)", fmtEurOrDash(data.guestHours.revenuePerGuestCents)],
+      ["Umsatz je Arbeitsstunde", fmtEurOrDash(data.guestHours.revenuePerWorkHourCents)],
+    ],
+    theme: "grid",
+  });
+  cursorY = lastY(doc) + 12;
+  if (data.guestHours.daily.length > 0) {
+    autoTable(doc, {
+      startY: cursorY,
+      margin: { left: marginX, right: marginX },
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
+      columnStyles: {
+        1: { halign: "right" },
+        2: { halign: "right" },
+        3: { halign: "right" },
+        4: { halign: "right" },
+      },
+      head: [["Datum", "Gäste", "Stunden", "€/Gast", "€/Std"]],
+      body: data.guestHours.daily.map((d) => [
+        d.businessDate,
+        String(d.guestCount),
+        fmtHours(d.workHours),
+        fmtEurOrDash(d.perGuestCents),
+        fmtEurOrDash(d.perHourCents),
       ]),
       theme: "grid",
     });

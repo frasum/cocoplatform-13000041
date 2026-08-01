@@ -18,6 +18,7 @@ import {
   lineChartGeometry,
   type ChartArea,
 } from "./statistik-pdf-charts";
+import type { TakeawayMatrix } from "./takeaway-channels";
 
 export type StatistikPdfData = {
   monthLabel: string;
@@ -39,9 +40,13 @@ export type StatistikPdfData = {
   previousYearTotalCents?: number | null;
   /** Vormonat/Vorperiode des Scopes; null ⇒ „—". */
   previousPeriodTotalCents?: number | null;
-  /** STAT1b — Take-Away-Segmente (Wolt / direkt / SoUse) aus takeawayDonutSegments. */
-  takeawaySegments: Array<{ name: string; amountCents: number }>;
-  takeawaySegmentsWarning: string | null;
+  /**
+   * STAT3b — Kanal-Auswertung (Wolt / direkt / SoUse) je Standort und gesamt,
+   * fertig aus `takeawayMatrix`; Δ bezieht sich auf die Vorperiode.
+   */
+  takeaway: TakeawayMatrix;
+  /** Anteil des Take-Away am Gesamtumsatz (aus takeawaySharePctOfTotal). */
+  takeawaySharePct: number | null;
   tips: {
     serviceCents: number;
     kitchenCents: number;

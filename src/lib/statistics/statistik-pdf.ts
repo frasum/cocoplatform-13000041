@@ -70,6 +70,14 @@ export type StatistikPdfData = {
     workHours?: number;
     perGuestCents?: number | null;
     perHourCents?: number | null;
+    /**
+     * STAT2c — Vormonatsfenster je Standort für die Trendspalte. Werte und
+     * Fenster kommen fertig aus den Statistik-Server-Fns; die Beschriftung
+     * entsteht über dieselbe Funktion wie in der UI (`previousTrendLabel`).
+     */
+    previousRange?: { startDate: string; endDate: string } | null;
+    previousPartial?: boolean;
+    prevTotalCents?: number | null;
   }>;
 };
 

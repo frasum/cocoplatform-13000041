@@ -24,6 +24,8 @@ import { getMonthlyRevenueMatrix } from "@/lib/statistics/monthly-revenue.functi
 import { generateMonatsberichtPdf, MONTH_LABELS } from "@/lib/statistics/monatsbericht-pdf";
 import type { MonthlyCell } from "@/lib/statistics/monthly-core";
 import { displayEuros, displayTsd } from "@/lib/statistics/monthly-core";
+import type { MonthlyViewMode } from "@/lib/statistics/monthly-view";
+import { viewHeadline, viewMaxCents, viewYearRows } from "@/lib/statistics/monthly-view";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -68,9 +70,9 @@ function monthLabelFromKey(key: string): string {
 }
 
 /** Zellfarbe relativ zum Standort-Maximum — dezente Intensitätsstufen. */
-function heatClass(cell: MonthlyCell | null, maxCents: number): string {
-  if (cell === null || maxCents <= 0) return "bg-muted/30 text-muted-foreground";
-  const ratio = cell.totalCents / maxCents;
+function heatClass(value: number | null, maxCents: number): string {
+  if (value === null || maxCents <= 0) return "bg-muted/30 text-muted-foreground";
+  const ratio = value / maxCents;
   if (ratio >= 0.85) return "bg-primary/80 text-primary-foreground";
   if (ratio >= 0.7) return "bg-primary/60 text-primary-foreground";
   if (ratio >= 0.55) return "bg-primary/40 text-foreground";
@@ -95,6 +97,9 @@ export function MonatsentwicklungTab() {
   });
   const [scope, setScope] = useState<string>("all");
   const [yearsN, setYearsN] = useState<"3" | "5" | "all">("5");
+  // MB2 — Takeaway ist Teilmenge des Gesamtumsatzes (N14): Umschalter statt
+  // Zusatzspalte, sonst verleitet die Nebeneinander-Darstellung zur Addition.
+  const [mode, setMode] = useState<MonthlyViewMode>("total");
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const series: Series | null = useMemo(() => {
@@ -102,30 +107,27 @@ export function MonatsentwicklungTab() {
     return q.data.series.find((s) => s.locationId === scope) ?? q.data.series.at(-1) ?? null;
   }, [q.data, scope]);
 
-  const maxCents = useMemo(
-    () => (series ? series.cells.reduce((m, c) => Math.max(m, c.totalCents), 0) : 0),
-    [series],
-  );
+  const viewRows = useMemo(() => (series ? viewYearRows(series.years, mode) : []), [series, mode]);
+
+  const maxCents = useMemo(() => viewMaxCents(viewRows), [viewRows]);
 
   const chartYears = useMemo(() => {
-    if (!series) return [];
-    const all = series.years.map((y) => y.year);
+    const all = viewRows.map((r) => r.year);
     if (yearsN === "all") return all;
     return all.slice(-Number(yearsN));
-  }, [series, yearsN]);
+  }, [viewRows, yearsN]);
 
   const chartData = useMemo(() => {
-    if (!series) return [];
     return MONTH_LABELS.map((label, idx) => {
       const row: Record<string, number | string | null> = { month: label };
-      for (const y of series.years) {
+      for (const y of viewRows) {
         if (!chartYears.includes(y.year)) continue;
-        const cell = y.months[idx];
-        row[String(y.year)] = cell ? displayEuros(cell.totalCents) : null;
+        const value = y.values[idx];
+        row[String(y.year)] = value === null || value === undefined ? null : displayEuros(value);
       }
       return row;
     });
-  }, [series, chartYears]);
+  }, [viewRows, chartYears]);
 
   async function handlePdf() {
     if (!series || !q.data) return;

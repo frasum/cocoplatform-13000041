@@ -100,6 +100,94 @@ export function barChartGeometry(
 
 export type LinePoint = { index: number; value: number; x: number; y: number };
 
+export type StackSegment = {
+  seriesIndex: number;
+  name: string;
+  value: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type BarStack = {
+  index: number;
+  /** Summe der Reihen dieses Tages (Skalierungsgrundlage). */
+  total: number;
+  x: number;
+  width: number;
+  /** Oberkante des gesamten Stapels. */
+  y: number;
+  height: number;
+  /** Von unten nach oben, Reihenfolge stabil nach Eingabereihen. */
+  segments: StackSegment[];
+};
+
+export type StackedBarGeometry = {
+  stacks: BarStack[];
+  /** Maximum der Tages-SUMMEN (nicht der Einzelreihen). */
+  max: number;
+  ticks: AxisTick[];
+};
+
+/**
+ * STAT3c — gestapelte Balken: je Index ein Stapel aus Segmenten (unten
+ * beginnend). Skaliert über das Maximum der Tages-Summen; die Segmentkanten
+ * entstehen aus Kumulativsummen, damit kein Rundungs-Spalt im Stapel klafft.
+ *
+ * Der Ein-Reihen-Fall ist rechnerisch identisch zu `barChartGeometry`.
+ */
+export function stackedBarChartGeometry(
+  series: ReadonlyArray<{ name: string; values: readonly (number | null | undefined)[] }>,
+  area: ChartArea,
+  opts?: { gapRatio?: number; tickCount?: number },
+): StackedBarGeometry {
+  const count = series.length > 0 ? (series[0]?.values.length ?? 0) : 0;
+  for (const s of series) {
+    if (s.values.length !== count) {
+      throw new Error(
+        `stackedBarChartGeometry: Reihe "${s.name}" hat ${s.values.length} Werte, erwartet ${count}`,
+      );
+    }
+  }
+
+  const gapRatio = clamp(opts?.gapRatio ?? 0.25, 0, 0.8);
+  const totals = Array.from({ length: count }, (_, i) =>
+    series.reduce((acc, s) => acc + safeValue(s.values[i]), 0),
+  );
+  const max = maxOf(totals);
+  const slot = count > 0 ? area.width / count : 0;
+  const width = slot * (1 - gapRatio);
+  const offset = (slot - width) / 2;
+  const baseline = area.y + area.height;
+
+  const stacks: BarStack[] = totals.map((total, index) => {
+    const x = area.x + index * slot + offset;
+    const height = max > 0 ? (total / max) * area.height : 0;
+    let cum = 0;
+    let lowerY = baseline;
+    const segments: StackSegment[] = series.map((s, seriesIndex) => {
+      const value = safeValue(s.values[index]);
+      cum += value;
+      const topY = max > 0 ? baseline - (cum / max) * area.height : baseline;
+      const segment: StackSegment = {
+        seriesIndex,
+        name: s.name,
+        value,
+        x,
+        y: topY,
+        width,
+        height: lowerY - topY,
+      };
+      lowerY = topY;
+      return segment;
+    });
+    return { index, total, x, width, y: baseline - height, height, segments };
+  });
+
+  return { stacks, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3) };
+}
+
 export type LineSeriesGeometry = {
   name: string;
   /** null = kein Wert für diesen Monat (Lücke, keine 0-Kerbe). */

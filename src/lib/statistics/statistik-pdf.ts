@@ -608,6 +608,8 @@ export async function generateStatistikPdf(
     "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.",
     // ASCII statt Delta-Zeichen: die jsPDF-Standardschrift (WinAnsi) kennt kein U+0394.
     "Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.",
+    // STAT2d — Bezugsbasis der Quote muss im Dokument stehen.
+    "TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).",
   ];
   if (hasMissingAny || data.personnel.staffWithoutRateNames.length > 0) {
     notes.push(

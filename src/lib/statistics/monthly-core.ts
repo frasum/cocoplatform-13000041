@@ -204,6 +204,8 @@ export type MonthlyHeadline = {
   ytdCents: number;
   previousYearYtdCents: number | null;
   ytdPct: number | null;
+  /** Monat, bis zu dem die YTD-Summen reichen (== month, außer der Fokusmonat läuft). */
+  ytdThroughMonth: number;
   /** Bestes Jahr für diesen Kalendermonat (ohne den laufenden Monat). */
   bestForMonth: { year: number; totalCents: number } | null;
 };
@@ -212,12 +214,21 @@ export function monthlyHeadline(
   cells: readonly MonthlyCell[],
   year: number,
   month: number,
+  /**
+   * MB3 — "YYYY-MM" des laufenden Kalendermonats. Ist der Fokusmonat der
+   * laufende Monat, enden BEIDE YTD-Summen bei `month - 1` (gleiche
+   * Monatsabdeckung; sonst stünden 7 Monate gegen 8). Ohne Angabe bleibt das
+   * Verhalten unverändert.
+   */
+  currentMonthKey?: string,
 ): MonthlyHeadline {
   const cur = findCell(cells, year, month);
   const prev = findCell(cells, year - 1, month);
   const partial = cur?.partial === true;
+  const focusIsRunning = currentMonthKey !== undefined && monthKey(year, month) === currentMonthKey;
+  const ytdThroughMonth = focusIsRunning ? month - 1 : month;
   const prevYtdRaw = cells.some((c) => c.year === year - 1)
-    ? ytdCents(cells, year - 1, month)
+    ? ytdCents(cells, year - 1, ytdThroughMonth)
     : null;
   const candidates = cells.filter((c) => c.month === month && !c.partial);
   const best = candidates.reduce<MonthlyCell | null>(
@@ -225,6 +236,7 @@ export function monthlyHeadline(
     null,
   );
   const currentCents = cur ? cur.totalCents : null;
+  const ownYtd = ytdCents(cells, year, ytdThroughMonth);
   return {
     monthKey: monthKey(year, month),
     currentCents,
@@ -232,9 +244,10 @@ export function monthlyHeadline(
     yoyPct:
       partial || currentCents === null ? null : growthPct(currentCents, prev?.totalCents ?? null),
     yoyExcludedPartial: partial,
-    ytdCents: ytdCents(cells, year, month),
+    ytdCents: ownYtd,
     previousYearYtdCents: prevYtdRaw,
-    ytdPct: growthPct(ytdCents(cells, year, month), prevYtdRaw),
+    ytdPct: growthPct(ownYtd, prevYtdRaw),
+    ytdThroughMonth,
     bestForMonth: best ? { year: best.year, totalCents: best.totalCents } : null,
   };
 }

@@ -17,6 +17,7 @@ import {
   toYearRows,
   ytdCents,
 } from "./monthly-core";
+import type { LegacyRow } from "./monthly-core";
 
 describe("MB1 — Live-Grenze", () => {
   it("LIVE_FROM ist der 01.03.2026", () => {
@@ -174,5 +175,75 @@ describe("MB1-N1 — Anzeige-Rundung vs. Rechnung", () => {
     expect(h.previousYearCents).toBe(16_019_268);
     expect(h.ytdCents).toBe(16_019_368);
     expect(h.yoyPct).toBeCloseTo((16_019_368 / 16_019_268 - 1) * 100, 9);
+  });
+});
+
+describe("MB3 — YTD klemmt auf gleiche Monatsabdeckung", () => {
+  // Realnahe Spicery-Lage: Jan–Jul beide Jahre, Vorjahr zusätzlich August.
+  const base: LegacyRow[] = [
+    ...[1, 2, 3, 4, 5, 6, 7].map((m) => ({
+      year: 2025,
+      month: m,
+      totalCents: 2_000_000,
+      takeawayCents: null,
+    })),
+    { year: 2025, month: 8, totalCents: 1_905_100, takeawayCents: null },
+    // 2026 vor der Live-Grenze (Jan/Feb) bleibt Legacy …
+    ...[1, 2].map((m) => ({
+      year: 2026,
+      month: m,
+      totalCents: 1_990_000,
+      takeawayCents: null,
+    })),
+  ];
+  // … Mär–Jul 2026 kommen live (die Legacy-Grenze verwirft Legacy ab Mär).
+  const live2026 = [3, 4, 5, 6, 7].map((m) => ({
+    year: 2026,
+    month: m,
+    totalCents: 1_990_000,
+    takeawayCents: 0,
+  }));
+
+  it("Fokusmonat läuft: beide Summen enden bei month - 1", () => {
+    const cells = mergeMonthlyCells({
+      legacy: base,
+      live: [...live2026, { year: 2026, month: 8, totalCents: 0, takeawayCents: 0 }],
+      currentMonthKey: "2026-08",
+    });
+    const h = monthlyHeadline(cells, 2026, 8, "2026-08");
+    expect(h.ytdThroughMonth).toBe(7);
+    expect(h.ytdCents).toBe(7 * 1_990_000);
+    // Der Vorjahres-August (19.051 €) fällt aus der Vorjahressumme heraus.
+    expect(h.previousYearYtdCents).toBe(7 * 2_000_000);
+    expect(h.ytdPct).toBeCloseTo(((7 * 1_990_000) / (7 * 2_000_000)) * 100 - 100, 6);
+  });
+
+  it("Fokusmonat läuft ohne eigene Zelle (YUM-Fall): Klemmen greift trotzdem", () => {
+    const cells = mergeMonthlyCells({ legacy: base, live: live2026, currentMonthKey: "2026-08" });
+    const h = monthlyHeadline(cells, 2026, 8, "2026-08");
+    expect(h.currentCents).toBeNull();
+    expect(h.ytdThroughMonth).toBe(7);
+    expect(h.previousYearYtdCents).toBe(7 * 2_000_000);
+  });
+
+  it("abgeschlossener Fokusmonat: bit-identisch zu vorher", () => {
+    const cells = mergeMonthlyCells({ legacy: base, live: live2026, currentMonthKey: "2026-08" });
+    const withNow = monthlyHeadline(cells, 2026, 7, "2026-08");
+    const legacyCall = monthlyHeadline(cells, 2026, 7);
+    expect(withNow).toEqual({ ...legacyCall, ytdThroughMonth: 7 });
+    expect(withNow.ytdThroughMonth).toBe(7);
+  });
+
+  it("Januar-Randfall: ytdThroughMonth 0, ytdPct null, kein Wurf", () => {
+    const cells = mergeMonthlyCells({
+      legacy: [{ year: 2025, month: 1, totalCents: 500_000, takeawayCents: null }],
+      live: [],
+      currentMonthKey: "2026-01",
+    });
+    const h = monthlyHeadline(cells, 2026, 1, "2026-01");
+    expect(h.ytdThroughMonth).toBe(0);
+    expect(h.ytdCents).toBe(0);
+    expect(h.previousYearYtdCents).toBe(0);
+    expect(h.ytdPct).toBeNull();
   });
 });

@@ -39,8 +39,9 @@ export function viewHeadline(
   year: number,
   month: number,
   mode: MonthlyViewMode,
+  currentMonthKey?: string,
 ): MonthlyHeadline {
-  return monthlyHeadline(projectCells(cells, mode), year, month);
+  return monthlyHeadline(projectCells(cells, mode), year, month, currentMonthKey);
 }
 
 export type MonthlyViewYearRow = {
@@ -49,6 +50,8 @@ export type MonthlyViewYearRow = {
   cells: (MonthlyCell | null)[];
   /** 12 Werte der gewählten Ansicht; null = keine Daten. */
   values: (number | null)[];
+  /** 12 Werte für den Linien-Chart: wie `values`, aber laufende Monate (partial) sind null. */
+  chartValues: (number | null)[];
   /** Σ der vorhandenen Werte des Jahres. */
   totalCents: number;
 };
@@ -61,10 +64,14 @@ export function viewYearRows(
   return years
     .map((y) => {
       const values = y.months.map((c) => cellValueCents(c, mode));
+      // MB3 — der laufende Monat ist unvollständig und würde die Linie
+      // senkrecht abstürzen lassen; im Chart daher als Lücke.
+      const chartValues = y.months.map((c) => (c?.partial ? null : cellValueCents(c, mode)));
       return {
         year: y.year,
         cells: [...y.months],
         values,
+        chartValues,
         totalCents: values.reduce<number>((s, v) => s + (v ?? 0), 0),
       };
     })

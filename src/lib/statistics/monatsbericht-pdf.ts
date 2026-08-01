@@ -56,6 +56,11 @@ function lastY(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 }
 
+function ytdLabel(throughMonth: number): string {
+  const m = MONTH_LABELS[throughMonth - 1];
+  return m ? `Jahressumme bis ${m} (YTD)` : "Jahressumme (YTD)";
+}
+
 export async function generateMonatsberichtPdf(
   data: MonatsberichtPdfData,
 ): Promise<{ doc: jsPDF; blob: Blob; fileName: string }> {
@@ -93,8 +98,11 @@ export async function generateMonatsberichtPdf(
         "Veränderung ggü. Vorjahresmonat",
         data.headline.yoyExcludedPartial ? "— (laufender Monat)" : fmtPct(data.headline.yoyPct),
       ],
-      ["Jahressumme bis Monat (YTD)", fmtEur(data.headline.ytdCents)],
-      ["Vorjahres-YTD", fmtEurOrDash(data.headline.previousYearYtdCents)],
+      [ytdLabel(data.headline.ytdThroughMonth), fmtEur(data.headline.ytdCents)],
+      [
+        `Vorjahres-YTD${MONTH_LABELS[data.headline.ytdThroughMonth - 1] ? ` (bis ${MONTH_LABELS[data.headline.ytdThroughMonth - 1]})` : ""}`,
+        fmtEurOrDash(data.headline.previousYearYtdCents),
+      ],
       ["Veränderung YTD", fmtPct(data.headline.ytdPct)],
       [
         "Bestes Jahr für diesen Monat",

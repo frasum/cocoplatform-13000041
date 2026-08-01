@@ -121,7 +121,7 @@ export function MonatsentwicklungTab() {
       const row: Record<string, number | string | null> = { month: label };
       for (const y of viewRows) {
         if (!chartYears.includes(y.year)) continue;
-        const value = y.values[idx];
+        const value = y.chartValues[idx];
         row[String(y.year)] = value === null || value === undefined ? null : displayEuros(value);
       }
       return row;
@@ -176,6 +176,7 @@ export function MonatsentwicklungTab() {
           Number(q.data.focusMonth.slice(0, 4)),
           Number(q.data.focusMonth.slice(5, 7)),
           mode,
+          q.data.currentMonthKey,
         );
   const currentYear = Number(q.data.focusMonth.slice(0, 4));
   const takeaway = mode === "takeaway";
@@ -280,7 +281,7 @@ export function MonatsentwicklungTab() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Jahressumme bis {MONTH_LABELS[Number(h.monthKey.slice(5, 7)) - 1]}
+              Jahressumme bis {MONTH_LABELS[h.ytdThroughMonth - 1] ?? "—"}
               {modeSuffix}
             </CardTitle>
           </CardHeader>

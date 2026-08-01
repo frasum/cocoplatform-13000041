@@ -315,7 +315,8 @@ export function LohnrechnerPanel() {
               ({fromDate} – {toDate})
             </span>
           </h2>
-          <Button
+          <div className="flex items-center gap-2">
+            <Button
             variant="outline"
             size="sm"
             onClick={handleCsvExport}
@@ -342,6 +343,7 @@ export function LohnrechnerPanel() {
               ? `Exportiere … (${zipProgress.done}/${zipProgress.total})`
               : "Excel-ZIP exportieren"}
           </Button>
+          </div>
         </div>
         {uebersichtQ.isLoading ? (
           <p className="text-sm text-muted-foreground">Lade…</p>

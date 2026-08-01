@@ -36,6 +36,77 @@ async function loginAsAdmin(page: Page, seed: E2ESeed): Promise<void> {
   await page.waitForURL((url) => !url.pathname.startsWith("/auth"), { timeout: 15_000 });
 }
 
+// E2E-G2b Diagnose (Befund B): unter webkit landet der Admin nach dem Login
+// nicht auf /admin/lohn-verteilung, sondern auf „/" — das Rollen-Gate in
+// src/routes/_authenticated/admin/route.tsx redirectet, wenn getMyIdentity()
+// keine Rolle manager+ liefert. Diese Funktion macht dieselbe Auflösung
+// sichtbar, die getMyIdentity() serverseitig macht (user_links → staff_id/
+// organization_id, dann role_assignments), aber über die REST-API mit dem
+// Bearer-Token der Browser-Session. Ändert kein Verhalten, loggt nur.
+async function logEffectiveIdentity(page: Page, label: string): Promise<void> {
+  const url = process.env.VITE_SUPABASE_URL ?? "";
+  const key = process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
+  const session = await page.evaluate(() => {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const k = window.localStorage.key(i);
+      if (!k || !/^sb-.*-auth-token$/.test(k)) continue;
+      try {
+        const raw = window.localStorage.getItem(k);
+        const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+        const token = parsed?.["access_token"];
+        const user = parsed?.["user"] as { id?: string } | undefined;
+        return {
+          storageKey: k,
+          hasToken: typeof token === "string" && token.length > 0,
+          token: typeof token === "string" ? token : null,
+          userId: user?.id ?? null,
+        };
+      } catch {
+        return { storageKey: k, hasToken: false, token: null, userId: null };
+      }
+    }
+    return { storageKey: null, hasToken: false, token: null, userId: null };
+  });
+
+  if (!url || !key || !session.token || !session.userId) {
+    console.log(
+      `[${label}] identity-probe unvollständig: url=${url ? "ok" : "leer"} ` +
+        `key=${key ? "ok" : "leer"} storageKey=${session.storageKey} ` +
+        `hasToken=${session.hasToken} userId=${session.userId} path=${new URL(page.url()).pathname}`,
+    );
+    return;
+  }
+
+  const headers = { apikey: key, Authorization: `Bearer ${session.token}` };
+  const linkRes = await page.request.get(
+    `${url}/rest/v1/user_links?select=staff_id,organization_id&user_id=eq.${session.userId}`,
+    { headers },
+  );
+  const links = (await linkRes.json().catch(() => null)) as
+    | Array<{ staff_id: string; organization_id: string }>
+    | null;
+  const link = links?.[0] ?? null;
+
+  let role: string | null = null;
+  let roleStatus = 0;
+  if (link) {
+    const roleRes = await page.request.get(
+      `${url}/rest/v1/role_assignments?select=role&staff_id=eq.${link.staff_id}` +
+        `&organization_id=eq.${link.organization_id}`,
+      { headers },
+    );
+    roleStatus = roleRes.status();
+    const roles = (await roleRes.json().catch(() => null)) as Array<{ role: string }> | null;
+    role = roles?.[0]?.role ?? null;
+  }
+
+  console.log(
+    `[${label}] path=${new URL(page.url()).pathname} userId=${session.userId} ` +
+      `linkStatus=${linkRes.status()} staffId=${link?.staff_id ?? null} ` +
+      `orgId=${link?.organization_id ?? null} roleStatus=${roleStatus} role=${role}`,
+  );
+}
+
 async function buildCombinedPdf(): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -67,6 +138,9 @@ test.describe("Lohn-Verteilung: Sammel-PDF splitten (Bundle-Diet)", () => {
   test("lädt genau EINEN pdf.worker-Chunk und splittet ohne Fehler", async ({ page }) => {
     seed = await seedKasseFinalize("bundle-diet", { withServiceHours: true });
     await loginAsAdmin(page, seed);
+
+    // Diagnose vor der Admin-Navigation: welche Rolle sieht das Gate?
+    await logEffectiveIdentity(page, "E2E-G2b-webkit");
 
     // Worker-Requests VOR der Navigation zu /admin/lohn-verteilung
     // beobachten — sonst entgehen uns eventuelle Preloads.

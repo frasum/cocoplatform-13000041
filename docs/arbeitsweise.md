@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 01.08.2026 (§121: STAT1/STAT1b Umsatz-Doppelzählung behoben; EX1 Lohn-Sammelexport; UK2 U/K-Erfassung; E2E-G1 GRANT-Lücke; Export-Generalprobe)
+Stand: 01.08.2026 (§122: MB-Serie Monatsentwicklung; STAT2c Standortvergleich; MB3/MB3b laufender-Monat-Fixes; Repo privat vollzogen)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -306,7 +306,7 @@ Immer **26. eines Monats bis einschließlich 25. des Folgemonats**. Label = Mona
 
 ### Quell-Repos (Lovable/GitHub, frasum)
 
-- **COCO (Ziel):** blank-slate-react
+- **COCO (Ziel, kanonisch seit §113):** cocoplatform-13000041 (privat)
 - **tagesabrechnung** (Kasse/Zeit-Quelle) — `gh repo clone frasum/tagesabrechnung`
 - **bunker-shift-flow** (Dienstplan-UI-Vorlage: RosterGrid, Paint-Tool) — `gh repo clone frasum/bunker-shift-flow`
 - **thaitime-12f46b18** (Dienstplan-Daten + Display-Vorlage)

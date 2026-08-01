@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LocationPills } from "@/components/shared/LocationPills";
 import { MonthNav } from "@/components/shared/MonthNav";
+import { MonatsentwicklungTab } from "@/components/statistik/MonatsentwicklungTab";
 import { Input } from "@/components/ui/input";
 import { listLocations } from "@/lib/admin/locations.functions";
 import { getRevenueStats } from "@/lib/statistics/revenue-stats.functions";

@@ -1434,6 +1434,9 @@ type CompareLocation = {
   prevWorkMinutesTotal: number | null;
   prevRevenuePerGuestCents: number | null;
   prevRevenuePerWorkHourCents: number | null;
+  // STAT2d — Trinkgeld-Quote (Trinkgeld gesamt ÷ HAUS-Umsatz), Vorperiode analog.
+  tipRatePct: number | null;
+  prevTipRatePct: number | null;
 };
 
 function LocationCompareSection({
@@ -1514,6 +1517,9 @@ function LocationCompareSection({
         prevWorkMinutesTotal: rev.previousDerived?.workMinutesTotal ?? null,
         prevRevenuePerGuestCents: prevKpis?.revenuePerGuestCents ?? null,
         prevRevenuePerWorkHourCents: prevKpis?.revenuePerWorkHourCents ?? null,
+        tipRatePct: tipRatePct(tipTotal, rev.summary.houseCents),
+        prevTipRatePct:
+          prevRev && prevTipTotal !== null ? tipRatePct(prevTipTotal, prevRev.houseCents) : null,
       });
     });
     return list;
@@ -1689,6 +1695,15 @@ function LocationCompareSection({
                     b={b}
                     valueOf={(r) => r.avgTipPerDayCents}
                     prevOf={(r) => r.prevAvgTipPerDayCents}
+                  />
+                  {/* STAT2d — QUOTE: Delta in Prozentpunkten, Bezug Haus-Umsatz. */}
+                  <RateCompareCard
+                    title="Trinkgeld-Quote"
+                    subtitle="bezogen auf Haus-Umsatz"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.tipRatePct}
+                    prevOf={(r) => r.prevTipRatePct}
                   />
                 </div>
               </div>

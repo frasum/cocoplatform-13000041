@@ -12,6 +12,7 @@
 import type jsPDF from "jspdf";
 import { fmtCents, parseIso } from "@/lib/format";
 import { growthPct } from "./monthly-core";
+import { tipRatePct } from "./revenue-core";
 import {
   barChartGeometry,
   formatTsd,
@@ -110,6 +111,8 @@ export type StatistikPdfData = {
     prevYearTotalCents?: number | null;
     /** Vormonatsfenster je Standort; null ⇒ „—". */
     prevTotalCents?: number | null;
+    /** STAT2d — Trinkgeld-Quote in Prozent (Trinkgeld ÷ Haus-Umsatz); null ⇒ „—". */
+    tipRatePct?: number | null;
   }>;
 };
 
@@ -277,6 +280,7 @@ export async function generateStatistikPdf(
       deltaLabel(c.totalCents, c.prevYearTotalCents, cmp),
       deltaLabel(c.totalCents, c.prevTotalCents, cmp),
       fmtEur(c.tipTotalCents),
+      fmtPctDe(c.tipRatePct ?? null),
       `${fmtPctDe(c.ratioPct)}${c.hasMissingRate ? " *" : ""}`,
       fmtHoursDe(c.netHours),
       fmtEurOrDash(c.perGuestCents ?? null),
@@ -289,6 +293,7 @@ export async function generateStatistikPdf(
       deltaLabel(data.revenue.totalCents, data.previousYearTotalCents, cmp),
       deltaLabel(data.revenue.totalCents, data.previousPeriodTotalCents, cmp),
       fmtEur(data.tips.totalCents),
+      fmtPctDe(tipRatePct(data.tips.totalCents, data.revenue.houseCents)),
       `${fmtPctDe(data.personnel.ratioPct)}${hasMissingAny ? " *" : ""}`,
       fmtHoursDe(data.personnel.netHours),
       fmtEurOrDash(gh?.revenuePerGuestCents ?? null),
@@ -306,15 +311,16 @@ export async function generateStatistikPdf(
         valign: "middle",
       },
       columnStyles: {
-        0: { cellWidth: 88, halign: "left" },
-        1: { cellWidth: 66, halign: "right" },
-        2: { cellWidth: 54, halign: "right" },
-        3: { cellWidth: 54, halign: "right" },
-        4: { cellWidth: 60, halign: "right" },
-        5: { cellWidth: 50, halign: "right" },
-        6: { cellWidth: 56, halign: "right" },
-        7: { cellWidth: 46, halign: "right" },
+        0: { cellWidth: 80, halign: "left" },
+        1: { cellWidth: 60, halign: "right" },
+        2: { cellWidth: 48, halign: "right" },
+        3: { cellWidth: 48, halign: "right" },
+        4: { cellWidth: 54, halign: "right" },
+        5: { cellWidth: 40, halign: "right" },
+        6: { cellWidth: 50, halign: "right" },
+        7: { cellWidth: 50, halign: "right" },
         8: { cellWidth: 46, halign: "right" },
+        9: { cellWidth: 46, halign: "right" },
       },
       head: [
         [
@@ -323,6 +329,7 @@ export async function generateStatistikPdf(
           "vs. Vorjahr",
           "vs. Vormonat",
           "Trinkgeld ges.",
+          "TG-Quote",
           "Quote",
           "Netto-Std.",
           "€ / Gast",
@@ -601,6 +608,8 @@ export async function generateStatistikPdf(
     "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.",
     // ASCII statt Delta-Zeichen: die jsPDF-Standardschrift (WinAnsi) kennt kein U+0394.
     "Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.",
+    // STAT2d — Bezugsbasis der Quote muss im Dokument stehen.
+    "TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).",
   ];
   if (hasMissingAny || data.personnel.staffWithoutRateNames.length > 0) {
     notes.push(

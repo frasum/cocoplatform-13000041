@@ -244,6 +244,23 @@ export function derivedKpis(input: {
   };
 }
 
+/** Trinkgeld-Quote in Prozent, bezogen auf den HAUS-Umsatz (Bauherren-Entscheid
+ *  STAT2d, Variante b). houseCents <= 0 ⇒ null (Variante B: „—", kein 0-Fake).
+ *  Keine Rundung hier — gerundet wird erst im Format. */
+export function tipRatePct(tipTotalCents: number, houseCents: number): number | null {
+  if (!Number.isFinite(tipTotalCents) || !Number.isFinite(houseCents)) return null;
+  if (houseCents <= 0) return null;
+  return (tipTotalCents / houseCents) * 100;
+}
+
+/** Delta zweier Quoten in PROZENTPUNKTEN (STAT2d): bei einer Prozent-Kennzahl
+ *  ist relatives Wachstum doppeldeutig. Fehlt ein Wert ⇒ null. */
+export function ppDelta(current: number | null, previous: number | null): number | null {
+  if (current === null || previous === null) return null;
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return null;
+  return current - previous;
+}
+
 // STAT2 — Gäste je Geschäftstag. Mehrere Sessions am selben Tag (z. B. zwei
 // Standorte im Filter „alle") summieren auf; fehlende Zählungen gelten als 0.
 export function sumGuestsByDate(

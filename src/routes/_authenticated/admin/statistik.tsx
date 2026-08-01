@@ -533,6 +533,7 @@ function StatistikPage() {
           <TabsTrigger value="trinkgeld">Trinkgeld</TabsTrigger>
           <TabsTrigger value="personal">Personalquote</TabsTrigger>
           <TabsTrigger value="vergleich">Standortvergleich</TabsTrigger>
+          <TabsTrigger value="monat">Monatsentwicklung</TabsTrigger>
         </TabsList>
         <TabsContent value="umsatz">
           {statsQ.isLoading ? (
@@ -569,6 +570,11 @@ function StatistikPage() {
             isLoading={compareLoading}
             firstError={compareError}
           />
+        </TabsContent>
+        <TabsContent value="monat">
+          {/* MB1 — eigener Datenpfad (24-Jahre-Historie), unabhängig vom
+              Monats-/Zeitraum-Filter oben. */}
+          <MonatsentwicklungTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -15,6 +15,9 @@ export type StatistikPdfData = {
     totalCents: number;
     daysWithRevenue: number;
   };
+  /** STAT1b — Take-Away-Segmente (Wolt / direkt / SoUse) aus takeawayDonutSegments. */
+  takeawaySegments: Array<{ name: string; amountCents: number }>;
+  takeawaySegmentsWarning: string | null;
   tips: {
     serviceCents: number;
     kitchenCents: number;
@@ -109,6 +112,36 @@ export async function generateStatistikPdf(
     theme: "grid",
   });
   cursorY = lastY(doc) + 18;
+
+  // 1b) Take-Away-Kanäle (STAT1b — gleiche Quelle wie der Donut)
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Take-Away-Kanäle", marginX, cursorY);
+  if (data.takeawaySegments.length === 0) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.text("Keine Take-Away-Umsätze im gewählten Zeitraum.", marginX, cursorY + 14);
+    cursorY += 24;
+  } else {
+    autoTable(doc, {
+      startY: cursorY + 6,
+      margin: { left: marginX, right: marginX },
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
+      columnStyles: { 1: { halign: "right" } },
+      head: [["Kanal", "Betrag"]],
+      body: data.takeawaySegments.map((s) => [s.name, fmtEur(s.amountCents)]),
+      theme: "grid",
+    });
+    cursorY = lastY(doc) + 12;
+    if (data.takeawaySegmentsWarning) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.text(data.takeawaySegmentsWarning, marginX, cursorY);
+      cursorY += 12;
+    }
+    cursorY += 6;
+  }
 
   // 2) Trinkgeld
   doc.setFont("helvetica", "bold");

@@ -386,9 +386,21 @@ export async function generateStatistikPdf(
     columnStyles: { 0: { cellWidth: 88, halign: "left", fontStyle: "bold" } },
     head: [["Bereich", ...tipCols.map((t) => t.locationName), "Gesamt"]],
     body: [
-      ["Service", ...tipCols.map((t) => fmtEurRounded(t.serviceCents)), fmtEurRounded(data.tips.serviceCents)],
-      ["Küche", ...tipCols.map((t) => fmtEurRounded(t.kitchenCents)), fmtEurRounded(data.tips.kitchenCents)],
-      ["Gesamt", ...tipCols.map((t) => fmtEurRounded(t.totalCents)), fmtEurRounded(data.tips.totalCents)],
+      [
+        "Service",
+        ...tipCols.map((t) => fmtEurRounded(t.serviceCents)),
+        fmtEurRounded(data.tips.serviceCents),
+      ],
+      [
+        "Küche",
+        ...tipCols.map((t) => fmtEurRounded(t.kitchenCents)),
+        fmtEurRounded(data.tips.kitchenCents),
+      ],
+      [
+        "Gesamt",
+        ...tipCols.map((t) => fmtEurRounded(t.totalCents)),
+        fmtEurRounded(data.tips.totalCents),
+      ],
     ],
     theme: "grid",
   });

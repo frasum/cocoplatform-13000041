@@ -11,7 +11,7 @@ import { fmtCents } from "@/lib/format";
 import { fillDailyGaps } from "./chart-fill";
 import { aggregateByBusinessDate, summarize, takeawayDonutSegments } from "./revenue-core";
 import { mapToSessionInputs, type ChannelAmountRow, type SessionRow } from "./revenue-map";
-import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
+import { fmtEurRounded, generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
 import { takeawayMatrix, takeawaySharePctOfTotal } from "./takeaway-channels";
 
 type Cell = string | { content: string };
@@ -172,7 +172,9 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     const directRow = cells.find((r) => r[0] === "Takeaway direkt (Telefon/Abholung)");
     expect(woltRow?.[1]).toBe(eurPdf(donut.segments[0]!.amountCents));
     expect(directRow?.[1]).toBe(eurPdf(donut.segments[1]!.amountCents));
-    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(eurPdf(EXPECTED.takeawayCents));
+    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(
+      eurPdf(EXPECTED.takeawayCents),
+    );
 
     // 6) Kein Pfad zeigt die Wolt-additive Altsumme (667.250 + 17.210).
     const allPdfCells = captured.flatMap((t) => t.body.flatMap((r) => r.map(cell)));

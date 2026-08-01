@@ -212,6 +212,39 @@ export function computeTrend(currentCents: number, previousCents: number): Trend
   return { deltaCents, pct };
 }
 
+// STAT2 — abgeleitete Kennzahlen „Ø Umsatz je Gast" und „Umsatz je
+// Arbeitsstunde". Rein und getestet; die UI rechnet nicht.
+//
+// Fachentscheid 01.08.2026: € je Gast bezieht sich auf den HAUS-Umsatz —
+// Takeaway-Besteller sind keine Gäste am Tisch. € je Stunde bezieht sich auf
+// den Gesamtumsatz (die Arbeitszeit trägt beide Kanäle).
+//
+// Nenner 0 ⇒ `null` (die UI zeigt „—"; kein NaN, kein Infinity, kein 0-Fake).
+export type DerivedKpis = {
+  /** Haus-Umsatz je Gast in ganzen Cent, oder null bei 0 Gästen. */
+  revenuePerGuestCents: number | null;
+  /** Gesamtumsatz je Arbeitsstunde in ganzen Cent, oder null bei 0 Minuten. */
+  revenuePerWorkHourCents: number | null;
+  /** Arbeitsstunden (Minuten/60), auf zwei Dezimalen gerundet. */
+  workHours: number;
+};
+
+export function derivedKpis(input: {
+  houseCents: number;
+  totalCents: number;
+  guestCount: number;
+  workMinutes: number;
+}): DerivedKpis {
+  const guests = input.guestCount > 0 ? input.guestCount : 0;
+  const minutes = input.workMinutes > 0 ? input.workMinutes : 0;
+  return {
+    revenuePerGuestCents: guests === 0 ? null : Math.round(input.houseCents / guests),
+    revenuePerWorkHourCents:
+      minutes === 0 ? null : Math.round((input.totalCents * 60) / minutes),
+    workHours: Math.round((minutes / 60) * 100) / 100,
+  };
+}
+
 // STAT-U2 — Take-Away je Kanal.
 // Summiert `amountCents` je Kanal-Name und sortiert absteigend. Reihenfolge
 // bei Gleichstand: stabil nach Kanal-Name (aufsteigend), damit die UI und

@@ -12,6 +12,7 @@
 import type jsPDF from "jspdf";
 import { fmtCents, parseIso } from "@/lib/format";
 import { growthPct } from "./monthly-core";
+import { tipRatePct } from "./revenue-core";
 import {
   barChartGeometry,
   formatTsd,

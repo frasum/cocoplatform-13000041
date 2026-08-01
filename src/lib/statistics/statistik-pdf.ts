@@ -117,6 +117,16 @@ function fmtEur(cents: number): string {
   return `${fmtCents(cents)} €`;
 }
 
+/**
+ * STAT3c — eine Farbzuordnung für Grafik A (gestapelte Tagesbalken) und
+ * Grafik B (13-Monats-Verlauf), damit EINE Legende beide Grafiken erklärt.
+ */
+const SERIES_PALETTE: Array<[number, number, number]> = [
+  [60, 90, 140],
+  [190, 110, 60],
+  [90, 140, 100],
+];
+
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
   return cents === null || cents === undefined ? "—" : fmtEur(cents);

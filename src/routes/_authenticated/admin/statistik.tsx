@@ -45,6 +45,7 @@ import {
   takeawayDonutSegments,
 } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
+import { compareKpi } from "@/lib/statistics/kpi-compare";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
@@ -317,6 +318,14 @@ function StatistikPage() {
       const t = tipQueries[i]?.data;
       const p = perQueries[i]?.data;
       if (!r || !t || !p) return;
+      // STAT2b — dieselben Felder wie die Vergleichskarten, keine eigene
+      // Summierung: derivedKpis ist die einzige Kennzahl-Quelle.
+      const k = derivedKpis({
+        houseCents: r.summary.houseCents,
+        totalCents: r.summary.totalCents,
+        guestCount: r.guestTotal,
+        workMinutes: r.workMinutesTotal,
+      });
       comparison.push({
         locationName: loc.name,
         totalCents: r.summary.totalCents,
@@ -325,6 +334,10 @@ function StatistikPage() {
         netHours: p.totals.netHours,
         laborCostCents: p.totals.laborCostCents,
         hasMissingRate: p.staffWithoutRate.length > 0,
+        guestTotal: r.guestTotal,
+        workHours: k.workHours,
+        perGuestCents: k.revenuePerGuestCents,
+        perHourCents: k.revenuePerWorkHourCents,
       });
     });
 
@@ -1268,6 +1281,11 @@ type CompareLocation = {
   avgTipPerDayCents: number;
   daysWithData: number;
   tipTotalCents: number;
+  // STAT2b — Rohsummen + fertige Kennzahlen (aus `derivedKpis`).
+  guestTotal: number;
+  workMinutesTotal: number;
+  revenuePerGuestCents: number | null;
+  revenuePerWorkHourCents: number | null;
 };
 
 function LocationCompareSection({
@@ -1297,6 +1315,13 @@ function LocationCompareSection({
       const daysWithData = rev.daily.filter((d) => d.totalCents > 0).length;
       const total = rev.summary.totalCents;
       const tipTotal = tip.totals.totalCents;
+      // STAT2b — keine Neuberechnung in der UI: derivedKpis ist die Quelle.
+      const kpis = derivedKpis({
+        houseCents: rev.summary.houseCents,
+        totalCents: rev.summary.totalCents,
+        guestCount: rev.guestTotal,
+        workMinutes: rev.workMinutesTotal,
+      });
       list.push({
         id: loc.id,
         name: loc.name,
@@ -1308,6 +1333,10 @@ function LocationCompareSection({
         avgTipPerDayCents: daysWithData > 0 ? Math.round(tipTotal / daysWithData) : 0,
         daysWithData,
         tipTotalCents: tipTotal,
+        guestTotal: rev.guestTotal,
+        workMinutesTotal: rev.workMinutesTotal,
+        revenuePerGuestCents: kpis.revenuePerGuestCents,
+        revenuePerWorkHourCents: kpis.revenuePerWorkHourCents,
       });
     });
     return list;
@@ -1455,6 +1484,42 @@ function LocationCompareSection({
                   b={b}
                   valueOf={(r) => r.avgTipPerDayCents}
                 />
+              </div>
+
+              {/* STAT2b — Gäste & Personal: Rohsummen mit Anteils-Balken,
+                  Dichte-Kennzahlen ohne Balken (Anteil wäre irreführend). */}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold tracking-tight text-foreground">
+                  Gäste &amp; Personal
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <SumCompareCard
+                    title="Gäste"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.guestTotal}
+                    format={(v) => v.toLocaleString("de-DE")}
+                  />
+                  <SumCompareCard
+                    title="Arbeitsstunden"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.workMinutesTotal}
+                    format={fmtMinutesAsHours}
+                  />
+                  <KpiCompareCard
+                    title="Ø Umsatz je Gast"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.revenuePerGuestCents}
+                  />
+                  <KpiCompareCard
+                    title="Umsatz je Arbeitsstunde"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.revenuePerWorkHourCents}
+                  />
+                </div>
               </div>
             </>
           ) : null}
@@ -1631,6 +1696,177 @@ function ComparisonSide({
       <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
         {fmtEuro(value)}
       </div>
+      <div className={cn("mt-1", align === "right" ? "flex justify-end" : "")}>
+        <span className={badgeCls}>{diffLabel}</span>
+      </div>
+    </div>
+  );
+}
+
+// ============ STAT2b — Gäste & Personal ============
+
+/** Arbeitsminuten als Stunden („h"-Format wie im Umsatz-Tab-Panel). */
+function fmtMinutesAsHours(minutes: number): string {
+  return `${(minutes / 60).toFixed(1)} h`;
+}
+
+/**
+ * Rohsummen-Vergleich (Gäste, Arbeitsstunden): gleiches Muster wie
+ * `ComparisonCard` (Anteils-Balken + pctDiff), aber mit eigener Formatierung —
+ * `ComparisonCard` rendert fest in Euro und bleibt unangetastet.
+ */
+function SumCompareCard({
+  title,
+  a,
+  b,
+  valueOf,
+  format,
+}: {
+  title: string;
+  a: CompareLocation;
+  b: CompareLocation;
+  valueOf: (row: CompareLocation) => number;
+  format: (value: number) => string;
+}) {
+  const av = valueOf(a);
+  const bv = valueOf(b);
+  const share = shareOf(av, bv);
+  const aPct = Math.round(share * 100);
+  const bPct = 100 - aPct;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <CompareSide
+            name={a.name}
+            text={format(av)}
+            diff={pctDiff(av, bv)}
+            align="left"
+            tone="a"
+          />
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            VS
+          </div>
+          <CompareSide
+            name={b.name}
+            text={format(bv)}
+            diff={pctDiff(bv, av)}
+            align="right"
+            tone="b"
+          />
+        </div>
+        <div>
+          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full bg-chart-1"
+              style={{ width: `${aPct}%` }}
+              aria-label={`${a.name} Anteil ${aPct} %`}
+            />
+            <div
+              className="h-full bg-chart-2"
+              style={{ width: `${bPct}%` }}
+              aria-label={`${b.name} Anteil ${bPct} %`}
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
+            <span>{aPct} %</span>
+            <span>{bPct} %</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Dichte-Kennzahlen (€ je Gast, € je Arbeitsstunde): bewusst OHNE
+ * Anteils-Balken — ein „Anteil" ist bei Verhältniszahlen irreführend.
+ * Wertepaar und Differenz kommen aus `compareKpi`; Nenner-0 ⇒ „—".
+ */
+function KpiCompareCard({
+  title,
+  a,
+  b,
+  valueOf,
+}: {
+  title: string;
+  a: CompareLocation;
+  b: CompareLocation;
+  valueOf: (row: CompareLocation) => number | null;
+}) {
+  const c = compareKpi(valueOf(a), valueOf(b));
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-start justify-between gap-3">
+          <CompareSide
+            name={a.name}
+            text={c.aValue === null ? "—" : fmtEuro(c.aValue)}
+            diff={c.aDiffPct}
+            align="left"
+            tone="a"
+          />
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            VS
+          </div>
+          <CompareSide
+            name={b.name}
+            text={c.bValue === null ? "—" : fmtEuro(c.bValue)}
+            diff={c.bDiffPct}
+            align="right"
+            tone="b"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Wie `ComparisonSide`, aber mit vorformatiertem Wert-Text. */
+function CompareSide({
+  name,
+  text,
+  diff,
+  align,
+  tone,
+}: {
+  name: string;
+  text: string;
+  diff: number | null;
+  align: "left" | "right";
+  tone: "a" | "b";
+}) {
+  const isPos = diff !== null && diff > 0;
+  const isNeg = diff !== null && diff < 0;
+  const badgeCls = cn(
+    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+    isPos
+      ? "bg-emerald-50 text-emerald-700"
+      : isNeg
+        ? "bg-rose-50 text-rose-700"
+        : "bg-muted text-muted-foreground",
+  );
+  const dotCls = tone === "a" ? "bg-chart-1" : "bg-chart-2";
+  const diffLabel =
+    diff === null ? "—" : `${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${Math.abs(diff).toFixed(1)} %`;
+  return (
+    <div className={cn("flex-1 min-w-0", align === "right" ? "text-right" : "text-left")}>
+      <div
+        className={cn(
+          "flex items-center gap-1.5 text-xs text-muted-foreground",
+          align === "right" ? "justify-end" : "",
+        )}
+      >
+        <span className={cn("h-2 w-2 rounded-full", dotCls)} aria-hidden />
+        <span className="truncate">{name}</span>
+      </div>
+      <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{text}</div>
       <div className={cn("mt-1", align === "right" ? "flex justify-end" : "")}>
         <span className={badgeCls}>{diffLabel}</span>
       </div>

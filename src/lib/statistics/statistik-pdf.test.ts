@@ -8,6 +8,7 @@ import { fmtCents } from "@/lib/format";
 import {
   aggregateByBusinessDate,
   summarize,
+  derivedKpis,
   takeawayDonutSegments,
   type SessionRevenueInput,
 } from "./revenue-core";
@@ -136,5 +137,73 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
     expect(src).not.toMatch(/\.reduce\(/);
     expect(src).not.toMatch(/Cents\s*[+\-*/]\s*\w*Cents/);
     expect(src).not.toMatch(/vectron|delivery_|houseCents\s*=/);
+  });
+});
+
+// STAT2b — Vergleichs-Abschnitt: Gäste, Arbeitsstunden und die beiden
+// Dichte-Kennzahlen erscheinen je Standort; Nenner 0 ⇒ „—".
+describe("statistik-pdf — Standort-Vergleich (STAT2b)", () => {
+  it("Fixture mit zwei Standorten rendert die vier neuen Werte", async () => {
+    captured.length = 0;
+    const kA = derivedKpis({
+      houseCents: 200_000,
+      totalCents: 260_000,
+      guestCount: 80,
+      workMinutes: 2_400,
+    });
+    const kB = derivedKpis({
+      houseCents: 100_000,
+      totalCents: 100_000,
+      guestCount: 0,
+      workMinutes: 0,
+    });
+
+    const data: StatistikPdfData = {
+      monthLabel: "Juli 2026",
+      scopeLabel: "Alle Standorte",
+      revenue: { houseCents: 0, takeawayCents: 0, totalCents: 0, daysWithRevenue: 0 },
+      takeawaySegments: [],
+      takeawaySegmentsWarning: null,
+      tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perStaff: [] },
+      personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
+      dailyRevenue: [],
+      comparison: [
+        {
+          locationName: "Spicery",
+          totalCents: 260_000,
+          tipTotalCents: 0,
+          ratioPct: null,
+          netHours: 40,
+          laborCostCents: 0,
+          hasMissingRate: false,
+          guestTotal: 80,
+          workHours: kA.workHours,
+          perGuestCents: kA.revenuePerGuestCents,
+          perHourCents: kA.revenuePerWorkHourCents,
+        },
+        {
+          locationName: "TSB",
+          totalCents: 100_000,
+          tipTotalCents: 0,
+          ratioPct: null,
+          netHours: 0,
+          laborCostCents: 0,
+          hasMissingRate: false,
+          guestTotal: 0,
+          workHours: kB.workHours,
+          perGuestCents: kB.revenuePerGuestCents,
+          perHourCents: kB.revenuePerWorkHourCents,
+        },
+      ],
+    };
+
+    await generateStatistikPdf(data);
+
+    const rowA = findRow("Spicery");
+    expect(rowA.slice(6)).toEqual(["80", "40.00", `${fmtCents(2_500)} €`, `${fmtCents(6_500)} €`]);
+
+    // TSB: beide Nenner 0 ⇒ beide Kennzahlen „—", Rohsummen bleiben 0.
+    const rowB = findRow("TSB");
+    expect(rowB.slice(6)).toEqual(["0", "0.00", "—", "—"]);
   });
 });

@@ -61,6 +61,15 @@ export type StatistikPdfData = {
     netHours: number;
     laborCostCents: number;
     hasMissingRate: boolean;
+    /**
+     * STAT2b — Gäste/Arbeitsstunden und die beiden Dichte-Kennzahlen je
+     * Standort. Werte kommen fertig aus `derivedKpis` bzw. den Stats-Feldern;
+     * hier wird nichts summiert. Optional gehalten (Alt-Fixtures ohne Block).
+     */
+    guestTotal?: number;
+    workHours?: number;
+    perGuestCents?: number | null;
+    perHourCents?: number | null;
   }>;
 };
 
@@ -79,6 +88,15 @@ function fmtPct(pct: number | null): string {
 
 function fmtHours(h: number): string {
   return h.toFixed(2);
+}
+
+/** STAT2b — fehlender/undefinierter Wert ⇒ „—". */
+function fmtHoursOrDash(h: number | undefined): string {
+  return h === undefined ? "—" : fmtHours(h);
+}
+
+function fmtCountOrDash(n: number | undefined): string {
+  return n === undefined ? "—" : String(n);
 }
 
 function lastY(doc: jsPDF): number {
@@ -360,9 +378,24 @@ export async function generateStatistikPdf(
         3: { halign: "right" },
         4: { halign: "right" },
         5: { halign: "right" },
+        6: { halign: "right" },
+        7: { halign: "right" },
+        8: { halign: "right" },
+        9: { halign: "right" },
       },
       head: [
-        ["Standort", "Umsatz", "Trinkgeld", "Personalquote", "Netto-Std.", "Basis-Lohnkosten"],
+        [
+          "Standort",
+          "Umsatz",
+          "Trinkgeld",
+          "Personalquote",
+          "Netto-Std.",
+          "Basis-Lohnkosten",
+          "Gäste",
+          "Arbeitsstd.",
+          "€ / Gast",
+          "€ / Std.",
+        ],
       ],
       body: data.comparison.map((c) => [
         c.locationName,
@@ -371,6 +404,10 @@ export async function generateStatistikPdf(
         `${fmtPct(c.ratioPct)}${c.hasMissingRate ? " *" : ""}`,
         fmtHours(c.netHours),
         fmtEur(c.laborCostCents),
+        fmtCountOrDash(c.guestTotal),
+        fmtHoursOrDash(c.workHours),
+        fmtEurOrDash(c.perGuestCents ?? null),
+        fmtEurOrDash(c.perHourCents ?? null),
       ]),
       theme: "grid",
     });

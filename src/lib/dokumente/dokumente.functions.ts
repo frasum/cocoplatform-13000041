@@ -293,7 +293,13 @@ async function loadPlaceholderInput(
 export const previewDocument = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ staffId: z.string().uuid(), templateId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        staffId: z.string().uuid(),
+        templateId: z.string().uuid(),
+        vorgang: vorgangSchema,
+      })
+      .parse(i),
   )
   .handler(async ({ data, context }): Promise<DocumentPreview> => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
@@ -309,7 +315,8 @@ export const previewDocument = createServerFn({ method: "POST" })
     if (!tpl) throw new Error("Template nicht gefunden.");
 
     const input = await loadPlaceholderInput(caller.organizationId, data.staffId);
-    const values = buildPlaceholderData(input);
+    const vorgang = resolveVorgangOrThrow(tpl.content, data.vorgang);
+    const values = buildPlaceholderData({ ...input, vorgang });
     return fillTemplate(tpl.content, values);
   });
 
@@ -335,12 +342,25 @@ export const saveGeneratedDocument = createServerFn({ method: "POST" })
 
       const { data: tpl, error: tErr } = await supabaseAdmin
         .from("document_templates")
-        .select("id, doc_type")
+        .select("id, doc_type, content")
         .eq("id", data.templateId)
         .eq("organization_id", caller.organizationId)
         .maybeSingle();
       if (tErr) throw tErr;
       if (!tpl) throw new Error("Template nicht gefunden.");
+
+      // DL2 — Vorgangs-Platzhalter sind Pflicht: ohne Wert kein Dokument.
+      const requiredVorgang = vorgangPlaceholdersInTemplate(tpl.content);
+      if (requiredVorgang.length > 0) {
+        const stillOpen = requiredVorgang.filter((p) =>
+          data.content.includes(`{{${p.key}}}`),
+        );
+        if (stillOpen.length > 0) {
+          throw new Error(
+            `Pflichtangabe fehlt: ${stillOpen.map((p) => p.label).join(", ")}`,
+          );
+        }
+      }
 
       const { data: staff, error: sErr } = await supabaseAdmin
         .from("staff")

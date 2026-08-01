@@ -1724,6 +1724,51 @@ function ShareBar({ a, b, aPct, bPct }: { a: string; b: string; aPct: number; bP
   );
 }
 
+/**
+ * Niveau-Balken für Verhältniszahlen (€ je Gast, € je Arbeitsstunde):
+ * zwei getrennte Balken, jeweils skaliert am größeren der beiden Werte.
+ * Bewusst KEIN Anteils-Balken — ein „Anteil" wäre bei Dichte-Kennzahlen
+ * irreführend. Fehlende Werte (null) ⇒ leerer Balken.
+ */
+function LevelBar({
+  a,
+  b,
+  aValue,
+  bValue,
+  format,
+}: {
+  a: string;
+  b: string;
+  aValue: number | null;
+  bValue: number | null;
+  format: (value: number) => string;
+}) {
+  const max = Math.max(aValue ?? 0, bValue ?? 0);
+  const widthOf = (v: number | null) => (max > 0 && v !== null ? (v / max) * 100 : 0);
+  const rows: Array<{ name: string; value: number | null; cls: string }> = [
+    { name: a, value: aValue, cls: "bg-chart-1" },
+    { name: b, value: bValue, cls: "bg-chart-2" },
+  ];
+  return (
+    <div className="space-y-1.5">
+      {rows.map((row) => (
+        <div key={row.name} className="flex items-center gap-2">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+            <div
+              className={`h-full ${row.cls}`}
+              style={{ width: `${widthOf(row.value)}%` }}
+              aria-label={`${row.name}: ${row.value === null ? "—" : format(row.value)}`}
+            />
+          </div>
+          <span className="w-20 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+            {row.value === null ? "—" : format(row.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** Eine Standort-Seite: Name, Wert, Trendzeile gegen das eigene Vormonatsfenster. */
 function CompareSide({
   name,
@@ -1845,7 +1890,7 @@ function SumCompareCard({
 }
 
 /**
- * Dichte-Kennzahlen (€ je Gast, € je Arbeitsstunde): bewusst OHNE
+ * Dichte-Kennzahlen (€ je Gast, € je Arbeitsstunde): Niveau-Balken statt
  * Anteils-Balken — ein „Anteil" ist bei Verhältniszahlen irreführend.
  * Wertepaar kommt aus `compareKpi`; Nenner-0 ⇒ „—".
  */
@@ -1898,6 +1943,13 @@ function KpiCompareCard({
           />
         </div>
         <LeadDeltaLine text={lead.text} tone={lead.tone} />
+        <LevelBar
+          a={a.name}
+          b={b.name}
+          aValue={c.aValue}
+          bValue={c.bValue}
+          format={fmtEuro}
+        />
       </CardContent>
     </Card>
   );

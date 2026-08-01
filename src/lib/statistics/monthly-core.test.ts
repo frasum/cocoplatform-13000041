@@ -17,6 +17,7 @@ import {
   toYearRows,
   ytdCents,
 } from "./monthly-core";
+import type { LegacyRow } from "./monthly-core";
 
 describe("MB1 — Live-Grenze", () => {
   it("LIVE_FROM ist der 01.03.2026", () => {

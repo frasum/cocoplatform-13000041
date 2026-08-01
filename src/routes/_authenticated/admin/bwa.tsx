@@ -1233,7 +1233,7 @@ function BreakEvenCard({ be }: { be: ReturnType<typeof computeBreakEven> }) {
 function waterfallColor(kind: WaterfallStep["kind"], signed: number): string {
   switch (kind) {
     case "plus":
-      return "hsl(var(--primary))";
+      return "var(--primary)";
     case "minus":
       return "hsl(0 70% 55%)";
     case "subtotal":
@@ -1401,15 +1401,15 @@ function TimeSeriesCard({ rows, highlightedMonth }: { rows: BwaRow[]; highlighte
                   `${v.toLocaleString("de-DE", { maximumFractionDigits: 0 })} €`
                 }
               />
-              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+              <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
               {highlightLabel && (
                 <ReferenceLine
                   x={highlightLabel}
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeDasharray="4 2"
                 />
               )}
-              <Bar dataKey="umsatz" fill="hsl(var(--primary))" opacity={0.7} name="Umsatz" />
+              <Bar dataKey="umsatz" fill="var(--primary)" opacity={0.7} name="Umsatz" />
               <Line
                 type="monotone"
                 dataKey="betrieb"
@@ -1479,7 +1479,7 @@ function QuoteBandsCard({ rows, highlightedMonth }: { rows: BwaRow[]; highlighte
               {highlightLabel && (
                 <ReferenceLine
                   x={highlightLabel}
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeDasharray="4 2"
                 />
               )}
@@ -2428,7 +2428,7 @@ function SmallMultiplesGrid({
                         tick={{ fontSize: 10 }}
                       />
                       <Tooltip formatter={(v: number) => `${compactFmt(v)} €`} />
-                      <Bar dataKey="umsatz" fill="hsl(var(--primary))" opacity={0.8} />
+                      <Bar dataKey="umsatz" fill="var(--primary)" opacity={0.8} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -2447,7 +2447,7 @@ function SmallMultiplesGrid({
                         tick={{ fontSize: 10 }}
                       />
                       <Tooltip formatter={(v: number) => `${compactFmt(v)} €`} />
-                      <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                      <ReferenceLine y={0} stroke="var(--muted-foreground)" />
                       <Line
                         type="monotone"
                         dataKey="betrieb"

@@ -695,7 +695,7 @@ function StaffMatrixRow({
                           style={
                             color
                               ? { backgroundColor: color, borderColor: color, color: "#fff" }
-                              : { borderColor: "hsl(var(--border))" }
+                              : { borderColor: "var(--border)" }
                           }
                         >
                           {sk.name}

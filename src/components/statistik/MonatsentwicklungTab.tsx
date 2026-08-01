@@ -353,7 +353,7 @@ export function MonatsentwicklungTab() {
                   name={String(year)}
                   stroke={
                     year === currentYear
-                      ? "hsl(var(--primary))"
+                      ? "var(--primary)"
                       : YEAR_COLORS[idx % YEAR_COLORS.length]
                   }
                   strokeWidth={year === currentYear ? 3 : 1.5}

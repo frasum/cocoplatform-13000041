@@ -485,7 +485,7 @@ function RankingSection({
                     );
                   })
                 ) : (
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
+                  <Bar dataKey="value" fill="var(--primary)" radius={[0, 4, 4, 0]}>
                     {chartData.map((_, i) => (
                       <Cell key={i} />
                     ))}

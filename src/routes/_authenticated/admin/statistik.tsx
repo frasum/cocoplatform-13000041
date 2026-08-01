@@ -42,6 +42,7 @@ import {
   takeawayDonutSegments,
 } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
+import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
 import { fillDailyGaps } from "@/lib/statistics/chart-fill";
@@ -119,6 +120,8 @@ type KpiCardProps = {
   trendRenderer?: () => React.ReactNode;
   /** Optionale Caption unter dem Wert (kleine, gedämpfte Zeile). */
   caption?: React.ReactNode;
+  /** Untertitel „vs. …" — nur wenn eine Vorperiode verglichen wurde. */
+  comparisonLabel?: string | null;
 };
 
 function KpiCard({
@@ -129,6 +132,7 @@ function KpiCard({
   value,
   trendRenderer,
   caption,
+  comparisonLabel,
 }: KpiCardProps) {
   let display: string;
   if (unit === "eur") {
@@ -146,6 +150,11 @@ function KpiCard({
       <CardContent className="space-y-1">
         <div className="text-2xl font-semibold tabular-nums">{display}</div>
         {trendRenderer ? trendRenderer() : <TrendLine trend={trend} />}
+        {comparisonLabel ? (
+          <div className="text-[11px] leading-tight text-muted-foreground/80">
+            {comparisonLabel}
+          </div>
+        ) : null}
         {caption ? <div className="text-xs text-muted-foreground">{caption}</div> : null}
       </CardContent>
     </Card>
@@ -542,6 +551,7 @@ function ErrorState({ message }: { message: string }) {
 
 function StatsView({ data }: { data: RevenueStats }) {
   const trend = data.trend;
+  const cmp = formatComparisonRange(data.previousRange, { partial: data.coverage.isPartial });
   const hasDaily = data.daily.length > 0;
   const hasTakeaway = data.takeawayByChannel.length > 0 && data.summary.takeawayCents > 0;
   return (
@@ -551,12 +561,19 @@ function StatsView({ data }: { data: RevenueStats }) {
           title="Gesamtumsatz"
           cents={data.summary.totalCents}
           trend={trend?.total ?? null}
+          comparisonLabel={cmp}
         />
-        <KpiCard title="Haus" cents={data.summary.houseCents} trend={trend?.house ?? null} />
+        <KpiCard
+          title="Haus"
+          cents={data.summary.houseCents}
+          trend={trend?.house ?? null}
+          comparisonLabel={cmp}
+        />
         <KpiCard
           title="Takeaway"
           cents={data.summary.takeawayCents}
           trend={trend?.takeaway ?? null}
+          comparisonLabel={cmp}
         />
       </div>
 
@@ -834,12 +851,28 @@ function TipsLoading() {
 
 function TipsView({ data }: { data: TipStats }) {
   const t = data.trend;
+  const cmp = formatComparisonRange(data.previousRange, { partial: data.coverage.isPartial });
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard title="Trinkgeld gesamt" cents={data.totals.totalCents} trend={t?.total ?? null} />
-        <KpiCard title="Service" cents={data.totals.serviceCents} trend={t?.service ?? null} />
-        <KpiCard title="Küche" cents={data.totals.kitchenCents} trend={t?.kitchen ?? null} />
+        <KpiCard
+          title="Trinkgeld gesamt"
+          cents={data.totals.totalCents}
+          trend={t?.total ?? null}
+          comparisonLabel={cmp}
+        />
+        <KpiCard
+          title="Service"
+          cents={data.totals.serviceCents}
+          trend={t?.service ?? null}
+          comparisonLabel={cmp}
+        />
+        <KpiCard
+          title="Küche"
+          cents={data.totals.kitchenCents}
+          trend={t?.kitchen ?? null}
+          comparisonLabel={cmp}
+        />
       </div>
       <Card>
         <CardHeader>
@@ -939,6 +972,9 @@ function PersonnelView({
   const netHours = personnel.totals.netHours;
   const revPerHourCents = netHours > 0 ? Math.round(revenue.summary.totalCents / netHours) : null;
   const trend = personnel.trend;
+  const cmp = formatComparisonRange(personnel.previousRange, {
+    partial: personnel.coverage.isPartial,
+  });
 
   if (netHours === 0) {
     return (
@@ -962,11 +998,13 @@ function PersonnelView({
           unit="hours"
           value={netHours}
           trendRenderer={() => <TrendLineHours trend={trend?.hours ?? null} />}
+          comparisonLabel={cmp}
         />
         <KpiCard
           title="Basis-Lohnkosten"
           cents={personnel.totals.laborCostCents}
           trend={trend?.cost ?? null}
+          comparisonLabel={cmp}
         />
         <KpiCard
           title="Umsatz / Stunde"

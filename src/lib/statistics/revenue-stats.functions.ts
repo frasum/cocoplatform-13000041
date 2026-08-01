@@ -222,6 +222,9 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       takeawayByChannel: cur.takeawayByChannel,
       takeawayComponents: cur.takeawayComponents,
       previous: prev ? prev.summary : null,
+      // Vergleichsfenster (nach U5a-Klemmung) für die UI-Untertitel.
+      previousRange:
+        prev && previous ? { startDate: previous.startDate, endDate: previous.endDate } : null,
       trend,
       coverage: { lastDataDay, isPartial },
     };

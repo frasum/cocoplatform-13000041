@@ -170,6 +170,9 @@ export const getTipStats = createServerFn({ method: "GET" })
       totals: cur.totals,
       perStaff: cur.perStaff,
       previous: prev ? prev.totals : null,
+      // Vergleichsfenster (nach U5a-Klemmung) für die UI-Untertitel.
+      previousRange:
+        prev && previous ? { startDate: previous.startDate, endDate: previous.endDate } : null,
       trend,
       coverage: { lastDataDay, isPartial },
     };

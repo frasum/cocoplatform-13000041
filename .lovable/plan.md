@@ -1,30 +1,23 @@
-## ST1-C3 — Alt-Satz-Feld und Legacy-Functions abreißen (Schlussrunde 4/4)
+## Ziel
 
-Vorbefund eigenhändig nachgemessen und bestätigt:
-- `src/lib/admin/compensation.functions.ts` hat genau einen Importeur: `src/components/admin/PersonalDetailsTab.tsx` (Zeile 14, Nutzung in 621/622).
-- `CompensationSection` ist ab Zeile 619 definiert und genau einmal gemountet (Zeile 538, `{canEdit && <CompensationSection staffId={staffId} />}`), direkt vor `CompensationRatesSection` (Zeile 540).
-- `from("staff_compensation")` steht nur in `compensation.functions.ts` und `m4-payroll-permissions.db.test.ts`.
-- Kein Test referenziert die beiden Functions; `CompensationDto` wird nur in der Definitionsdatei benutzt.
-- Der Mount ist ein eigenständiger Geschwister-Block ohne Layout-Kopplung — die Entfernung berührt keine Conditional-Kette.
+Jede KPI-Kachel in der Statistik zeigt unter der Trendzeile als Untertitel, gegen welchen Zeitraum verglichen wird — z. B. `vs. 01.–18.06.2026`. Damit ist ohne Nachdenken erkennbar, ob es der Vormonat, ein geklemmter Teil-Vormonat oder die vorangehende freie Spanne ist.
 
-### Änderungen
+## Verhalten
 
-**1. `src/components/admin/PersonalDetailsTab.tsx`**
-- Import in Zeile 14 entfernen.
-- Mount-Zeile 538 entfernen; `CompensationRatesSection` bleibt zeichengleich stehen.
-- Funktion `CompensationSection` (ca. 619–765) ersatzlos löschen, samt State (`rate`, `validFrom`, `editing`, `msg`), Query, Mutation und Markup.
-- Danach prüfen, ob dadurch Imports (`useEffect`, `useQuery`, `useServerFn` u. a.) ungenutzt werden — nur solche entfernen, die kein anderer Block mehr braucht.
+- Untertitel erscheint nur, wenn tatsächlich ein Vergleich vorliegt (Vorperiode geladen und Trend vorhanden). Ohne Vorperiode: kein Untertitel, kein Platzhaltertext.
+- Formatierung des Zeitraums:
+  - gleicher Monat: `vs. 01.–18.06.2026`
+  - über Monatsgrenze: `vs. 29.06.–09.07.2026`
+  - ein einzelner Tag: `vs. 18.06.2026`
+- Ist der laufende Monat unvollständig und der Vormonat deshalb auf denselben Tagesausschnitt geklemmt, erscheint zusätzlich der Hinweis `(gleicher Tagesausschnitt)`, damit der verkürzte Vormonat nicht wie ein Fehler wirkt.
+- Untertitel dezent: kleiner als die Trendzeile, gedämpfte Farbe, keine zusätzliche Kachelhöhe außer einer Textzeile.
+- Gilt für alle drei Bereiche mit Trendkacheln: Umsatz (Gesamt/Haus/Takeaway), Trinkgeld (Gesamt/Service/Küche), Personal (Stunden/Kosten).
 
-**2. `src/lib/admin/compensation.functions.ts`**
-- Datei löschen (beide Functions + `CompensationDto`).
+## Technische Umsetzung
 
-Keine Migration, kein Feature-Flag, kein auskommentierter Rest.
+1. **Serverseitig Vergleichsfenster mitliefern.** In `src/lib/statistics/revenue-stats.functions.ts`, `tip-stats.functions.ts` und `personnel-stats.functions.ts` das bereits berechnete `previous`-Fenster (nach der U5a-Klemmung) zusätzlich als `previousRange: { startDate, endDate } | null` zurückgeben. Keine Änderung an der Berechnung, kein zusätzlicher Query — nur das schon vorhandene Fenster wird durchgereicht. `previousRange` ist `null`, wenn keine Vorperiode geladen wurde.
+2. **Reine Formatierfunktion.** Neue Funktion `formatComparisonRange(range, opts)` in `src/lib/statistics/period-window.ts` (oder einem kleinen Nachbarmodul), die aus Start/Ende den kompakten deutschen Text erzeugt. Rein, testbar, ohne UI-Bezug.
+3. **UI.** In `src/routes/_authenticated/admin/statistik.tsx` erhält `KpiCard` eine optionale `comparisonLabel`-Prop, die unter `TrendLine`/`TrendLineHours` gerendert wird. Die drei Sections (Umsatz, Trinkgeld, Personal) übergeben den aus `previousRange` + `coverage.isPartial` gebauten Text.
+4. **Tests.** Unit-Tests für `formatComparisonRange` (gleicher Monat, Monatsgrenze, Einzeltag, Jahreswechsel) in einer Test-Datei neben `period-window.test.ts`.
 
-### Nicht angefasst
-`compensation-rates.functions.ts`, `CompensationRatesSection`, `DepartmentRatesRow`, `permissions-catalog.ts` und die Keys `payroll.compensation.view/.edit`, `m4-payroll-permissions.db.test.ts`, `expect-ok.ts`, `admin-call.ts`, `audit.ts`, alle Migrationen, `supabase/**`, Workflows, `docs/arbeitsweise.md` (§117 sammelt separat).
-
-### Gates & Fertigmeldung
-- `prettier --write` + `eslint --fix` auf die geänderte Datei, danach `tsc --noEmit`, `eslint . --max-warnings=0`, `prettier --check .`, `vitest run`.
-- Erwartet unverändert 204 Dateien / 2041 Tests; jede Abweichung wird aufgeschlüsselt.
-- Die drei Greps aus 2c mit exakten Ergebnissen melden, inkl. Wortgrenzen-Kontrolle, dass `upsertStaffCompensationRate` unberührt bleibt — Grep 3 soll dann nur noch `m4-payroll-permissions.db.test.ts` zeigen (Freigabe-Kriterium für die Drop-Migration).
-- §104: Halt-und-melden bei jedem zusätzlichen Importeur oder Layout-Kopplung.
+Nicht Teil dieses Schritts: Statistik-PDF, Standortvergleich-Karten, sonstige Kacheln ohne Trend.

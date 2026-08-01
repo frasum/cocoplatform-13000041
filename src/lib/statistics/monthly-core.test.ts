@@ -7,6 +7,9 @@ import {
   LIVE_FROM,
   LIVE_FROM_MONTH,
   aggregateLiveMonths,
+  displayEuros,
+  displayTsd,
+  formatDisplayEuros,
   findCell,
   growthPct,
   mergeMonthlyCells,
@@ -147,5 +150,29 @@ describe("MB1 — Jahreszeilen / YTD / YoY", () => {
     expect(h.yoyExcludedPartial).toBe(true);
     // Der laufende Monat zählt auch nicht als „bestes Jahr".
     expect(h.bestForMonth).toEqual({ year: 2025, totalCents: 100_000 });
+  });
+});
+
+describe("MB1-N1 — Anzeige-Rundung vs. Rechnung", () => {
+  it("16019268 Cents ergeben Anzeige „160.193" und T€ 160", () => {
+    expect(displayEuros(16_019_268)).toBe(160_193);
+    expect(formatDisplayEuros(16_019_268)).toBe("160.193");
+    expect(displayTsd(16_019_268)).toBe(160);
+  });
+
+  it("die Cent-Werte bleiben für YoY/YTD unverändert", () => {
+    const cells = mergeMonthlyCells({
+      legacy: [
+        { year: 2025, month: 5, totalCents: 16_019_268, takeawayCents: null },
+        { year: 2026, month: 5, totalCents: 16_019_368, takeawayCents: null },
+      ],
+      live: [],
+      currentMonthKey: "2026-06",
+    });
+    const h = monthlyHeadline(cells, 2026, 5);
+    expect(h.currentCents).toBe(16_019_368);
+    expect(h.previousYearCents).toBe(16_019_268);
+    expect(h.ytdCents).toBe(16_019_368);
+    expect(h.yoyPct).toBeCloseTo((16_019_368 / 16_019_268 - 1) * 100, 9);
   });
 });

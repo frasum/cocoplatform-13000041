@@ -1403,11 +1403,7 @@ function TimeSeriesCard({ rows, highlightedMonth }: { rows: BwaRow[]; highlighte
               />
               <ReferenceLine y={0} stroke="var(--muted-foreground)" strokeDasharray="3 3" />
               {highlightLabel && (
-                <ReferenceLine
-                  x={highlightLabel}
-                  stroke="var(--primary)"
-                  strokeDasharray="4 2"
-                />
+                <ReferenceLine x={highlightLabel} stroke="var(--primary)" strokeDasharray="4 2" />
               )}
               <Bar dataKey="umsatz" fill="var(--primary)" opacity={0.7} name="Umsatz" />
               <Line
@@ -1477,11 +1473,7 @@ function QuoteBandsCard({ rows, highlightedMonth }: { rows: BwaRow[]; highlighte
                 label={{ value: "Personal 30–35 %", position: "insideBottomRight", fontSize: 10 }}
               />
               {highlightLabel && (
-                <ReferenceLine
-                  x={highlightLabel}
-                  stroke="var(--primary)"
-                  strokeDasharray="4 2"
-                />
+                <ReferenceLine x={highlightLabel} stroke="var(--primary)" strokeDasharray="4 2" />
               )}
               <Line
                 type="monotone"

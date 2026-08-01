@@ -199,11 +199,7 @@ export function PosHourlyView({
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--muted-foreground)"
-                />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
                 <YAxis
                   tick={{ fontSize: 11 }}
                   stroke="var(--muted-foreground)"
@@ -233,9 +229,7 @@ export function PosHourlyView({
                   {chartData.map((d) => (
                     <Cell
                       key={d.hour}
-                      fill={
-                        d.isPeak ? "var(--primary)" : "var(--chart-1, var(--primary))"
-                      }
+                      fill={d.isPeak ? "var(--primary)" : "var(--chart-1, var(--primary))"}
                       fillOpacity={d.isPeak ? 1 : 0.6}
                     />
                   ))}

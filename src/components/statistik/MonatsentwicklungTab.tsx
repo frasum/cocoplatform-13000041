@@ -353,9 +353,7 @@ export function MonatsentwicklungTab() {
                   dataKey={String(year)}
                   name={String(year)}
                   stroke={
-                    year === currentYear
-                      ? "var(--primary)"
-                      : YEAR_COLORS[idx % YEAR_COLORS.length]
+                    year === currentYear ? "var(--primary)" : YEAR_COLORS[idx % YEAR_COLORS.length]
                   }
                   strokeWidth={year === currentYear ? 3 : 1.5}
                   dot={false}

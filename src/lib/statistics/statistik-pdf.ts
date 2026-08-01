@@ -202,7 +202,9 @@ export async function generateStatistikPdf(
       value: fmtPctDe(data.personnel.ratioPct),
       lead: fmtEur(data.personnel.laborCostCents),
       leadLabel: "Basis-Lohnkosten",
-      foot: `Takeaway: ${fmtEur(data.revenue.takeawayCents)}`,
+      // STAT3b: kein Umsatzwert in der Lohnkosten-Kachel (missverständlich).
+      // Der Takeaway-Gesamtwert steht in der Kopfzeile des Takeaway-Blocks.
+      foot: "Basis-Brutto ohne AG-SV/SFN",
     },
     {
       title: "Umsatz je Arbeitsstunde",

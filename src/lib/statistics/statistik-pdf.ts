@@ -61,6 +61,15 @@ export type StatistikPdfData = {
     netHours: number;
     laborCostCents: number;
     hasMissingRate: boolean;
+    /**
+     * STAT2b — Gäste/Arbeitsstunden und die beiden Dichte-Kennzahlen je
+     * Standort. Werte kommen fertig aus `derivedKpis` bzw. den Stats-Feldern;
+     * hier wird nichts summiert. Optional gehalten (Alt-Fixtures ohne Block).
+     */
+    guestTotal?: number;
+    workHours?: number;
+    perGuestCents?: number | null;
+    perHourCents?: number | null;
   }>;
 };
 
@@ -79,6 +88,15 @@ function fmtPct(pct: number | null): string {
 
 function fmtHours(h: number): string {
   return h.toFixed(2);
+}
+
+/** STAT2b — fehlender/undefinierter Wert ⇒ „—". */
+function fmtHoursOrDash(h: number | undefined): string {
+  return h === undefined ? "—" : fmtHours(h);
+}
+
+function fmtCountOrDash(n: number | undefined): string {
+  return n === undefined ? "—" : String(n);
 }
 
 function lastY(doc: jsPDF): number {

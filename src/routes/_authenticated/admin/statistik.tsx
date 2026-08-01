@@ -1943,13 +1943,7 @@ function KpiCompareCard({
           />
         </div>
         <LeadDeltaLine text={lead.text} tone={lead.tone} />
-        <LevelBar
-          a={a.name}
-          b={b.name}
-          aValue={c.aValue}
-          bValue={c.bValue}
-          format={fmtEuro}
-        />
+        <LevelBar a={a.name} b={b.name} aValue={c.aValue} bValue={c.bValue} format={fmtEuro} />
       </CardContent>
     </Card>
   );

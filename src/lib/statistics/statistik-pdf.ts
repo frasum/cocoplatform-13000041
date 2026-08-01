@@ -553,7 +553,7 @@ export async function generateStatistikPdf(
       doc.text(formatTsd(t.value), chartB.x - 4, t.y + 2, { align: "right" });
     }
     doc.setTextColor(20);
-    geo.series.forEach((s, si) => {
+    geo.series.forEach((s) => {
       const color = colorOf(s.name);
       doc.setDrawColor(color[0], color[1], color[2]);
       doc.setFillColor(color[0], color[1], color[2]);

@@ -1485,6 +1485,42 @@ function LocationCompareSection({
                   valueOf={(r) => r.avgTipPerDayCents}
                 />
               </div>
+
+              {/* STAT2b — Gäste & Personal: Rohsummen mit Anteils-Balken,
+                  Dichte-Kennzahlen ohne Balken (Anteil wäre irreführend). */}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold tracking-tight text-foreground">
+                  Gäste &amp; Personal
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <SumCompareCard
+                    title="Gäste"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.guestTotal}
+                    format={(v) => v.toLocaleString("de-DE")}
+                  />
+                  <SumCompareCard
+                    title="Arbeitsstunden"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.workMinutesTotal}
+                    format={fmtMinutesAsHours}
+                  />
+                  <KpiCompareCard
+                    title="Ø Umsatz je Gast"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.revenuePerGuestCents}
+                  />
+                  <KpiCompareCard
+                    title="Umsatz je Arbeitsstunde"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.revenuePerWorkHourCents}
+                  />
+                </div>
+              </div>
             </>
           ) : null}
 

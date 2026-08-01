@@ -255,8 +255,8 @@ function OverviewTab({
               <YAxis />
               <Tooltip formatter={(v) => `${Number(v).toFixed(2)} €`} />
               <Legend />
-              <Bar dataKey="ein" name="Eingänge" fill="hsl(var(--chart-2))" />
-              <Bar dataKey="aus" name="Ausgänge" fill="hsl(var(--destructive))" />
+              <Bar dataKey="ein" name="Eingänge" fill="var(--chart-2)" />
+              <Bar dataKey="aus" name="Ausgänge" fill="var(--destructive)" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

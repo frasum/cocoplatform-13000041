@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getMonthlyRevenueMatrix } from "@/lib/statistics/monthly-revenue.functions";
 import { generateMonatsberichtPdf, MONTH_LABELS } from "@/lib/statistics/monatsbericht-pdf";
 import type { MonthlyCell } from "@/lib/statistics/monthly-core";
+import { displayEuros, displayTsd } from "@/lib/statistics/monthly-core";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +58,7 @@ function fmtPct(pct: number | null): string {
 }
 
 function tsd(cents: number): string {
-  return String(Math.round(cents / 100_000));
+  return String(displayTsd(cents));
 }
 
 function monthLabelFromKey(key: string): string {
@@ -120,7 +121,7 @@ export function MonatsentwicklungTab() {
       for (const y of series.years) {
         if (!chartYears.includes(y.year)) continue;
         const cell = y.months[idx];
-        row[String(y.year)] = cell ? Math.round(cell.totalCents / 100) : null;
+        row[String(y.year)] = cell ? displayEuros(cell.totalCents) : null;
       }
       return row;
     });
@@ -352,9 +353,7 @@ export function MonatsentwicklungTab() {
                   dataKey={String(year)}
                   name={String(year)}
                   stroke={
-                    year === currentYear
-                      ? "hsl(var(--primary))"
-                      : YEAR_COLORS[idx % YEAR_COLORS.length]
+                    year === currentYear ? "var(--primary)" : YEAR_COLORS[idx % YEAR_COLORS.length]
                   }
                   strokeWidth={year === currentYear ? 3 : 1.5}
                   dot={false}

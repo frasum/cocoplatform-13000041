@@ -198,23 +198,19 @@ export function PosHourlyView({
           <div className="h-[320px] w-full rounded-md border border-border bg-card p-3">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11 }}
-                  stroke="hsl(var(--muted-foreground))"
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
                 <YAxis
                   tick={{ fontSize: 11 }}
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   tickFormatter={(v: number) =>
                     metric === "umsatz" ? eurFmt.format(v) : intFmt.format(v)
                   }
                   width={80}
                 />
-                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" />
+                <ReferenceLine y={0} stroke="var(--muted-foreground)" />
                 <Tooltip
-                  cursor={{ fill: "hsl(var(--muted))", opacity: 0.3 }}
+                  cursor={{ fill: "var(--muted)", opacity: 0.3 }}
                   content={({ active, payload }) => {
                     if (!active || !payload || !payload.length) return null;
                     const d = payload[0].payload as (typeof chartData)[number];
@@ -233,9 +229,7 @@ export function PosHourlyView({
                   {chartData.map((d) => (
                     <Cell
                       key={d.hour}
-                      fill={
-                        d.isPeak ? "hsl(var(--primary))" : "hsl(var(--chart-1, var(--primary)))"
-                      }
+                      fill={d.isPeak ? "var(--primary)" : "var(--chart-1, var(--primary))"}
                       fillOpacity={d.isPeak ? 1 : 0.6}
                     />
                   ))}

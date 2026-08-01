@@ -1982,6 +1982,57 @@ export type Database = {
           },
         ]
       }
+      monthly_revenue_history: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          month: number
+          organization_id: string
+          source: string
+          takeaway_cents: number | null
+          total_cents: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          month: number
+          organization_id: string
+          source?: string
+          takeaway_cents?: number | null
+          total_cents: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          month?: number
+          organization_id?: string
+          source?: string
+          takeaway_cents?: number | null
+          total_cents?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_revenue_history_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_revenue_history_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_email_log: {
         Row: {
           created_at: string

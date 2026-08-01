@@ -163,13 +163,13 @@ describe("MB1-N1 — Anzeige-Rundung vs. Rechnung", () => {
   it("die Cent-Werte bleiben für YoY/YTD unverändert", () => {
     const cells = mergeMonthlyCells({
       legacy: [
-        { year: 2025, month: 5, totalCents: 16_019_268, takeawayCents: null },
-        { year: 2026, month: 5, totalCents: 16_019_368, takeawayCents: null },
+        { year: 2024, month: 5, totalCents: 16_019_268, takeawayCents: null },
+        { year: 2025, month: 5, totalCents: 16_019_368, takeawayCents: null },
       ],
       live: [],
       currentMonthKey: "2026-06",
     });
-    const h = monthlyHeadline(cells, 2026, 5);
+    const h = monthlyHeadline(cells, 2025, 5);
     expect(h.currentCents).toBe(16_019_368);
     expect(h.previousYearCents).toBe(16_019_268);
     expect(h.ytdCents).toBe(16_019_368);

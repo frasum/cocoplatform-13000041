@@ -48,7 +48,12 @@ import {
 } from "@/lib/statistics/revenue-core";
 import { shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
 import { compareKpi } from "@/lib/statistics/kpi-compare";
-import { leadDelta, previousTrendLabel, ppTrendLabel } from "@/lib/statistics/comparison-labels";
+import {
+  leadDelta,
+  previousTrendLabel,
+  ppTrendLabel,
+  ppLeadDelta,
+} from "@/lib/statistics/comparison-labels";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { takeawayMatrix, takeawaySharePctOfTotal } from "@/lib/statistics/takeaway-channels";
@@ -2130,7 +2135,8 @@ function RateCompareCard({
   prevOf: (row: CompareLocation) => number | null;
 }) {
   const c = compareKpi(valueOf(a), valueOf(b));
-  const lead = leadDelta({ aName: a.name, bName: b.name, aValue: c.aValue, bValue: c.bValue });
+  // STAT2d-Mikro-Nachtrag: Quoten-Kachel spricht durchgehend Prozentpunkte.
+  const lead = ppLeadDelta({ aName: a.name, bName: b.name, aValue: c.aValue, bValue: c.bValue });
   const aTrend = ppTrendLabel(c.aValue, prevOf(a), a.previousRange, { partial: a.previousPartial });
   const bTrend = ppTrendLabel(c.bValue, prevOf(b), b.previousRange, { partial: b.previousPartial });
   return (

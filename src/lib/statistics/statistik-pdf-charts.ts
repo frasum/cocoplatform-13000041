@@ -165,21 +165,23 @@ export function stackedBarChartGeometry(
     const x = area.x + index * slot + offset;
     const height = max > 0 ? (total / max) * area.height : 0;
     let cum = 0;
-    let lowerY = baseline;
+    let prevScaled = 0;
     const segments: StackSegment[] = series.map((s, seriesIndex) => {
       const value = safeValue(s.values[index]);
       cum += value;
-      const topY = max > 0 ? baseline - (cum / max) * area.height : baseline;
+      // Kanten aus skalierten Kumulativsummen: kein Rundungs-Spalt, und der
+      // Ein-Reihen-Fall ergibt bitgleich (value / max) * height.
+      const scaled = max > 0 ? (cum / max) * area.height : 0;
       const segment: StackSegment = {
         seriesIndex,
         name: s.name,
         value,
         x,
-        y: topY,
+        y: baseline - scaled,
         width,
-        height: lowerY - topY,
+        height: scaled - prevScaled,
       };
-      lowerY = topY;
+      prevScaled = scaled;
       return segment;
     });
     return { index, total, x, width, y: baseline - height, height, segments };

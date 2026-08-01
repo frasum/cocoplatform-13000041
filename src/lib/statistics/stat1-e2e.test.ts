@@ -107,9 +107,9 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
 
     // 4) Donut: nur Marker/SoUse sind Segmente, Wolt bleibt außerhalb.
     const donut = groupTakeawayByChannel(
-      CHANNEL_ROWS.filter(
-        (c) => c.kind === "delivery_vectron" || c.kind === "delivery_souse",
-      ).map((c) => ({ name: c.kind, amountCents: c.amountCents })),
+      CHANNEL_ROWS.filter((c) => c.kind === "delivery_vectron" || c.kind === "delivery_souse").map(
+        (c) => ({ name: c.kind, amountCents: c.amountCents }),
+      ),
     );
     expect(donut).toEqual([{ name: "delivery_vectron", amountCents: 36_510 }]);
     expect(donut.reduce((s, d) => s + d.amountCents, 0)).toBe(summary.takeawayCents);

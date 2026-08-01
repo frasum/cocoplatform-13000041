@@ -14,9 +14,9 @@ import {
   aggregateByBusinessDate,
   summarize,
   derivedKpis,
-  takeawayDonutSegments,
   type SessionRevenueInput,
 } from "./revenue-core";
+import { takeawayMatrix, takeawaySharePctOfTotal } from "./takeaway-channels";
 import {
   fmtDeltaPctDe,
   fmtHoursDe,
@@ -98,8 +98,11 @@ function baseData(over: Partial<StatistikPdfData> = {}): StatistikPdfData {
     generatedAtLabel: "01.08.2026, 10:00",
     calendarMonth: true,
     revenue: { houseCents: 0, takeawayCents: 0, totalCents: 0, daysWithRevenue: 0 },
-    takeawaySegments: [],
-    takeawaySegmentsWarning: null,
+    takeaway: takeawayMatrix([], {
+      current: { markerSumCents: 0, souseSumCents: 0, woltInfoCents: 0 },
+      previous: null,
+    }),
+    takeawaySharePct: null,
     tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perLocation: [] },
     personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
     dailyRevenue: [],
@@ -135,7 +138,7 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
     texts.length = 0;
     const daily = aggregateByBusinessDate(sessions);
     const sum = summarize(daily);
-    const segs = takeawayDonutSegments(36_510, 0, sum.woltInfoCents);
+    const current = { markerSumCents: 36_510, souseSumCents: 0, woltInfoCents: sum.woltInfoCents };
 
     await generateStatistikPdf(
       baseData({
@@ -145,8 +148,11 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
           totalCents: sum.totalCents,
           daysWithRevenue: sum.daysWithRevenue,
         },
-        takeawaySegments: segs.segments,
-        takeawaySegmentsWarning: segs.warning,
+        takeaway: takeawayMatrix([{ locationName: "Spicery", current }], {
+          current,
+          previous: { markerSumCents: 30_000, souseSumCents: 0, woltInfoCents: 12_000 },
+        }),
+        takeawaySharePct: takeawaySharePctOfTotal(sum.takeawayCents, sum.totalCents),
         dailyRevenue: daily.map((d) => ({
           businessDate: d.businessDate,
           totalCents: d.totalCents,
@@ -163,12 +169,16 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
       daysWithRevenue: 2,
     });
 
-    // Gesamtumsatz-Kachel und Aufteilungszeile — exakt die Kernwerte.
+    // Gesamtumsatz-Kachel und Kopfzeile der Kanal-Tabelle — exakt die Kernwerte.
     expect(texts).toContain(eur(sum.totalCents));
     const split = drawn("Haus ", "Takeaway ");
     expect(split).toContain(`Haus ${eur(sum.houseCents)}`);
     expect(split).toContain(`Takeaway ${eur(sum.takeawayCents)}`);
-    expect(split).toContain(`Wolt ${eur(17_210)}`);
+    // STAT3b — Kanalzeilen: Wolt-Betrag steht in der Tabelle, nicht im Text.
+    const wolt = findRow("Wolt");
+    expect(wolt[1]).toBe(eur(17_210));
+    expect(wolt[2]).toBe(eur(17_210));
+    expect(findRow("Take-Away gesamt")[2]).toBe(eur(sum.takeawayCents));
     expect(drawn("Tage mit Umsatz")).toBe(`Tage mit Umsatz: ${sum.daysWithRevenue}`);
 
     // Wolt-additive Altsumme darf nirgends auftauchen.
@@ -205,8 +215,8 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
         ],
       }),
     );
-    // Genau zwei Tabellen: Standort-Vergleich + Trinkgeld-Matrix.
-    expect(captured).toHaveLength(2);
+    // Genau drei Tabellen: Standort-Vergleich, Trinkgeld-Matrix, Kanal-Matrix.
+    expect(captured).toHaveLength(3);
     const bodies = captured.flatMap((t) => t.body.map((r) => r.map(cell)));
     expect(bodies.some((r) => r[0] === "2026-07-18")).toBe(false);
   });

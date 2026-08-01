@@ -227,6 +227,14 @@ export async function seedKasseFinalize(
   // Kellnerabrechnung: 100 € POS − 20 € Karte − 80 € Bar = 0 Differenz;
   // Pool entsteht aus den Trinkgeld-Feldern der Kalkulation (siehe
   // `tip-pool.ts`). Werte gespiegelt aus `cash-finalize.db.test.ts`.
+  //
+  // Küchen-Trinkgeld je Variante (E2E-G2): Seit der Verschärfung vom
+  // 13.07. warnt TG1 JE POOL (`poolFullyUnallocated`), nicht mehr nur bei
+  // aggregierten 0 Minuten. Der Seed legt kein Küchen-Personal an — ein
+  // gefüllter Küchen-Pool würde die Warnung also immer auslösen und der
+  // „Happy Path" (sowie die Ruhetag-Variante) prüfte in Wahrheit den
+  // Warnpfad. Nur `poolwarn` braucht den gefüllten Pool ohne Stunden.
+  const wantsPoolWarning = label === "poolwarn";
   const { error: wsErr } = await svc.from("waiter_settlements").insert({
     organization_id: orgId,
     session_id: sessionId,
@@ -236,8 +244,8 @@ export async function seedKasseFinalize(
     hilf_mahl_cents: 0,
     open_invoices_cents: 0,
     cash_handed_in_cents: 80000,
-    kitchen_tip_rate: 0.02,
-    kitchen_tip_cents: 2000,
+    kitchen_tip_rate: wantsPoolWarning ? 0.02 : 0,
+    kitchen_tip_cents: wantsPoolWarning ? 2000 : 0,
     status: "submitted",
   });
   if (wsErr) throw new Error(`waiter_settlements insert failed: ${wsErr.message}`);

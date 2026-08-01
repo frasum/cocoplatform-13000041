@@ -200,12 +200,32 @@ export class PoolHoursWarningError extends Error {
     public readonly serviceCents: number,
     public readonly kitchenCents: number,
     public readonly eligibleMinutes: number,
+    /** Warnende Pools — nur diese werden im Text genannt (E2E-G2). */
+    flags: { serviceWarn: boolean; kitchenWarn: boolean } = {
+      serviceWarn: true,
+      kitchenWarn: true,
+    },
   ) {
-    super(
-      `Pool enthält Geld (Service ${(serviceCents / 100).toFixed(2)} € · Küche ${(
-        kitchenCents / 100
-      ).toFixed(2)} €), aber 0 anrechenbare Stunden. Bitte prüfen.`,
-    );
+    // Ehrlicher Text: `eligibleMinutes` summiert nur die MANUELLEN
+    // poolEntries — Stempel-Stunden fehlen dort. Deshalb nennt die
+    // Meldung je warnenden Pool den Betrag und die verteilte Summe
+    // (0 €, weil `poolFullyUnallocated` genau das prüft). Die Wortfolge
+    // „0 anrechenbare Stunden" bleibt erhalten: sowohl der Kassen-Dialog
+    // (kasse.tsx) als auch die E2E-Assertion erkennen die Warnung daran.
+    const parts: string[] = [];
+    if (flags.serviceWarn) {
+      parts.push(
+        `Service-Pool enthält ${(serviceCents / 100).toFixed(2)} €, aber es wurden 0 € verteilt ` +
+          `(0 anrechenbare Stunden im Bereich Service).`,
+      );
+    }
+    if (flags.kitchenWarn) {
+      parts.push(
+        `Küchen-Pool enthält ${(kitchenCents / 100).toFixed(2)} €, aber es wurden 0 € verteilt ` +
+          `(0 anrechenbare Stunden im Bereich Küche).`,
+      );
+    }
+    super(`${parts.join(" ")} Bitte prüfen.`);
     this.name = "PoolHoursWarningError";
   }
 }
@@ -1486,6 +1506,7 @@ export async function finalizeSessionCore(
           pool.servicePoolCents,
           pool.kitchenPoolCents,
           eligibleMinutes,
+          { serviceWarn, kitchenWarn },
         );
       }
 

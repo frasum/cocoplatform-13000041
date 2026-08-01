@@ -504,6 +504,7 @@ export function LohnrechnerPanel() {
 
           <Card className="p-4">
             <h2 className="mb-3 text-base font-semibold">Entgeltzeilen</h2>
+            {/* Platzhalter-Anker: der U/K-Block steht oberhalb (siehe unten). */}
             <Table>
               <TableHeader>
                 <TableRow>

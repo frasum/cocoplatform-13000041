@@ -65,6 +65,11 @@ function fmtEur(cents: number): string {
   return `${fmtCents(cents)} €`;
 }
 
+/** STAT2 — Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
+function fmtEurOrDash(cents: number | null): string {
+  return cents === null ? "—" : fmtEur(cents);
+}
+
 function fmtPct(pct: number | null): string {
   return pct === null ? "—" : `${pct.toFixed(1)} %`;
 }

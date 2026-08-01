@@ -36,6 +36,8 @@ export const ALL_LOCATIONS = "all";
 export type MonthlySeries = {
   locationId: string;
   locationName: string;
+  /** false = Standort ist stillgelegt (locations.is_active). Historie bleibt sichtbar. */
+  inactive: boolean;
   cells: MonthlyCell[];
   years: YearRow[];
   headline: MonthlyHeadline;
@@ -69,13 +71,14 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
     // 1) Standorte (Namen für die Umschalter und das PDF).
     const { data: locRows, error: locErr } = await supabaseAdmin
       .from("locations")
-      .select("id, name")
+      .select("id, name, is_active")
       .eq("organization_id", org)
       .order("name", { ascending: true });
     if (locErr) throw locErr;
     const locations = (locRows ?? []).map((l) => ({
       id: l.id as string,
       name: l.name as string,
+      inactive: l.is_active === false,
     }));
 
     // 2) Legacy-Historie (< LIVE_FROM; die Grenze zieht `mergeMonthlyCells`).
@@ -144,7 +147,11 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
     const live = aggregateLiveMonths(mapToSessionInputs(sessions, channels));
 
     // 4) Serien bauen: je Standort + summierte Gesamtansicht.
-    function buildSeries(locationId: string, locationName: string): MonthlySeries {
+    function buildSeries(
+      locationId: string,
+      locationName: string,
+      inactive = false,
+    ): MonthlySeries {
       const isAll = locationId === ALL_LOCATIONS;
       const legacy = accumulate(
         (legacyRows ?? [])
@@ -178,6 +185,7 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
       return {
         locationId,
         locationName,
+        inactive,
         cells,
         years: toYearRows(cells),
         headline: monthlyHeadline(cells, focusYear, focusMonthNo, nowMonth),
@@ -185,7 +193,7 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
     }
 
     const series: MonthlySeries[] = [
-      ...locations.map((l) => buildSeries(l.id, l.name)),
+      ...locations.map((l) => buildSeries(l.id, l.name, l.inactive)),
       buildSeries(ALL_LOCATIONS, "Alle Standorte"),
     ];
 

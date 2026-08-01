@@ -408,6 +408,20 @@ function StatistikPage() {
     // Grafik B — 13-Monats-Fenster (Vorjahresmonat … Berichtsmonat) je Standort
     // bzw. als Summe; die Werte kommen unverändert aus der MB1-Matrix.
     const window13 = monthWindow(focusYear, focusMonthNo, 13);
+    // STAT3c — Tagesreihen je Standort für die gestapelten Tagesbalken.
+    // Inaktive Standorte erscheinen nur, wenn sie im Zeitraum Umsatz haben.
+    const dailyByLocation: Array<{ name: string; byDate: Map<string, number> }> =
+      locationFilter === "all"
+        ? locations.flatMap((loc, i) => {
+            const r = revQueries[i]?.data;
+            if (!r) return [];
+            const byDate = new Map<string, number>();
+            for (const d of r.daily) byDate.set(d.businessDate, d.totalCents);
+            const hasRevenue = r.daily.some((d) => d.totalCents !== 0);
+            if (!hasRevenue) return [];
+            return [{ name: loc.name, byDate }];
+          })
+        : [];
     const monthlySeriesIds =
       locationFilter === "all" ? locations.map((l) => l.id) : [locationFilter];
     const monthly =

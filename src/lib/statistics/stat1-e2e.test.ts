@@ -12,6 +12,7 @@ import { fillDailyGaps } from "./chart-fill";
 import { aggregateByBusinessDate, summarize, takeawayDonutSegments } from "./revenue-core";
 import { mapToSessionInputs, type ChannelAmountRow, type SessionRow } from "./revenue-map";
 import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
+import { takeawayMatrix, takeawaySharePctOfTotal } from "./takeaway-channels";
 
 type Cell = string | { content: string };
 type Captured = { body: Cell[][] };
@@ -142,8 +143,11 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
         totalCents: summary.totalCents,
         daysWithRevenue: summary.daysWithRevenue,
       },
-      takeawaySegments: donut.segments,
-      takeawaySegmentsWarning: donut.warning,
+      takeaway: takeawayMatrix([], {
+        current: { markerSumCents: 36_510, souseSumCents: 0, woltInfoCents: summary.woltInfoCents },
+        previous: null,
+      }),
+      takeawaySharePct: takeawaySharePctOfTotal(summary.takeawayCents, summary.totalCents),
       tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perLocation: [] },
       personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
       dailyRevenue: daily.map((d) => ({
@@ -158,9 +162,15 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     const split = drawn("Haus ", "Takeaway ");
     expect(split).toContain(`Haus ${eur(EXPECTED.houseCents)}`);
     expect(split).toContain(`Takeaway ${eur(EXPECTED.takeawayCents)}`);
-    expect(split).toContain(`Wolt ${eur(17_210)}`);
-    expect(split).toContain(`Takeaway direkt (Telefon/Abholung) ${eur(19_300)}`);
     expect(texts).toContain(eur(EXPECTED.totalCents));
+
+    // STAT3b — Kanalzeilen stehen in der Tabelle und stammen aus demselben Donut.
+    const cells = captured.flatMap((t) => t.body.map((r) => r.map(cell)));
+    const woltRow = cells.find((r) => r[0] === "Wolt");
+    const directRow = cells.find((r) => r[0] === "Takeaway direkt (Telefon/Abholung)");
+    expect(woltRow?.[1]).toBe(eur(donut.segments[0]!.amountCents));
+    expect(directRow?.[1]).toBe(eur(donut.segments[1]!.amountCents));
+    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(eur(EXPECTED.takeawayCents));
 
     // 6) Kein Pfad zeigt die Wolt-additive Altsumme (667.250 + 17.210).
     const allPdfCells = captured.flatMap((t) => t.body.flatMap((r) => r.map(cell)));

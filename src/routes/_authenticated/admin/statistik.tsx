@@ -50,6 +50,7 @@ import { compareKpi } from "@/lib/statistics/kpi-compare";
 import { leadDelta, previousTrendLabel } from "@/lib/statistics/comparison-labels";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
+import { takeawayMatrix, takeawaySharePctOfTotal } from "@/lib/statistics/takeaway-channels";
 import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
@@ -329,11 +330,40 @@ function StatistikPage() {
     const scopeSeriesId = locationFilter === "all" ? ALL_LOCATIONS : locationFilter;
 
     const ratio = personnelRatioPct(per.totals.laborCostCents, rev.summary.totalCents);
-    // STAT1b — gleiche Quelle wie der Donut.
-    const segs = takeawayDonutSegments(
-      rev.takeawayComponents.markerSumCents,
-      rev.takeawayComponents.souseSumCents,
-      rev.summary.woltInfoCents,
+    // STAT3b — Kanal-Matrix: Gesamt-Scope + Standortspalten. Die Zerlegung
+    // selbst liegt in takeaway-channels (→ takeawayDonutSegments), hier wird
+    // nur eingesammelt.
+    const takeaway = takeawayMatrix(
+      locationFilter === "all"
+        ? locations.flatMap((loc, i) => {
+            const r = revQueries[i]?.data;
+            if (!r) return [];
+            return [
+              {
+                locationName: loc.name,
+                current: {
+                  markerSumCents: r.takeawayComponents.markerSumCents,
+                  souseSumCents: r.takeawayComponents.souseSumCents,
+                  woltInfoCents: r.summary.woltInfoCents,
+                },
+              },
+            ];
+          })
+        : [],
+      {
+        current: {
+          markerSumCents: rev.takeawayComponents.markerSumCents,
+          souseSumCents: rev.takeawayComponents.souseSumCents,
+          woltInfoCents: rev.summary.woltInfoCents,
+        },
+        previous: rev.previousTakeawayComponents
+          ? {
+              markerSumCents: rev.previousTakeawayComponents.markerSumCents,
+              souseSumCents: rev.previousTakeawayComponents.souseSumCents,
+              woltInfoCents: rev.previousWoltInfoCents ?? 0,
+            }
+          : null,
+      },
     );
     const staffWithoutRateNames = per.staffWithoutRate.map(
       (id) => per.perStaff.find((p) => p.staffId === id)?.name ?? id,
@@ -412,8 +442,8 @@ function StatistikPage() {
       },
       previousYearTotalCents: matrixCents(scopeSeriesId, focusYear - 1, focusMonthNo),
       previousPeriodTotalCents: rev.previous?.totalCents ?? null,
-      takeawaySegments: segs.segments,
-      takeawaySegmentsWarning: segs.warning,
+      takeaway,
+      takeawaySharePct: takeawaySharePctOfTotal(rev.summary.takeawayCents, rev.summary.totalCents),
       tips: {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,

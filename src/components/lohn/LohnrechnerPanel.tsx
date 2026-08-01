@@ -32,9 +32,15 @@ import {
   berechneLohnUebersicht,
 } from "@/lib/lohn/lohn-rechner.functions";
 import { buildLohnFileName, buildLohnXlsx, downloadBlob } from "@/lib/lohn/lohn-excel-export";
+import {
+  buildLohnZip,
+  buildLohnZipFileName,
+  hasEntgeltzeilen,
+  type LohnZipPerson,
+} from "@/lib/lohn/lohn-zip-export";
 import { buildUebersichtCsv } from "@/lib/lohn/lohn-csv-export";
 import { LohnExportBlockedError, type StaffBlocker } from "@/lib/lohn/export-blockers";
-import { FileSpreadsheet, Download } from "lucide-react";
+import { FileSpreadsheet, Download, FileArchive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -79,6 +85,8 @@ export function LohnrechnerPanel() {
   const [toDate, setToDate] = useState<string>(def.to);
   const [mode, setMode] = useState<Mode>("simple");
   const [staffId, setStaffId] = useState<string>("");
+  // EX1 — Fortschritt des Sammelexports: null = inaktiv.
+  const [zipProgress, setZipProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Default = aktuelle Periode (die, in der heute liegt); Fallback: neueste
   // vergangene Periode; letzter Fallback: erste (neueste) aus der Liste.
@@ -187,6 +195,69 @@ export function LohnrechnerPanel() {
     }
   }
 
+  // EX1 — Sammelexport: je Person das bestehende Einzel-Excel, gebündelt als
+  // ZIP. Bewusst sequentiell (≈40 Calls), Blocker-Regel identisch zum CSV.
+  async function handleZipExport() {
+    const rows = uebersichtQ.data?.rows;
+    if (!rows || rows.length === 0) {
+      toast.error("Keine Daten zum Exportieren.");
+      return;
+    }
+    if (blockers.length > 0) {
+      toast.error("Export blockiert — bitte Banner prüfen.");
+      return;
+    }
+    const candidates = rows.filter((r) => r.error == null && hasEntgeltzeilen(r));
+    if (candidates.length === 0) {
+      toast.error("Keine Person mit Entgeltzeilen im Zeitraum.");
+      return;
+    }
+    setZipProgress({ done: 0, total: candidates.length });
+    try {
+      const persons: LohnZipPerson[] = [];
+      for (const row of candidates) {
+        let blob: Blob;
+        try {
+          const res = await callFn({
+            data: { staffId: row.staffId, fromDate, toDate, mode, zusatzZeilen: [] },
+          });
+          blob = await buildLohnXlsx({
+            staffLabel: row.displayName,
+            fromDate,
+            toDate,
+            mode: res.mode,
+            totalHours: res.totalHours,
+            hourlyRateCents: res.hourlyRateCents ?? 0,
+            entryCount: res.entryCount,
+            zuschlagCents: res.zuschlagCents,
+            buckets: res.buckets,
+            person: res.person,
+            zeilen: res.zeilen,
+            ergebnis: res.ergebnis,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "unbekannter Fehler";
+          toast.error(`Sammelexport abgebrochen bei ${row.displayName}: ${msg}`);
+          return;
+        }
+        persons.push({
+          staffLabel: row.displayName,
+          fromDate,
+          toDate,
+          hasEntgeltzeilen: true,
+          blob,
+        });
+        setZipProgress({ done: persons.length, total: candidates.length });
+      }
+      const zip = await buildLohnZip(persons);
+      downloadBlob(zip, buildLohnZipFileName(fromDate, toDate));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Excel-ZIP-Export fehlgeschlagen.");
+    } finally {
+      setZipProgress(null);
+    }
+  }
+
   const blockers: StaffBlocker[] = uebersichtQ.data?.blockers ?? [];
   const exportBlocked = blockers.length > 0;
 
@@ -253,6 +324,23 @@ export function LohnrechnerPanel() {
           >
             <Download className="mr-2 h-4 w-4" />
             CSV exportieren
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleZipExport}
+            disabled={
+              uebersichtQ.isLoading ||
+              !uebersichtQ.data?.rows.length ||
+              exportBlocked ||
+              zipProgress != null
+            }
+            title={exportBlocked ? "Export blockiert — bitte Banner oben prüfen." : undefined}
+          >
+            <FileArchive className="mr-2 h-4 w-4" />
+            {zipProgress
+              ? `Exportiere … (${zipProgress.done}/${zipProgress.total})`
+              : "Excel-ZIP exportieren"}
           </Button>
         </div>
         {uebersichtQ.isLoading ? (

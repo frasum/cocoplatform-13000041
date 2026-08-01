@@ -82,7 +82,7 @@ describe("lineChartGeometry", () => {
     const g = lineChartGeometry([{ name: "A", values: [null, 100, null] }], area);
     expect(g.series[0]!.points[0]).toBeNull();
     expect(g.series[0]!.points[2]).toBeNull();
-    expect(g.series[0]!.points[1]!.height).toBeUndefined();
+    expect(g.series[0]!.points[1]!.value).toBe(100);
     expect(g.series[0]!.points[1]!.y).toBeCloseTo(area.y, 6);
   });
 

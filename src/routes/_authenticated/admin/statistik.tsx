@@ -36,7 +36,7 @@ import { getRevenueStats } from "@/lib/statistics/revenue-stats.functions";
 import { getTipStats } from "@/lib/statistics/tip-stats.functions";
 import { getPersonnelStats } from "@/lib/statistics/personnel-stats.functions";
 import { personnelRatioPct } from "@/lib/statistics/personnel-core";
-import { computeChannelPercents } from "@/lib/statistics/revenue-core";
+import { checkDonutSegments, computeChannelPercents } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
@@ -738,6 +738,18 @@ function TakeawayChannelsDonut({
         </ResponsiveContainer>
       </div>
       <div className="flex-1 space-y-2 text-sm">
+        {!check.ok ? (
+          <div
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          >
+            {check.message}
+          </div>
+        ) : check.message ? (
+          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+            {check.message}
+          </div>
+        ) : null}
         <ul className="space-y-1.5">
           {withPct.map((c, i) => (
             <li key={c.name} className="flex items-center gap-2">

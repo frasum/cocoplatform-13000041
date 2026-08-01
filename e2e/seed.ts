@@ -172,6 +172,41 @@ export async function seedKasseFinalize(
       // Bewusst ohne department: Pool nutzt staff_locations.department; vermeidet den PostgREST-Schema-Cache-Bug (PGRST204) auf frischen Stacks.
     });
     if (teErr) throw new Error(`time_entries insert failed: ${teErr.message}`);
+
+    // E2E-G2b Diagnose: trennt Kandidat 1 (Query-Achse org+location+business_date
+    // trifft die Zeile nicht) von Kandidat 2 (Bereichs-Auflösung liefert den
+    // Kellner nicht). Ausgabe landet im Playwright-Log des CI-Laufs.
+    // Produktachse abgelesen aus computeSessionTipPoolCore
+    // (src/lib/cash/cash.functions.ts): time_entries
+    //   .select("staff_id, started_at, ended_at")
+    //   .eq organization_id / .eq location_id / .eq business_date
+    //   .not("ended_at", "is", null)
+    // Der Readback spiegelt genau diese Achse (plus id für die Zuordnung) und
+    // loggt zusätzlich die Variante OHNE ended_at-Filter, damit ein offener
+    // Eintrag als Ursache erkennbar wäre.
+    const { data: diagTe } = await svc
+      .from("time_entries")
+      .select("id, staff_id, business_date, location_id, started_at, ended_at")
+      .eq("organization_id", orgId)
+      .eq("location_id", locationId)
+      .eq("business_date", businessDate);
+    const { data: diagTeProd } = await svc
+      .from("time_entries")
+      .select("staff_id, started_at, ended_at")
+      .eq("organization_id", orgId)
+      .eq("location_id", locationId)
+      .eq("business_date", businessDate)
+      .not("ended_at", "is", null);
+    const { data: diagSl } = await svc
+      .from("staff_locations")
+      .select("staff_id, department, location_id")
+      .eq("staff_id", waiter.staffId);
+    console.log(
+      `[E2E-G2b] te-hits=${diagTe?.length ?? 0} prod-axis-hits=${diagTeProd?.length ?? 0} ` +
+        `te=${JSON.stringify(diagTe)} prodTe=${JSON.stringify(diagTeProd)} ` +
+        `sl=${JSON.stringify(diagSl)} ` +
+        `sessionDate=${businessDate} loc=${locationId} waiter=${waiter.staffId}`,
+    );
   }
 
   const { data: sess, error: sessErr } = await svc

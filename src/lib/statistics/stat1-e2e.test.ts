@@ -7,7 +7,6 @@
 // zählt), weicht sie hier von Gesamt/Takeaway/Haus ab und der Test bricht.
 
 import { describe, expect, it, vi } from "vitest";
-import { fmtCents } from "@/lib/format";
 import { fillDailyGaps } from "./chart-fill";
 import { aggregateByBusinessDate, summarize, takeawayDonutSegments } from "./revenue-core";
 import { mapToSessionInputs, type ChannelAmountRow, type SessionRow } from "./revenue-map";
@@ -70,7 +69,6 @@ function drawn(...parts: string[]): string {
   return hit;
 }
 
-const eur = (c: number) => `${fmtCents(c)} €`;
 // STAT3d — im PDF stehen gerundete Beträge (reine Formatschicht).
 const eurPdf = (c: number) => fmtEurRounded(c);
 

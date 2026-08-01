@@ -345,14 +345,16 @@ export async function generateStatistikPdf(
     data.takeawaySegments.length === 0
       ? "keine Take-Away-Umsätze im Zeitraum"
       : data.takeawaySegments.map((s) => `${s.name} ${fmtEur(s.amountCents)}`).join(" · ");
-  doc.text(
+  // Umbruch statt Überlauf: bei vielen Take-Away-Kanälen wird die Zeile lang.
+  const splitX = marginX + 74;
+  const splitLines = doc.splitTextToSize(
     `Haus ${fmtEur(data.revenue.houseCents)} · Takeaway ${fmtEur(
       data.revenue.takeawayCents,
     )} · ${segLine}`,
-    marginX + 74,
-    cursorY,
+    marginX + usable - splitX,
   );
-  cursorY += 11;
+  doc.text(splitLines, splitX, cursorY);
+  cursorY += 11 + (splitLines.length - 1) * 9;
   if (data.takeawaySegmentsWarning) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");

@@ -280,6 +280,12 @@ function StatistikPage() {
         : (locations.find((l) => l.id === locationFilter)?.name ?? "Standort");
 
     const ratio = personnelRatioPct(per.totals.laborCostCents, rev.summary.totalCents);
+    // STAT1b — gleiche Quelle wie der Donut.
+    const segs = takeawayDonutSegments(
+      rev.takeawayComponents.markerSumCents,
+      rev.takeawayComponents.souseSumCents,
+      rev.summary.woltInfoCents,
+    );
     const staffWithoutRateNames = per.staffWithoutRate.map(
       (id) => per.perStaff.find((p) => p.staffId === id)?.name ?? id,
     );
@@ -310,6 +316,8 @@ function StatistikPage() {
         totalCents: rev.summary.totalCents,
         daysWithRevenue: rev.daily.filter((d) => d.totalCents > 0).length,
       },
+      takeawaySegments: segs.segments,
+      takeawaySegmentsWarning: segs.warning,
       tips: {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,

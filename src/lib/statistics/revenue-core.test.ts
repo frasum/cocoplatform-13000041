@@ -418,3 +418,41 @@ describe("sessionHouseCentsFromKasse — Kasse-Modell (N14b, 19.07.)", () => {
     ).toThrow();
   });
 });
+
+describe("checkDonutSegments — UI-Validierung der Donut-Segmente", () => {
+  it("ok ohne Meldung, wenn Segmentsumme = Marker + SoUse und keine Deckelung", () => {
+    const r = checkDonutSegments({
+      segmentSumCents: 40_000,
+      markerSumCents: 36_510,
+      souseSumCents: 3_490,
+      takeawayCents: 40_000,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.capped).toBe(false);
+    expect(r.message).toBeNull();
+  });
+
+  it("meldet Fehler mit Differenz, wenn Segmente nicht aufgehen", () => {
+    const r = checkDonutSegments({
+      segmentSumCents: 36_510,
+      markerSumCents: 36_510,
+      souseSumCents: 3_490,
+      takeawayCents: 40_000,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain("Donut-Prüfung fehlgeschlagen");
+    expect(r.message).toContain("34,90 €");
+  });
+
+  it("weist bei Deckelung auf min(vectron, marker+souse) hin, bleibt aber ok", () => {
+    const r = checkDonutSegments({
+      segmentSumCents: 50_000,
+      markerSumCents: 50_000,
+      souseSumCents: 0,
+      takeawayCents: 40_000,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.capped).toBe(true);
+    expect(r.message).toContain("gedeckelt");
+  });
+});

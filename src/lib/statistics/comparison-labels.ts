@@ -13,7 +13,7 @@
 // Fehlender Vergleichswert oder Nenner 0 ⇒ „—" (nie NaN/Infinity/0-Fake).
 
 import { pctDiff } from "./comparison-core";
-import { computeTrend } from "./revenue-core";
+import { computeTrend, ppDelta } from "./revenue-core";
 import { formatComparisonRange, type ComparisonRange } from "./comparison-label";
 
 export type Tone = "up" | "down" | "neutral";
@@ -98,5 +98,26 @@ export function previousTrendLabel(
     pct,
     text: `${sign}${formatPctDe(pct)} % ${suffix}`,
     tone: pct > 0 ? "up" : pct < 0 ? "down" : "neutral",
+  };
+}
+
+/**
+ * STAT2d — Trendzeile für eine QUOTEN-Kennzahl: Punktdifferenz statt relativem
+ * Wachstum („+0,2 pp vs. 01.–30.06."). Fehlender Wert ⇒ „—".
+ */
+export function ppTrendLabel(
+  current: number | null | undefined,
+  previous: number | null | undefined,
+  range: ComparisonRange | null | undefined,
+  opts?: { partial?: boolean },
+): TrendLabel {
+  const delta = ppDelta(current ?? null, previous ?? null);
+  if (delta === null) return { pct: null, text: "—", tone: "neutral" };
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "±";
+  const suffix = formatComparisonRange(range ?? null, opts) ?? "vs. Vormonat";
+  return {
+    pct: delta,
+    text: `${sign}${formatPctDe(delta)} pp ${suffix}`,
+    tone: delta > 0 ? "up" : delta < 0 ? "down" : "neutral",
   };
 }

@@ -180,7 +180,7 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
         locationName,
         cells,
         years: toYearRows(cells),
-        headline: monthlyHeadline(cells, focusYear, focusMonthNo),
+        headline: monthlyHeadline(cells, focusYear, focusMonthNo, nowMonth),
       };
     }
 

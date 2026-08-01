@@ -314,6 +314,20 @@ function StatistikPage() {
         ? "Alle Standorte"
         : (locations.find((l) => l.id === locationFilter)?.name ?? "Standort");
 
+    // STAT3 — nur der Kalendermonat-Modus trägt Vorjahres-/Verlaufsvergleiche.
+    const calendarMonth = mode === "month";
+    const focusYear = Number(month.slice(0, 4));
+    const focusMonthNo = Number(month.slice(5, 7));
+    const matrix = matrixQ.data ?? null;
+    /** Monatszelle eines Standorts (bzw. der Summe) aus der MB1-Matrix. */
+    function matrixCents(locationId: string, year: number, monthNo: number): number | null {
+      if (!matrix || !calendarMonth) return null;
+      const series = matrix.series.find((s) => s.locationId === locationId);
+      if (!series) return null;
+      return findCell(series.cells, year, monthNo)?.totalCents ?? null;
+    }
+    const scopeSeriesId = locationFilter === "all" ? ALL_LOCATIONS : locationFilter;
+
     const ratio = personnelRatioPct(per.totals.laborCostCents, rev.summary.totalCents);
     // STAT1b — gleiche Quelle wie der Donut.
     const segs = takeawayDonutSegments(
@@ -354,35 +368,76 @@ function StatistikPage() {
         laborCostCents: p.totals.laborCostCents,
         hasMissingRate: p.staffWithoutRate.length > 0,
         guestTotal: r.guestTotal,
-        workHours: k.workHours,
         perGuestCents: k.revenuePerGuestCents,
         perHourCents: k.revenuePerWorkHourCents,
-        previousRange: r.previousRange,
-        previousPartial: r.coverage.isPartial,
+        prevYearTotalCents: matrixCents(loc.id, focusYear - 1, focusMonthNo),
         prevTotalCents: r.previous?.totalCents ?? null,
       });
     });
 
+    // Grafik B — 13-Monats-Fenster (Vorjahresmonat … Berichtsmonat) je Standort
+    // bzw. als Summe; die Werte kommen unverändert aus der MB1-Matrix.
+    const window13 = monthWindow(focusYear, focusMonthNo, 13);
+    const monthlySeriesIds =
+      locationFilter === "all" ? locations.map((l) => l.id) : [locationFilter];
+    const monthly =
+      calendarMonth && matrix
+        ? {
+            monthLabels: window13.map((m) => m.label),
+            series: monthlySeriesIds
+              .map((id) => {
+                const series = matrix.series.find((s) => s.locationId === id);
+                if (!series) return null;
+                return {
+                  name: series.locationName,
+                  values: window13.map((m) => findCell(series.cells, m.year, m.month)?.totalCents ?? null),
+                };
+              })
+              .filter((s): s is { name: string; values: Array<number | null> } => s !== null),
+          }
+        : undefined;
+
     const data: StatistikPdfData = {
       monthLabel,
       scopeLabel,
+      generatedAtLabel: format(new Date(), "dd.MM.yyyy, HH:mm", { locale: de }),
+      calendarMonth,
       revenue: {
         houseCents: rev.summary.houseCents,
         takeawayCents: rev.summary.takeawayCents,
         totalCents: rev.summary.totalCents,
         daysWithRevenue: rev.daily.filter((d) => d.totalCents > 0).length,
       },
+      previousYearTotalCents: matrixCents(scopeSeriesId, focusYear - 1, focusMonthNo),
+      previousPeriodTotalCents: rev.previous?.totalCents ?? null,
       takeawaySegments: segs.segments,
       takeawaySegmentsWarning: segs.warning,
       tips: {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,
         totalCents: tip.totals.totalCents,
-        perStaff: tip.perStaff.map((p) => ({
-          name: p.name,
-          department: p.department,
-          tipCents: p.tipCents,
-        })),
+        // STAT3 — 3×n-Matrix statt Klarnamen-Liste (Bank-/Gesellschafter-PDF).
+        perLocation: locations
+          .map((loc, i) => {
+            const t = tipQueries[i]?.data;
+            if (!t) return null;
+            return {
+              locationName: loc.name,
+              serviceCents: t.totals.serviceCents,
+              kitchenCents: t.totals.kitchenCents,
+              totalCents: t.totals.totalCents,
+            };
+          })
+          .filter(
+            (
+              t,
+            ): t is {
+              locationName: string;
+              serviceCents: number;
+              kitchenCents: number;
+              totalCents: number;
+            } => t !== null,
+          ),
       },
       personnel: {
         netHours: per.totals.netHours,
@@ -392,8 +447,6 @@ function StatistikPage() {
       },
       dailyRevenue: rev.daily.map((d) => ({
         businessDate: d.businessDate,
-        houseCents: d.houseCents,
-        takeawayCents: d.takeawayCents,
         totalCents: d.totalCents,
       })),
       // STAT2 — gleiche Quelle wie die Kacheln/das Panel; keine eigene Summierung.
@@ -402,22 +455,8 @@ function StatistikPage() {
         workHours: pdfKpis.workHours,
         revenuePerGuestCents: pdfKpis.revenuePerGuestCents,
         revenuePerWorkHourCents: pdfKpis.revenuePerWorkHourCents,
-        daily: rev.daily.map((d) => {
-          const k = derivedKpis({
-            houseCents: d.houseCents,
-            totalCents: d.totalCents,
-            guestCount: d.guestCount,
-            workMinutes: d.workMinutes,
-          });
-          return {
-            businessDate: d.businessDate,
-            guestCount: d.guestCount,
-            workHours: k.workHours,
-            perGuestCents: k.revenuePerGuestCents,
-            perHourCents: k.revenuePerWorkHourCents,
-          };
-        }),
       },
+      ...(monthly ? { monthly } : {}),
       comparison,
     };
 

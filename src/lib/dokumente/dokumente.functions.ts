@@ -14,13 +14,20 @@ import {
   buildPlaceholderData,
   fillTemplate,
   listPlaceholdersInTemplate,
+  resolveVorgangValues,
+  vorgangPlaceholdersInTemplate,
   type PlaceholderInput,
 } from "./document-placeholders";
 import { formatWageLines, resolveWageLines } from "./wage-lines";
 import type { RateRow } from "@/lib/lohn/rate-resolution";
 import type { Department } from "@/lib/time/primary-department";
 
-const DOC_TYPES = ["arbeitsvertrag", "arbeitszeugnis_einfach", "arbeitsbescheinigung"] as const;
+const DOC_TYPES = [
+  "arbeitsvertrag",
+  "arbeitszeugnis_einfach",
+  "arbeitsbescheinigung",
+  "abmahnung",
+] as const;
 export type DocType = (typeof DOC_TYPES)[number];
 
 export type DocumentTemplateRow = {
@@ -184,6 +191,28 @@ export const updateTemplate = createServerFn({ method: "POST" })
   });
 
 // ── Data-Loading + Preview + Save ──────────────────────────────────────────
+
+// DL2 — Vorgangswerte (Einzelfall-Eingaben aus dem Generieren-Dialog).
+const vorgangSchema = z.record(z.string(), z.string()).optional();
+
+/**
+ * Prüft die Vorgangs-Platzhalter des Templates und liefert die formatierten
+ * Werte. Fehlt eine Pflicht-Eingabe, wird abgelehnt — ein Dokument mit
+ * sichtbarem {{fehltag}} darf nie entstehen.
+ */
+function resolveVorgangOrThrow(
+  templateContent: string,
+  raw: Record<string, string> | undefined,
+): Record<string, string> {
+  const required = vorgangPlaceholdersInTemplate(templateContent);
+  if (required.length === 0) return {};
+  const { values, missing } = resolveVorgangValues(raw ?? {}, required);
+  if (missing.length > 0) {
+    const labels = missing.map((k) => required.find((p) => p.key === k)?.label ?? k);
+    throw new Error(`Pflichtangabe fehlt: ${labels.join(", ")}`);
+  }
+  return values;
+}
 
 async function loadPlaceholderInput(
   organizationId: string,

@@ -237,6 +237,14 @@ function StatistikPage() {
     enabled: periodValid,
   });
 
+  // STAT3 — Vorjahres- und Verlaufszahlen kommen aus der BESTEHENDEN
+  // MB1-Server-Fn (gleicher Query-Key wie der Tab „Monatsentwicklung", also
+  // aus dem Cache). Keine neue Query, keine zweite Formel.
+  const matrixQ = useQuery({
+    queryKey: ["monthlyRevenueMatrix"],
+    queryFn: () => getMonthlyRevenueMatrix({ data: {} }),
+  });
+
   // Compare-Queries (alle Standorte, ignorieren den Pill-Filter) — genau einmal
   // hier deklariert, damit der PDF-Export dieselben Daten nutzen kann wie die
   // Vergleichstabelle. LocationCompareSection erhält die Ergebnisse als Props.

@@ -550,6 +550,7 @@ function ErrorState({ message }: { message: string }) {
 
 function StatsView({ data }: { data: RevenueStats }) {
   const trend = data.trend;
+  const cmp = formatComparisonRange(data.previousRange, { partial: data.coverage.isPartial });
   const hasDaily = data.daily.length > 0;
   const hasTakeaway = data.takeawayByChannel.length > 0 && data.summary.takeawayCents > 0;
   return (
@@ -559,12 +560,19 @@ function StatsView({ data }: { data: RevenueStats }) {
           title="Gesamtumsatz"
           cents={data.summary.totalCents}
           trend={trend?.total ?? null}
+          comparisonLabel={cmp}
         />
-        <KpiCard title="Haus" cents={data.summary.houseCents} trend={trend?.house ?? null} />
+        <KpiCard
+          title="Haus"
+          cents={data.summary.houseCents}
+          trend={trend?.house ?? null}
+          comparisonLabel={cmp}
+        />
         <KpiCard
           title="Takeaway"
           cents={data.summary.takeawayCents}
           trend={trend?.takeaway ?? null}
+          comparisonLabel={cmp}
         />
       </div>
 
@@ -842,12 +850,28 @@ function TipsLoading() {
 
 function TipsView({ data }: { data: TipStats }) {
   const t = data.trend;
+  const cmp = formatComparisonRange(data.previousRange, { partial: data.coverage.isPartial });
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard title="Trinkgeld gesamt" cents={data.totals.totalCents} trend={t?.total ?? null} />
-        <KpiCard title="Service" cents={data.totals.serviceCents} trend={t?.service ?? null} />
-        <KpiCard title="Küche" cents={data.totals.kitchenCents} trend={t?.kitchen ?? null} />
+        <KpiCard
+          title="Trinkgeld gesamt"
+          cents={data.totals.totalCents}
+          trend={t?.total ?? null}
+          comparisonLabel={cmp}
+        />
+        <KpiCard
+          title="Service"
+          cents={data.totals.serviceCents}
+          trend={t?.service ?? null}
+          comparisonLabel={cmp}
+        />
+        <KpiCard
+          title="Küche"
+          cents={data.totals.kitchenCents}
+          trend={t?.kitchen ?? null}
+          comparisonLabel={cmp}
+        />
       </div>
       <Card>
         <CardHeader>

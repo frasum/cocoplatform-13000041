@@ -154,7 +154,7 @@ describe("MB1 — Jahreszeilen / YTD / YoY", () => {
 });
 
 describe("MB1-N1 — Anzeige-Rundung vs. Rechnung", () => {
-  it("16019268 Cents ergeben Anzeige „160.193" und T€ 160", () => {
+  it("16019268 Cents ergeben Anzeige 160.193 und T€ 160", () => {
     expect(displayEuros(16_019_268)).toBe(160_193);
     expect(formatDisplayEuros(16_019_268)).toBe("160.193");
     expect(displayTsd(16_019_268)).toBe(160);

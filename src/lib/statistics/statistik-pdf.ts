@@ -633,6 +633,8 @@ export async function generateStatistikPdf(
     "Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.",
     // STAT2d — Bezugsbasis der Quote muss im Dokument stehen.
     "TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).",
+    // STAT3d — Rundung ist Präsentation, keine Nachjustierung der Summen.
+    "Beträge kaufmännisch auf ganze Euro gerundet; Summen können rundungsbedingt um ±1 € abweichen. Centgenaue Werte in COCO.",
   ];
   if (hasMissingAny || data.personnel.staffWithoutRateNames.length > 0) {
     notes.push(

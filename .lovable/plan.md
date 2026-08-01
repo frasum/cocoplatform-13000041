@@ -1,23 +1,19 @@
 ## Ziel
 
-Jede KPI-Kachel in der Statistik zeigt unter der Trendzeile als Untertitel, gegen welchen Zeitraum verglichen wird — z. B. `vs. 01.–18.06.2026`. Damit ist ohne Nachdenken erkennbar, ob es der Vormonat, ein geklemmter Teil-Vormonat oder die vorangehende freie Spanne ist.
+Die Summen-Kacheln (Umsatz, Trinkgeld, Gäste, Arbeitsstunden) nutzen aktuell einen geteilten Anteils-Balken (`ShareBar`, eine Zeile, 54 % / 46 %). Sie sollen dieselbe zweizeilige Balken-Anordnung bekommen wie „Ø Umsatz je Gast" und „Umsatz je Arbeitsstunde" — je Standort eine eigene Zeile mit Wert rechts.
 
-## Verhalten
+## Umsetzung (nur Darstellung, keine Rechenlogik)
 
-- Untertitel erscheint nur, wenn tatsächlich ein Vergleich vorliegt (Vorperiode geladen und Trend vorhanden). Ohne Vorperiode: kein Untertitel, kein Platzhaltertext.
-- Formatierung des Zeitraums:
-  - gleicher Monat: `vs. 01.–18.06.2026`
-  - über Monatsgrenze: `vs. 29.06.–09.07.2026`
-  - ein einzelner Tag: `vs. 18.06.2026`
-- Ist der laufende Monat unvollständig und der Vormonat deshalb auf denselben Tagesausschnitt geklemmt, erscheint zusätzlich der Hinweis `(gleicher Tagesausschnitt)`, damit der verkürzte Vormonat nicht wie ein Fehler wirkt.
-- Untertitel dezent: kleiner als die Trendzeile, gedämpfte Farbe, keine zusätzliche Kachelhöhe außer einer Textzeile.
-- Gilt für alle drei Bereiche mit Trendkacheln: Umsatz (Gesamt/Haus/Takeaway), Trinkgeld (Gesamt/Service/Küche), Personal (Stunden/Kosten).
+Datei: `src/routes/_authenticated/admin/statistik.tsx`
 
-## Technische Umsetzung
+1. `LevelBar` um eine optionale Zusatzangabe erweitern, damit bei Summen neben dem Wert der Anteil sichtbar bleibt (z. B. rechts `11.603,68 €` und darunter/daneben `53 %`). Die bestehende Verwendung bei den Dichte-Kacheln bleibt unverändert (kein Anteil, da dort rechnerisch irreführend).
+2. In `SumCompareCard` den `ShareBar`-Aufruf durch `LevelBar` ersetzen:
+   - Zeile 1: Standort A, Balken skaliert am größeren der beiden Werte, Wert + Anteil.
+   - Zeile 2: Standort B analog.
+   - Farben bleiben `bg-chart-1` / `bg-chart-2`, Höhe/Radius wie bisher.
+3. `ShareBar` entfernen, sobald keine Verwendung mehr existiert (sonst Lint-Warnung wegen ungenutzter Komponente) — vorher per Suche prüfen, ob die Komponente noch woanders eingesetzt wird.
+4. Kurz-Check: `tsgo` sowie bestehende Statistik-Tests laufen lassen; Screenshot des Standortvergleichs zur Sichtprüfung.
 
-1. **Serverseitig Vergleichsfenster mitliefern.** In `src/lib/statistics/revenue-stats.functions.ts`, `tip-stats.functions.ts` und `personnel-stats.functions.ts` das bereits berechnete `previous`-Fenster (nach der U5a-Klemmung) zusätzlich als `previousRange: { startDate, endDate } | null` zurückgeben. Keine Änderung an der Berechnung, kein zusätzlicher Query — nur das schon vorhandene Fenster wird durchgereicht. `previousRange` ist `null`, wenn keine Vorperiode geladen wurde.
-2. **Reine Formatierfunktion.** Neue Funktion `formatComparisonRange(range, opts)` in `src/lib/statistics/period-window.ts` (oder einem kleinen Nachbarmodul), die aus Start/Ende den kompakten deutschen Text erzeugt. Rein, testbar, ohne UI-Bezug.
-3. **UI.** In `src/routes/_authenticated/admin/statistik.tsx` erhält `KpiCard` eine optionale `comparisonLabel`-Prop, die unter `TrendLine`/`TrendLineHours` gerendert wird. Die drei Sections (Umsatz, Trinkgeld, Personal) übergeben den aus `previousRange` + `coverage.isPartial` gebauten Text.
-4. **Tests.** Unit-Tests für `formatComparisonRange` (gleicher Monat, Monatsgrenze, Einzeltag, Jahreswechsel) in einer Test-Datei neben `period-window.test.ts`.
+## Technischer Hinweis
 
-Nicht Teil dieses Schritts: Statistik-PDF, Standortvergleich-Karten, sonstige Kacheln ohne Trend.
+Bei Summen ist die Skalierung am Maximum identisch mit dem Anteilsverhältnis, d. h. der Informationsgehalt bleibt gleich — es ändert sich nur die Anordnung. Die PDF-Ausgabe (`statistik-pdf.ts`) ist davon nicht betroffen und bleibt unangetastet.

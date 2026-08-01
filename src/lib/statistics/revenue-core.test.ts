@@ -7,6 +7,7 @@ import {
   groupTakeawayByChannel,
   computeChannelPercents,
   checkDonutSegments,
+  takeawayDonutSegments,
   sessionHouseCentsFromKasse,
   type SessionRevenueInput,
 } from "./revenue-core";
@@ -455,5 +456,42 @@ describe("checkDonutSegments — UI-Validierung der Donut-Segmente", () => {
     expect(r.ok).toBe(true);
     expect(r.capped).toBe(true);
     expect(r.message).toContain("gedeckelt");
+  });
+});
+
+describe("takeawayDonutSegments — STAT1b Darstellungszerlegung", () => {
+  it("zerlegt Live-Zahlen in Wolt, Takeaway direkt und SoUse", () => {
+    const r = takeawayDonutSegments(2_528_460, 241_538, 1_912_180);
+    expect(r.segments).toEqual([
+      { name: "Wolt", amountCents: 1_912_180 },
+      { name: "Takeaway direkt (Telefon/Abholung)", amountCents: 616_280 },
+      { name: "SoUse", amountCents: 241_538 },
+    ]);
+    expect(r.segmentSumCents).toBe(2_769_998);
+    expect(r.woltExceedsMarker).toBe(false);
+    expect(r.warning).toBeNull();
+  });
+
+  it("ohne Wolt bleiben zwei Segmente, direkt = voller Marker", () => {
+    const r = takeawayDonutSegments(36_510, 3_490, 0);
+    expect(r.segments).toEqual([
+      { name: "Takeaway direkt (Telefon/Abholung)", amountCents: 36_510 },
+      { name: "SoUse", amountCents: 3_490 },
+    ]);
+    expect(r.segmentSumCents).toBe(40_000);
+  });
+
+  // Dokumentiert: übersteigt Wolt den Marker, wird das Wolt-Segment auf den
+  // Marker gedeckelt und Direkt = 0 (Segment entfällt). Die Segmentsumme
+  // bleibt marker + souse — sie folgt NICHT dem zu großen Wolt-Betrag.
+  it("Guard: Wolt > Marker → direkt 0, Flag gesetzt, Summe = Marker + SoUse", () => {
+    const r = takeawayDonutSegments(10_000, 2_000, 12_000);
+    expect(r.segments).toEqual([
+      { name: "Wolt", amountCents: 10_000 },
+      { name: "SoUse", amountCents: 2_000 },
+    ]);
+    expect(r.segmentSumCents).toBe(12_000);
+    expect(r.woltExceedsMarker).toBe(true);
+    expect(r.warning).toContain("Erfassung prüfen");
   });
 });

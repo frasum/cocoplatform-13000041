@@ -9,7 +9,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { fmtCents } from "@/lib/format";
 import { fillDailyGaps } from "./chart-fill";
-import { aggregateByBusinessDate, groupTakeawayByChannel, summarize } from "./revenue-core";
+import { aggregateByBusinessDate, summarize, takeawayDonutSegments } from "./revenue-core";
 import { mapToSessionInputs, type ChannelAmountRow, type SessionRow } from "./revenue-map";
 import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
 
@@ -105,14 +105,14 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     }).toEqual(EXPECTED);
     expect(chart[0].businessDate).toBe("2026-07-18");
 
-    // 4) Donut: nur Marker/SoUse sind Segmente, Wolt bleibt außerhalb.
-    const donut = groupTakeawayByChannel(
-      CHANNEL_ROWS.filter((c) => c.kind === "delivery_vectron" || c.kind === "delivery_souse").map(
-        (c) => ({ name: c.kind, amountCents: c.amountCents }),
-      ),
-    );
-    expect(donut).toEqual([{ name: "delivery_vectron", amountCents: 36_510 }]);
-    expect(donut.reduce((s, d) => s + d.amountCents, 0)).toBe(summary.takeawayCents);
+    // 4) Donut (STAT1b): Marker in Wolt + Direkt zerlegt, SoUse unverändert.
+    const donut = takeawayDonutSegments(36_510, 0, summary.woltInfoCents);
+    expect(donut.segments).toEqual([
+      { name: "Wolt", amountCents: 17_210 },
+      { name: "Takeaway direkt (Telefon/Abholung)", amountCents: 19_300 },
+    ]);
+    expect(donut.segmentSumCents).toBe(summary.takeawayCents);
+    expect(donut.woltExceedsMarker).toBe(false);
 
     // 5) PDF-Export aus genau diesen Werten.
     const data: StatistikPdfData = {
@@ -124,6 +124,8 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
         totalCents: summary.totalCents,
         daysWithRevenue: summary.daysWithRevenue,
       },
+      takeawaySegments: donut.segments,
+      takeawaySegmentsWarning: donut.warning,
       tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perStaff: [] },
       personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
       dailyRevenue: daily.map((d) => ({
@@ -135,6 +137,9 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
       comparison: [],
     };
     await generateStatistikPdf(data);
+
+    expect(pdfRow("Wolt")[1]).toBe(eur(17_210));
+    expect(pdfRow("Takeaway direkt (Telefon/Abholung)")[1]).toBe(eur(19_300));
 
     expect(pdfRow("Haus")[1]).toBe(eur(EXPECTED.houseCents));
     expect(pdfRow("Takeaway")[1]).toBe(eur(EXPECTED.takeawayCents));

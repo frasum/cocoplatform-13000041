@@ -36,7 +36,11 @@ import { getRevenueStats } from "@/lib/statistics/revenue-stats.functions";
 import { getTipStats } from "@/lib/statistics/tip-stats.functions";
 import { getPersonnelStats } from "@/lib/statistics/personnel-stats.functions";
 import { personnelRatioPct } from "@/lib/statistics/personnel-core";
-import { checkDonutSegments, computeChannelPercents } from "@/lib/statistics/revenue-core";
+import {
+  checkDonutSegments,
+  computeChannelPercents,
+  takeawayDonutSegments,
+} from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
@@ -276,6 +280,12 @@ function StatistikPage() {
         : (locations.find((l) => l.id === locationFilter)?.name ?? "Standort");
 
     const ratio = personnelRatioPct(per.totals.laborCostCents, rev.summary.totalCents);
+    // STAT1b — gleiche Quelle wie der Donut.
+    const segs = takeawayDonutSegments(
+      rev.takeawayComponents.markerSumCents,
+      rev.takeawayComponents.souseSumCents,
+      rev.summary.woltInfoCents,
+    );
     const staffWithoutRateNames = per.staffWithoutRate.map(
       (id) => per.perStaff.find((p) => p.staffId === id)?.name ?? id,
     );
@@ -306,6 +316,8 @@ function StatistikPage() {
         totalCents: rev.summary.totalCents,
         daysWithRevenue: rev.daily.filter((d) => d.totalCents > 0).length,
       },
+      takeawaySegments: segs.segments,
+      takeawaySegmentsWarning: segs.warning,
       tips: {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,
@@ -562,7 +574,6 @@ function StatsView({ data }: { data: RevenueStats }) {
         <CardContent>
           {hasTakeaway ? (
             <TakeawayChannelsDonut
-              channels={data.takeawayByChannel}
               totalCents={data.summary.takeawayCents}
               woltInfoCents={data.summary.woltInfoCents}
               components={data.takeawayComponents}
@@ -690,21 +701,24 @@ const CHANNEL_COLORS = [
 ];
 
 function TakeawayChannelsDonut({
-  channels,
   totalCents,
   woltInfoCents,
   components,
 }: {
-  channels: RevenueStats["takeawayByChannel"];
   totalCents: number;
   woltInfoCents: number;
   components: RevenueStats["takeawayComponents"];
 }) {
-  const withPct = computeChannelPercents(channels);
+  // STAT1b — Segmente kommen aus der reinen Zerlegung; die UI rechnet nicht.
+  const decomposed = takeawayDonutSegments(
+    components.markerSumCents,
+    components.souseSumCents,
+    woltInfoCents,
+  );
+  const withPct = computeChannelPercents(decomposed.segments);
   // STAT1 — Segmentsumme automatisch gegen Marker + SoUse prüfen.
-  const segmentSumCents = channels.reduce((s, c) => s + c.amountCents, 0);
   const check = checkDonutSegments({
-    segmentSumCents,
+    segmentSumCents: decomposed.segmentSumCents,
     markerSumCents: components.markerSumCents,
     souseSumCents: components.souseSumCents,
     takeawayCents: totalCents,
@@ -750,6 +764,11 @@ function TakeawayChannelsDonut({
             {check.message}
           </div>
         ) : null}
+        {decomposed.warning ? (
+          <div className="rounded-md border border-border bg-muted/40 p-2 text-xs text-muted-foreground">
+            {decomposed.warning}
+          </div>
+        ) : null}
         <ul className="space-y-1.5">
           {withPct.map((c, i) => (
             <li key={c.name} className="flex items-center gap-2">
@@ -765,16 +784,6 @@ function TakeawayChannelsDonut({
             </li>
           ))}
         </ul>
-        {woltInfoCents > 0 ? (
-          // STAT1: Wolt ist im Vectron-Takeaway-Marker enthalten — reine
-          // „davon"-Zeile ohne eigenes Donut-Segment.
-          <div className="pl-[18px] text-xs text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <span className="flex-1 truncate">davon Wolt</span>
-              <span className="tabular-nums">{fmtEuro(woltInfoCents)}</span>
-            </span>
-          </div>
-        ) : null}
         <div className="border-t border-border pt-2 text-xs text-muted-foreground">
           Gesamt Takeaway: <span className="tabular-nums">{fmtEuro(totalCents)}</span>
         </div>

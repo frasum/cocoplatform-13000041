@@ -5,11 +5,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { fmtCents } from "@/lib/format";
-import {
-  aggregateByBusinessDate,
-  summarize,
-  type SessionRevenueInput,
-} from "./revenue-core";
+import { aggregateByBusinessDate, summarize, type SessionRevenueInput } from "./revenue-core";
 import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
 
 type Cell = string | { content: string };

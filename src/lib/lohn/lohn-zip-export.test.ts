@@ -64,7 +64,7 @@ describe("uniqueFileName / buildLohnZipFileName", () => {
   it("zählt Suffixe hoch", () => {
     const taken = new Set<string>();
     expect(uniqueFileName("a.xlsx", taken)).toBe("a.xlsx");
-    expect(uniqueFileName("a.xlsx", taken)).toBe("a.xlsx_2".replace("a.xlsx_2", "a_2.xlsx"));
+    expect(uniqueFileName("a.xlsx", taken)).toBe("a_2.xlsx");
     expect(uniqueFileName("a.xlsx", taken)).toBe("a_3.xlsx");
   });
 

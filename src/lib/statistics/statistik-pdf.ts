@@ -1,22 +1,44 @@
-// PDF-Export für die M-Statistik-Seite. Reine Präsentation, keine
-// Berechnungslogik. Konsumiert ausschließlich bereits geladene Daten.
+// STAT3 — PDF-Export der Statistik-Seite: EINE A4-Seite Management-Blick
+// (Summen, Vergleich, Entwicklung, Grafik). Detailzahlen bleiben in der App.
+//
+// Reine Präsentation, keine Berechnungslogik: alle Werte kommen fertig aus den
+// Statistik-Server-Fns bzw. der MB1-Monatsmatrix. Prozent-Deltas entstehen
+// über `growthPct` (monthly-core), die Chart-Geometrie über
+// `statistik-pdf-charts.ts` — hier wird nur gezeichnet.
+//
 // Muster wie src/lib/cash/pdfExport.ts: dynamische jspdf/jspdf-autotable
 // Imports, kein Buffer, kein node:-Modul — läuft komplett im Browser.
 
 import type jsPDF from "jspdf";
-import { fmtCents } from "@/lib/format";
-import { leadDelta, previousTrendLabel } from "./comparison-labels";
-import { pickTopTwoByTotal } from "./comparison-core";
+import { fmtCents, parseIso } from "@/lib/format";
+import { growthPct } from "./monthly-core";
+import {
+  barChartGeometry,
+  formatTsd,
+  lineChartGeometry,
+  type ChartArea,
+} from "./statistik-pdf-charts";
 
 export type StatistikPdfData = {
   monthLabel: string;
   scopeLabel: string;
+  /** Erstellungsdatum, klein im Kopf. */
+  generatedAtLabel: string;
+  /**
+   * true = Kalendermonat-Modus. Nur dann tragen die Vorjahres-/Vormonatsspalten und der
+   * 13-Monats-Verlauf; im freien Zeitraum stehen „—" bzw. entfällt Grafik B.
+   */
+  calendarMonth: boolean;
   revenue: {
     houseCents: number;
     takeawayCents: number;
     totalCents: number;
     daysWithRevenue: number;
   };
+  /** Vorjahresmonat des Scopes (MB1-Historie); null ⇒ „—". */
+  previousYearTotalCents?: number | null;
+  /** Vormonat/Vorperiode des Scopes; null ⇒ „—". */
+  previousPeriodTotalCents?: number | null;
   /** STAT1b — Take-Away-Segmente (Wolt / direkt / SoUse) aus takeawayDonutSegments. */
   takeawaySegments: Array<{ name: string; amountCents: number }>;
   takeawaySegmentsWarning: string | null;
@@ -24,7 +46,16 @@ export type StatistikPdfData = {
     serviceCents: number;
     kitchenCents: number;
     totalCents: number;
-    perStaff: Array<{ name: string; department: "kitchen" | "service"; tipCents: number }>;
+    /**
+     * STAT3 — kompakte 3×n-Matrix je Standort. Einzelbeträge je Mitarbeiter
+     * erscheinen bewusst NICHT mehr im PDF (Bank-/Gesellschafter-Versand).
+     */
+    perLocation: Array<{
+      locationName: string;
+      serviceCents: number;
+      kitchenCents: number;
+      totalCents: number;
+    }>;
   };
   personnel: {
     netHours: number;
@@ -32,28 +63,22 @@ export type StatistikPdfData = {
     ratioPct: number | null;
     staffWithoutRateNames: string[];
   };
-  dailyRevenue: Array<{
-    businessDate: string;
-    houseCents: number;
-    takeawayCents: number;
-    totalCents: number;
-  }>;
-  /**
-   * STAT2 — Gäste/Stunden je Tag + Kennzahlen; Werte kommen fertig aus
-   * `derivedKpis`. Optional: ohne Block wird der Abschnitt weggelassen.
-   */
+  /** Grafik A — Tagesumsätze des Berichtszeitraums (Gesamt je Geschäftstag). */
+  dailyRevenue: Array<{ businessDate: string; totalCents: number }>;
+  /** STAT2 — Kennzahlen der Kacheln; Werte kommen fertig aus `derivedKpis`. */
   guestHours?: {
     guestTotal: number;
     workHours: number;
     revenuePerGuestCents: number | null;
     revenuePerWorkHourCents: number | null;
-    daily: Array<{
-      businessDate: string;
-      guestCount: number;
-      workHours: number;
-      perGuestCents: number | null;
-      perHourCents: number | null;
-    }>;
+  };
+  /**
+   * Grafik B — 13-Monats-Verlauf aus der MB1-Monatsmatrix. Fehlt der Block
+   * (freier Zeitraum), entfällt die Grafik.
+   */
+  monthly?: {
+    monthLabels: string[];
+    series: Array<{ name: string; values: Array<number | null> }>;
   };
   comparison: Array<{
     locationName: string;
@@ -63,22 +88,12 @@ export type StatistikPdfData = {
     netHours: number;
     laborCostCents: number;
     hasMissingRate: boolean;
-    /**
-     * STAT2b — Gäste/Arbeitsstunden und die beiden Dichte-Kennzahlen je
-     * Standort. Werte kommen fertig aus `derivedKpis` bzw. den Stats-Feldern;
-     * hier wird nichts summiert. Optional gehalten (Alt-Fixtures ohne Block).
-     */
     guestTotal?: number;
-    workHours?: number;
     perGuestCents?: number | null;
     perHourCents?: number | null;
-    /**
-     * STAT2c — Vormonatsfenster je Standort für die Trendspalte. Werte und
-     * Fenster kommen fertig aus den Statistik-Server-Fns; die Beschriftung
-     * entsteht über dieselbe Funktion wie in der UI (`previousTrendLabel`).
-     */
-    previousRange?: { startDate: string; endDate: string } | null;
-    previousPartial?: boolean;
+    /** Vorjahresmonat je Standort (MB1); null ⇒ „—". */
+    prevYearTotalCents?: number | null;
+    /** Vormonatsfenster je Standort; null ⇒ „—". */
     prevTotalCents?: number | null;
   }>;
 };
@@ -87,30 +102,51 @@ function fmtEur(cents: number): string {
   return `${fmtCents(cents)} €`;
 }
 
-/** STAT2 — Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
-function fmtEurOrDash(cents: number | null): string {
-  return cents === null ? "—" : fmtEur(cents);
+/** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
+function fmtEurOrDash(cents: number | null | undefined): string {
+  return cents === null || cents === undefined ? "—" : fmtEur(cents);
 }
 
-function fmtPct(pct: number | null): string {
-  return pct === null ? "—" : `${pct.toFixed(1)} %`;
+/** STAT3 — deutsches Zahlformat: „5.464,48 h" (nie Punkt-Dezimalen). */
+export function fmtHoursDe(h: number | null | undefined): string {
+  if (h === null || h === undefined || !Number.isFinite(h)) return "—";
+  return `${h.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h`;
 }
 
-function fmtHours(h: number): string {
-  return h.toFixed(2);
+/** STAT3 — deutsches Zahlformat: „28,8 %". */
+export function fmtPctDe(pct: number | null | undefined): string {
+  if (pct === null || pct === undefined || !Number.isFinite(pct)) return "—";
+  return `${pct.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 }
 
-/** STAT2b — fehlender/undefinierter Wert ⇒ „—". */
-function fmtHoursOrDash(h: number | undefined): string {
-  return h === undefined ? "—" : fmtHours(h);
+/** STAT3 — vorzeichenbehaftetes Delta: „+3,4 %", „-12,1 %", „±0,0 %". */
+export function fmtDeltaPctDe(pct: number | null | undefined): string {
+  if (pct === null || pct === undefined || !Number.isFinite(pct)) return "—";
+  // ASCII-Minus: die jsPDF-Standardschrift (WinAnsi) kennt U+2212 nicht.
+  const sign = pct > 0 ? "+" : pct < 0 ? "-" : "±";
+  return `${sign}${fmtPctDe(Math.abs(pct))}`;
 }
 
-function fmtCountOrDash(n: number | undefined): string {
-  return n === undefined ? "—" : String(n);
+function fmtCount(n: number | null | undefined): string {
+  return n === null || n === undefined ? "—" : n.toLocaleString("de-DE");
+}
+
+/** Delta gegen eine Basis; ohne Basis oder außerhalb des Monatsmodus „—". */
+function deltaLabel(
+  currentCents: number,
+  baseCents: number | null | undefined,
+  enabled: boolean,
+): string {
+  if (!enabled) return "—";
+  return fmtDeltaPctDe(growthPct(currentCents, baseCents ?? null));
 }
 
 function lastY(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+}
+
+function isSunday(iso: string): boolean {
+  return parseIso(iso).getUTCDay() === 0;
 }
 
 export async function generateStatistikPdf(
@@ -121,336 +157,352 @@ export async function generateStatistikPdf(
 
   const doc = new JsPDF("portrait", "pt", "a4");
   const pageWidth = doc.internal.pageSize.getWidth();
-  const marginX = 40;
+  const marginX = 36;
+  const usable = pageWidth - marginX * 2;
+  const cmp = data.calendarMonth;
 
-  // Kopf
-  doc.setFontSize(16);
+  // ── Kopf ────────────────────────────────────────────────────────────────
+  doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
-  doc.text("Statistik-Bericht", pageWidth / 2, 48, { align: "center" });
-  doc.setFontSize(10);
+  doc.text(`Statistik-Bericht ${data.monthLabel} · ${data.scopeLabel}`, marginX, 44);
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.text(`${data.monthLabel} · ${data.scopeLabel}`, pageWidth / 2, 64, { align: "center" });
+  doc.text(`Erstellt am ${data.generatedAtLabel}`, marginX, 56);
 
-  let cursorY = 84;
-
-  // 1) Umsatz
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("Umsatz", marginX, cursorY);
-  autoTable(doc, {
-    startY: cursorY + 6,
-    margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 4 },
-    headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-    columnStyles: { 1: { halign: "right" } },
-    head: [["Position", "Betrag"]],
-    body: [
-      ["Haus", fmtEur(data.revenue.houseCents)],
-      ["Takeaway", fmtEur(data.revenue.takeawayCents)],
-      [
-        { content: "Gesamt", styles: { fontStyle: "bold" } },
-        {
-          content: fmtEur(data.revenue.totalCents),
-          styles: { fontStyle: "bold", halign: "right" },
-        },
-      ],
-      [
-        { content: "Tage mit Umsatz", styles: { fontStyle: "normal" } },
-        { content: String(data.revenue.daysWithRevenue), styles: { halign: "right" } },
-      ],
-    ],
-    theme: "grid",
-  });
-  cursorY = lastY(doc) + 18;
-
-  // 1b) Take-Away-Kanäle (STAT1b — gleiche Quelle wie der Donut)
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("Take-Away-Kanäle", marginX, cursorY);
-  if (data.takeawaySegments.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.text("Keine Take-Away-Umsätze im gewählten Zeitraum.", marginX, cursorY + 14);
-    cursorY += 24;
-  } else {
-    autoTable(doc, {
-      startY: cursorY + 6,
-      margin: { left: marginX, right: marginX },
-      styles: { fontSize: 9, cellPadding: 4 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-      columnStyles: { 1: { halign: "right" } },
-      head: [["Kanal", "Betrag"]],
-      body: data.takeawaySegments.map((s) => [s.name, fmtEur(s.amountCents)]),
-      theme: "grid",
-    });
-    cursorY = lastY(doc) + 12;
-    if (data.takeawaySegmentsWarning) {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(9);
-      doc.text(data.takeawaySegmentsWarning, marginX, cursorY);
-      cursorY += 12;
-    }
-    cursorY += 6;
-  }
-
-  // 2) Trinkgeld
-  doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld", marginX, cursorY);
-  autoTable(doc, {
-    startY: cursorY + 6,
-    margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 4 },
-    headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-    columnStyles: { 1: { halign: "right" } },
-    head: [["Position", "Betrag"]],
-    body: [
-      ["Service", fmtEur(data.tips.serviceCents)],
-      ["Küche", fmtEur(data.tips.kitchenCents)],
-      [
-        { content: "Gesamt", styles: { fontStyle: "bold" } },
-        { content: fmtEur(data.tips.totalCents), styles: { fontStyle: "bold", halign: "right" } },
-      ],
-    ],
-    theme: "grid",
-  });
-  cursorY = lastY(doc) + 12;
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld pro Mitarbeiter", marginX, cursorY);
-  if (data.tips.perStaff.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.text("Keine Trinkgeld-Auszahlungen im gewählten Zeitraum.", marginX, cursorY + 14);
-    cursorY += 24;
-  } else {
-    autoTable(doc, {
-      startY: cursorY + 6,
-      margin: { left: marginX, right: marginX },
-      styles: { fontSize: 9, cellPadding: 4 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-      columnStyles: { 2: { halign: "right" } },
-      head: [["Name", "Bereich", "Betrag"]],
-      body: data.tips.perStaff.map((p) => [
-        p.name,
-        p.department === "service" ? "Service" : "Küche",
-        fmtEur(p.tipCents),
-      ]),
-      theme: "grid",
-    });
-    cursorY = lastY(doc) + 18;
-  }
-
-  // 3) Personal
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("Personal", marginX, cursorY);
-  autoTable(doc, {
-    startY: cursorY + 6,
-    margin: { left: marginX, right: marginX },
-    styles: { fontSize: 9, cellPadding: 4 },
-    headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-    columnStyles: { 1: { halign: "right" } },
-    head: [["Position", "Wert"]],
-    body: [
-      ["Netto-Stunden", fmtHours(data.personnel.netHours)],
-      ["Basis-Lohnkosten", fmtEur(data.personnel.laborCostCents)],
-      [
-        { content: "Personalquote", styles: { fontStyle: "bold" } },
-        {
-          content: fmtPct(data.personnel.ratioPct),
-          styles: { fontStyle: "bold", halign: "right" },
-        },
-      ],
-    ],
-    theme: "grid",
-  });
-  cursorY = lastY(doc) + 10;
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "italic");
-  doc.text(
-    "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz.",
-    marginX,
-    cursorY,
-  );
-  cursorY += 12;
-  if (data.personnel.staffWithoutRateNames.length > 0) {
-    const names = data.personnel.staffWithoutRateNames.join(", ");
-    const lines = doc.splitTextToSize(
-      `Ohne hinterlegten Stundenlohn: ${names} — Quote untertreibt.`,
-      pageWidth - marginX * 2,
-    );
-    doc.text(lines, marginX, cursorY);
-    cursorY += 10 * (Array.isArray(lines) ? lines.length : 1);
-  }
-  cursorY += 8;
-
-  // 4) Umsatzverlauf
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text("Umsatzverlauf", marginX, cursorY);
-  if (data.dailyRevenue.length === 0) {
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.text("Keine Umsätze im gewählten Zeitraum.", marginX, cursorY + 14);
-    cursorY += 24;
-  } else {
-    autoTable(doc, {
-      startY: cursorY + 6,
-      margin: { left: marginX, right: marginX },
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-      columnStyles: {
-        1: { halign: "right" },
-        2: { halign: "right" },
-        3: { halign: "right" },
-      },
-      head: [["Datum", "Haus", "Takeaway", "Gesamt"]],
-      body: data.dailyRevenue.map((d) => [
-        d.businessDate,
-        fmtEur(d.houseCents),
-        fmtEur(d.takeawayCents),
-        fmtEur(d.totalCents),
-      ]),
-      theme: "grid",
-    });
-    cursorY = lastY(doc) + 18;
-  }
-
-  // 4b) Gäste & Arbeitsstunden (STAT2 — gleiche Quelle wie die Kacheln)
+  // ── KPI-Zeile (gezeichnete Boxen, kein autoTable) ───────────────────────
   const gh = data.guestHours;
-  if (gh) {
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("Gäste & Arbeitsstunden", marginX, cursorY);
-    autoTable(doc, {
-      startY: cursorY + 6,
-      margin: { left: marginX, right: marginX },
-      styles: { fontSize: 9, cellPadding: 4 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-      columnStyles: { 1: { halign: "right" } },
-      head: [["Position", "Wert"]],
-      body: [
-        ["Gäste", String(gh.guestTotal)],
-        ["Erfasste Arbeitsstunden", fmtHours(gh.workHours)],
-        ["Ø Umsatz je Gast (Haus)", fmtEurOrDash(gh.revenuePerGuestCents)],
-        ["Umsatz je Arbeitsstunde", fmtEurOrDash(gh.revenuePerWorkHourCents)],
-      ],
-      theme: "grid",
-    });
-    cursorY = lastY(doc) + 12;
-    if (gh.daily.length > 0) {
-      autoTable(doc, {
-        startY: cursorY,
-        margin: { left: marginX, right: marginX },
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [230, 230, 230], textColor: 20 },
-        columnStyles: {
-          1: { halign: "right" },
-          2: { halign: "right" },
-          3: { halign: "right" },
-          4: { halign: "right" },
-        },
-        head: [["Datum", "Gäste", "Stunden", "€/Gast", "€/Std"]],
-        body: gh.daily.map((d) => [
-          d.businessDate,
-          String(d.guestCount),
-          fmtHours(d.workHours),
-          fmtEurOrDash(d.perGuestCents),
-          fmtEurOrDash(d.perHourCents),
-        ]),
-        theme: "grid",
-      });
-      cursorY = lastY(doc) + 18;
-    }
-  }
+  const boxY = 66;
+  const boxH = 74;
+  const gap = 8;
+  const boxW = (usable - gap * 3) / 4;
 
-  // 5) Standort-Vergleich
-  doc.setFontSize(12);
+  type Kpi = { title: string; value: string; lead: string; leadLabel: string; foot: string };
+  const kpis: Kpi[] = [
+    {
+      title: "Gesamtumsatz",
+      value: fmtEur(data.revenue.totalCents),
+      lead: deltaLabel(data.revenue.totalCents, data.previousYearTotalCents, cmp),
+      leadLabel: "vs. Vorjahresmonat",
+      foot: `Vormonat: ${deltaLabel(data.revenue.totalCents, data.previousPeriodTotalCents, cmp)}`,
+    },
+    {
+      title: "Gäste",
+      value: fmtCount(gh?.guestTotal),
+      lead: fmtEurOrDash(gh?.revenuePerGuestCents ?? null),
+      leadLabel: "Ø je Gast (Haus)",
+      foot: `Tage mit Umsatz: ${fmtCount(data.revenue.daysWithRevenue)}`,
+    },
+    {
+      title: "Personalquote",
+      value: fmtPctDe(data.personnel.ratioPct),
+      lead: fmtEur(data.personnel.laborCostCents),
+      leadLabel: "Basis-Lohnkosten",
+      foot: `Takeaway: ${fmtEur(data.revenue.takeawayCents)}`,
+    },
+    {
+      title: "Umsatz je Arbeitsstunde",
+      value: fmtEurOrDash(gh?.revenuePerWorkHourCents ?? null),
+      lead: fmtHoursDe(data.personnel.netHours),
+      leadLabel: "Netto-Stunden",
+      foot: `Erfasst: ${fmtHoursDe(gh?.workHours)}`,
+    },
+  ];
+
+  kpis.forEach((k, i) => {
+    const x = marginX + i * (boxW + gap);
+    doc.setDrawColor(200);
+    doc.setFillColor(247, 247, 247);
+    doc.rect(x, boxY, boxW, boxH, "FD");
+    doc.setTextColor(90);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.text(k.title, x + 6, boxY + 13);
+    doc.setTextColor(20);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(k.value, x + 6, boxY + 30);
+    doc.setFontSize(13);
+    doc.text(k.lead, x + 6, boxY + 49);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(90);
+    doc.text(k.leadLabel, x + 6, boxY + 59);
+    doc.text(k.foot, x + 6, boxY + 68);
+    doc.setTextColor(20);
+  });
+
+  let cursorY = boxY + boxH + 18;
+
+  // ── Standort-Vergleich (die wichtigste Tabelle: zuerst) ─────────────────
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.text("Standort-Vergleich", marginX, cursorY);
   const hasMissingAny = data.comparison.some((c) => c.hasMissingRate);
   if (data.comparison.length === 0) {
     doc.setFont("helvetica", "italic");
-    doc.setFontSize(9);
-    doc.text("Keine Standorte vorhanden.", marginX, cursorY + 14);
+    doc.setFontSize(8);
+    doc.text("Keine Standorte vorhanden.", marginX, cursorY + 13);
     cursorY += 24;
   } else {
+    const body = data.comparison.map((c) => [
+      c.locationName,
+      fmtEur(c.totalCents),
+      deltaLabel(c.totalCents, c.prevYearTotalCents, cmp),
+      deltaLabel(c.totalCents, c.prevTotalCents, cmp),
+      fmtEur(c.tipTotalCents),
+      `${fmtPctDe(c.ratioPct)}${c.hasMissingRate ? " *" : ""}`,
+      fmtHoursDe(c.netHours),
+      fmtEurOrDash(c.perGuestCents ?? null),
+      fmtEurOrDash(c.perHourCents ?? null),
+    ]);
+    // Summenzeile: fertige Gesamtwerte, keine Neuberechnung im PDF.
+    body.push([
+      "Gesamt",
+      fmtEur(data.revenue.totalCents),
+      deltaLabel(data.revenue.totalCents, data.previousYearTotalCents, cmp),
+      deltaLabel(data.revenue.totalCents, data.previousPeriodTotalCents, cmp),
+      fmtEur(data.tips.totalCents),
+      `${fmtPctDe(data.personnel.ratioPct)}${hasMissingAny ? " *" : ""}`,
+      fmtHoursDe(data.personnel.netHours),
+      fmtEurOrDash(gh?.revenuePerGuestCents ?? null),
+      fmtEurOrDash(gh?.revenuePerWorkHourCents ?? null),
+    ]);
     autoTable(doc, {
-      startY: cursorY + 6,
+      startY: cursorY + 5,
       margin: { left: marginX, right: marginX },
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
+      styles: { fontSize: 7.5, cellPadding: 3, overflow: "visible" },
+      headStyles: {
+        fillColor: [230, 230, 230],
+        textColor: 20,
+        fontSize: 7,
+        halign: "right",
+        valign: "middle",
+      },
       columnStyles: {
-        1: { halign: "right" },
-        3: { halign: "right" },
-        4: { halign: "right" },
-        5: { halign: "right" },
-        6: { halign: "right" },
-        7: { halign: "right" },
-        8: { halign: "right" },
-        9: { halign: "right" },
-        10: { halign: "right" },
+        0: { cellWidth: 88, halign: "left" },
+        1: { cellWidth: 66, halign: "right" },
+        2: { cellWidth: 54, halign: "right" },
+        3: { cellWidth: 54, halign: "right" },
+        4: { cellWidth: 60, halign: "right" },
+        5: { cellWidth: 50, halign: "right" },
+        6: { cellWidth: 56, halign: "right" },
+        7: { cellWidth: 46, halign: "right" },
+        8: { cellWidth: 46, halign: "right" },
       },
       head: [
         [
           "Standort",
           "Umsatz",
-          "Umsatz vs. Vormonat",
-          "Trinkgeld",
-          "Personalquote",
+          "vs. Vorjahr",
+          "vs. Vormonat",
+          "Trinkgeld ges.",
+          "Quote",
           "Netto-Std.",
-          "Basis-Lohnkosten",
-          "Gäste",
-          "Arbeitsstd.",
           "€ / Gast",
           "€ / Std.",
         ],
       ],
-      body: data.comparison.map((c) => [
-        c.locationName,
-        fmtEur(c.totalCents),
-        previousTrendLabel(c.totalCents, c.prevTotalCents ?? null, c.previousRange ?? null, {
-          partial: c.previousPartial ?? false,
-        }).text,
-        fmtEur(c.tipTotalCents),
-        `${fmtPct(c.ratioPct)}${c.hasMissingRate ? " *" : ""}`,
-        fmtHours(c.netHours),
-        fmtEur(c.laborCostCents),
-        fmtCountOrDash(c.guestTotal),
-        fmtHoursOrDash(c.workHours),
-        fmtEurOrDash(c.perGuestCents ?? null),
-        fmtEurOrDash(c.perHourCents ?? null),
-      ]),
+      body,
+      didParseCell: (hook) => {
+        if (hook.section === "body" && hook.row.index === body.length - 1) {
+          hook.cell.styles.fontStyle = "bold";
+        }
+        if (hook.section === "head" && hook.column.index === 0) {
+          hook.cell.styles.halign = "left";
+        }
+      },
       theme: "grid",
     });
-    cursorY = lastY(doc) + 10;
-    // STAT2c — ehrliches Standort-gegen-Standort-Delta, benannter Bezug.
-    const top = pickTopTwoByTotal(
-      data.comparison.map((c) => ({ name: c.locationName, totalCents: c.totalCents })),
+    cursorY = lastY(doc) + 12;
+  }
+
+  // ── Trinkgeld kompakt (3×n) + Takeaway einzeilig ────────────────────────
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Trinkgeld", marginX, cursorY);
+  const tipCols = data.tips.perLocation;
+  autoTable(doc, {
+    startY: cursorY + 5,
+    margin: { left: marginX, right: marginX },
+    styles: { fontSize: 7.5, cellPadding: 3, overflow: "visible", halign: "right" },
+    headStyles: { fillColor: [230, 230, 230], textColor: 20, fontSize: 7, halign: "right" },
+    columnStyles: { 0: { cellWidth: 88, halign: "left", fontStyle: "bold" } },
+    head: [["Bereich", ...tipCols.map((t) => t.locationName), "Gesamt"]],
+    body: [
+      ["Service", ...tipCols.map((t) => fmtEur(t.serviceCents)), fmtEur(data.tips.serviceCents)],
+      ["Küche", ...tipCols.map((t) => fmtEur(t.kitchenCents)), fmtEur(data.tips.kitchenCents)],
+      ["Gesamt", ...tipCols.map((t) => fmtEur(t.totalCents)), fmtEur(data.tips.totalCents)],
+    ],
+    theme: "grid",
+  });
+  cursorY = lastY(doc) + 12;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text("Umsatzaufteilung", marginX, cursorY);
+  doc.setFont("helvetica", "normal");
+  const segLine =
+    data.takeawaySegments.length === 0
+      ? "keine Take-Away-Umsätze im Zeitraum"
+      : data.takeawaySegments.map((s) => `${s.name} ${fmtEur(s.amountCents)}`).join(" · ");
+  // Umbruch statt Überlauf: bei vielen Take-Away-Kanälen wird die Zeile lang.
+  const splitX = marginX + 74;
+  const splitLines = doc.splitTextToSize(
+    `Haus ${fmtEur(data.revenue.houseCents)} · Takeaway ${fmtEur(
+      data.revenue.takeawayCents,
+    )} · ${segLine}`,
+    marginX + usable - splitX,
+  );
+  doc.text(splitLines, splitX, cursorY);
+  cursorY += 11 + (splitLines.length - 1) * 9;
+  if (data.takeawaySegmentsWarning) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    doc.text(data.takeawaySegmentsWarning, marginX, cursorY);
+    cursorY += 10;
+  }
+  cursorY += 6;
+
+  // ── Grafik A — Tagesumsatz-Balken ───────────────────────────────────────
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Tagesumsatz", marginX, cursorY);
+  cursorY += 6;
+  const axisW = 42;
+  const chartA: ChartArea = {
+    x: marginX + axisW,
+    y: cursorY,
+    width: usable - axisW,
+    height: 120,
+  };
+  if (data.dailyRevenue.length === 0) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.text("Keine Umsätze im gewählten Zeitraum.", marginX, cursorY + 12);
+    cursorY += 24;
+  } else {
+    const geo = barChartGeometry(
+      data.dailyRevenue.map((d) => d.totalCents),
+      chartA,
+      { gapRatio: 0.25, tickCount: 3 },
     );
-    if (top.length === 2) {
-      const lead = leadDelta({
-        aName: top[0]!.name,
-        bName: top[1]!.name,
-        aValue: top[0]!.totalCents,
-        bValue: top[1]!.totalCents,
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
+    for (const t of geo.ticks) {
+      doc.setDrawColor(225);
+      doc.line(chartA.x, t.y, chartA.x + chartA.width, t.y);
+      doc.setTextColor(120);
+      doc.text(formatTsd(t.value), chartA.x - 4, t.y + 2, { align: "right" });
+    }
+    doc.setTextColor(20);
+    for (const bar of geo.bars) {
+      const sunday = isSunday(data.dailyRevenue[bar.index]!.businessDate);
+      if (sunday) doc.setFillColor(120, 140, 175);
+      else doc.setFillColor(60, 90, 140);
+      if (bar.height > 0) doc.rect(bar.x, bar.y, bar.width, bar.height, "F");
+    }
+    // Tagesachse: jeder Tag als Nummer, Sonntage fett markiert.
+    doc.setFontSize(5.5);
+    for (const bar of geo.bars) {
+      const iso = data.dailyRevenue[bar.index]!.businessDate;
+      doc.setFont("helvetica", isSunday(iso) ? "bold" : "normal");
+      doc.text(iso.slice(8, 10), bar.x + bar.width / 2, chartA.y + chartA.height + 8, {
+        align: "center",
       });
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(`Umsatz: ${lead.text}`, marginX, cursorY);
-      cursorY += 12;
     }
-    if (hasMissingAny) {
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(
-        "* Mitarbeiter ohne hinterlegten Stundenlohn — Quote untertreibt.",
-        marginX,
-        cursorY,
-      );
+    doc.setFont("helvetica", "normal");
+    cursorY = chartA.y + chartA.height + 20;
+  }
+
+  // ── Grafik B — 13-Monats-Verlauf ────────────────────────────────────────
+  const mv = data.monthly;
+  if (mv && mv.series.length > 0) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("13-Monats-Verlauf", marginX, cursorY);
+    cursorY += 6;
+    const chartB: ChartArea = {
+      x: marginX + axisW,
+      y: cursorY,
+      width: usable - axisW,
+      height: 120,
+    };
+    const geo = lineChartGeometry(mv.series, chartB, { tickCount: 3 });
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
+    for (const t of geo.ticks) {
+      doc.setDrawColor(225);
+      doc.line(chartB.x, t.y, chartB.x + chartB.width, t.y);
+      doc.setTextColor(120);
+      doc.text(formatTsd(t.value), chartB.x - 4, t.y + 2, { align: "right" });
     }
+    doc.setTextColor(20);
+    const palette: Array<[number, number, number]> = [
+      [60, 90, 140],
+      [190, 110, 60],
+      [90, 140, 100],
+    ];
+    geo.series.forEach((s, si) => {
+      const color = palette[si % palette.length]!;
+      doc.setDrawColor(color[0], color[1], color[2]);
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.setLineWidth(1);
+      let prev: { x: number; y: number } | null = null;
+      for (const p of s.points) {
+        if (p === null) {
+          prev = null;
+          continue;
+        }
+        if (prev) doc.line(prev.x, prev.y, p.x, p.y);
+        doc.circle(p.x, p.y, 1.4, "F");
+        prev = p;
+      }
+      doc.setLineWidth(0.5);
+    });
+    // Legende in der Titelzeile (Punkt + Name), damit sie die Fläche nicht überdeckt.
+    doc.setFontSize(6.5);
+    let legendX = marginX + 90;
+    geo.series.forEach((s, si) => {
+      const color = palette[si % palette.length]!;
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.circle(legendX, chartB.y - 8, 1.8, "F");
+      doc.setTextColor(60);
+      doc.text(s.name, legendX + 4, chartB.y - 6);
+      legendX += 12 + doc.getTextWidth(s.name);
+    });
+    doc.setTextColor(20);
+    doc.setDrawColor(200);
+    doc.setFontSize(5.5);
+    doc.setTextColor(90);
+    mv.monthLabels.forEach((label, i) => {
+      const x = geo.slotX[i];
+      if (x === undefined) return;
+      doc.text(label, x, chartB.y + chartB.height + 8, { align: "center" });
+    });
+    doc.setTextColor(20);
+    cursorY = chartB.y + chartB.height + 18;
+  }
+
+  // ── Fußnoten ────────────────────────────────────────────────────────────
+  doc.setFontSize(6.5);
+  doc.setFont("helvetica", "italic");
+  const notes: string[] = [
+    "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.",
+  ];
+  if (hasMissingAny || data.personnel.staffWithoutRateNames.length > 0) {
+    notes.push(
+      `* Ohne hinterlegten Stundenlohn: ${
+        data.personnel.staffWithoutRateNames.join(", ") || "einzelne Mitarbeiter"
+      } — Quote untertreibt.`,
+    );
+  }
+  if (!cmp) {
+    notes.push("Freier Zeitraum: Vorjahres-/Vormonatsvergleich und der Monatsverlauf entfallen.");
+  }
+  for (const note of notes) {
+    const lines = doc.splitTextToSize(note, usable);
+    doc.text(lines, marginX, cursorY);
+    cursorY += 8 * (Array.isArray(lines) ? lines.length : 1);
   }
 
   const blob = doc.output("blob");

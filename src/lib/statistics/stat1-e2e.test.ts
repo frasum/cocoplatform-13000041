@@ -16,6 +16,8 @@ import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
 type Cell = string | { content: string };
 type Captured = { body: Cell[][] };
 const captured: Captured[] = [];
+/** STAT3 — der Einseiter zeichnet die Summen als Text statt als Tabelle. */
+const texts: string[] = [];
 
 vi.mock("jspdf", () => {
   class FakeDoc {
@@ -23,7 +25,20 @@ vi.mock("jspdf", () => {
     internal = { pageSize: { getWidth: () => 595 } };
     setFontSize() {}
     setFont() {}
-    text() {}
+    setDrawColor() {}
+    setFillColor() {}
+    setTextColor() {}
+    setLineWidth() {}
+    rect() {}
+    line() {}
+    circle() {}
+    getTextWidth(t: string) {
+      return t.length * 3;
+    }
+    text(value: string | string[]) {
+      if (Array.isArray(value)) texts.push(...value);
+      else texts.push(value);
+    }
     splitTextToSize(s: string) {
       return [s];
     }
@@ -45,13 +60,13 @@ function cell(c: Cell): string {
   return typeof c === "string" ? c : c.content;
 }
 
-function pdfRow(label: string): string[] {
-  for (const t of captured) {
-    for (const row of t.body) {
-      if (cell(row[0]) === label) return row.map(cell);
-    }
+/** Ein gezeichneter Textblock, der alle Teilstrings enthält. */
+function drawn(...parts: string[]): string {
+  const hit = texts.find((t) => parts.every((p) => t.includes(p)));
+  if (hit === undefined) {
+    throw new Error(`Kein gezeichneter Text mit [${parts.join(" | ")}] gefunden`);
   }
-  throw new Error(`Zeile "${label}" nicht im PDF gefunden`);
+  return hit;
 }
 
 const eur = (c: number) => `${fmtCents(c)} €`;
@@ -78,6 +93,7 @@ const EXPECTED = { totalCents: 667_250, takeawayCents: 36_510, houseCents: 630_7
 describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () => {
   it("Fixture 18.07. Spicery: Gesamt/Takeaway/Haus überall gleich, Wolt nie Summand", async () => {
     captured.length = 0;
+    texts.length = 0;
 
     // 1) Datenpfad wie in getRevenueStats (ohne DB).
     const inputs = mapToSessionInputs(SESSION_ROWS, CHANNEL_ROWS);
@@ -118,6 +134,8 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     const data: StatistikPdfData = {
       monthLabel: "Juli 2026",
       scopeLabel: "Spicery",
+      generatedAtLabel: "01.08.2026, 10:00",
+      calendarMonth: true,
       revenue: {
         houseCents: summary.houseCents,
         takeawayCents: summary.takeawayCents,
@@ -126,32 +144,27 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
       },
       takeawaySegments: donut.segments,
       takeawaySegmentsWarning: donut.warning,
-      tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perStaff: [] },
+      tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perLocation: [] },
       personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
       dailyRevenue: daily.map((d) => ({
         businessDate: d.businessDate,
-        houseCents: d.houseCents,
-        takeawayCents: d.takeawayCents,
         totalCents: d.totalCents,
       })),
       comparison: [],
     };
     await generateStatistikPdf(data);
 
-    expect(pdfRow("Wolt")[1]).toBe(eur(17_210));
-    expect(pdfRow("Takeaway direkt (Telefon/Abholung)")[1]).toBe(eur(19_300));
-
-    expect(pdfRow("Haus")[1]).toBe(eur(EXPECTED.houseCents));
-    expect(pdfRow("Takeaway")[1]).toBe(eur(EXPECTED.takeawayCents));
-    expect(pdfRow("Gesamt")[1]).toBe(eur(EXPECTED.totalCents));
-    expect(pdfRow("2026-07-18").slice(1)).toEqual([
-      eur(EXPECTED.houseCents),
-      eur(EXPECTED.takeawayCents),
-      eur(EXPECTED.totalCents),
-    ]);
+    // STAT3 — Summen und Segmente stehen im gezeichneten Einseiter-Text.
+    const split = drawn("Haus ", "Takeaway ");
+    expect(split).toContain(`Haus ${eur(EXPECTED.houseCents)}`);
+    expect(split).toContain(`Takeaway ${eur(EXPECTED.takeawayCents)}`);
+    expect(split).toContain(`Wolt ${eur(17_210)}`);
+    expect(split).toContain(`Takeaway direkt (Telefon/Abholung) ${eur(19_300)}`);
+    expect(texts).toContain(eur(EXPECTED.totalCents));
 
     // 6) Kein Pfad zeigt die Wolt-additive Altsumme (667.250 + 17.210).
     const allPdfCells = captured.flatMap((t) => t.body.flatMap((r) => r.map(cell)));
     expect(allPdfCells).not.toContain(eur(667_250 + 17_210));
+    expect(texts.join(" ")).not.toContain(eur(667_250 + 17_210));
   });
 });

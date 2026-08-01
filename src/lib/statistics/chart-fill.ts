@@ -10,6 +10,9 @@ export type DailyPoint = {
   takeawayCents: number;
   totalCents: number;
   cardCents?: number;
+  /** STAT2 — optional; fehlende Tage bleiben undefined (Konsument liest ?? 0). */
+  guestCount?: number;
+  workMinutes?: number;
 };
 
 function pad2(n: number): string {

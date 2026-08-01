@@ -36,6 +36,23 @@ export type StatistikPdfData = {
     takeawayCents: number;
     totalCents: number;
   }>;
+  /**
+   * STAT2 — Gäste/Stunden je Tag + Kennzahlen; Werte kommen fertig aus
+   * `derivedKpis`. Optional: ohne Block wird der Abschnitt weggelassen.
+   */
+  guestHours?: {
+    guestTotal: number;
+    workHours: number;
+    revenuePerGuestCents: number | null;
+    revenuePerWorkHourCents: number | null;
+    daily: Array<{
+      businessDate: string;
+      guestCount: number;
+      workHours: number;
+      perGuestCents: number | null;
+      perHourCents: number | null;
+    }>;
+  };
   comparison: Array<{
     locationName: string;
     totalCents: number;
@@ -49,6 +66,11 @@ export type StatistikPdfData = {
 
 function fmtEur(cents: number): string {
   return `${fmtCents(cents)} €`;
+}
+
+/** STAT2 — Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
+function fmtEurOrDash(cents: number | null): string {
+  return cents === null ? "—" : fmtEur(cents);
 }
 
 function fmtPct(pct: number | null): string {
@@ -266,6 +288,54 @@ export async function generateStatistikPdf(
       theme: "grid",
     });
     cursorY = lastY(doc) + 18;
+  }
+
+  // 4b) Gäste & Arbeitsstunden (STAT2 — gleiche Quelle wie die Kacheln)
+  const gh = data.guestHours;
+  if (gh) {
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Gäste & Arbeitsstunden", marginX, cursorY);
+    autoTable(doc, {
+      startY: cursorY + 6,
+      margin: { left: marginX, right: marginX },
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: [230, 230, 230], textColor: 20 },
+      columnStyles: { 1: { halign: "right" } },
+      head: [["Position", "Wert"]],
+      body: [
+        ["Gäste", String(gh.guestTotal)],
+        ["Erfasste Arbeitsstunden", fmtHours(gh.workHours)],
+        ["Ø Umsatz je Gast (Haus)", fmtEurOrDash(gh.revenuePerGuestCents)],
+        ["Umsatz je Arbeitsstunde", fmtEurOrDash(gh.revenuePerWorkHourCents)],
+      ],
+      theme: "grid",
+    });
+    cursorY = lastY(doc) + 12;
+    if (gh.daily.length > 0) {
+      autoTable(doc, {
+        startY: cursorY,
+        margin: { left: marginX, right: marginX },
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [230, 230, 230], textColor: 20 },
+        columnStyles: {
+          1: { halign: "right" },
+          2: { halign: "right" },
+          3: { halign: "right" },
+          4: { halign: "right" },
+        },
+        head: [["Datum", "Gäste", "Stunden", "€/Gast", "€/Std"]],
+        body: gh.daily.map((d) => [
+          d.businessDate,
+          String(d.guestCount),
+          fmtHours(d.workHours),
+          fmtEurOrDash(d.perGuestCents),
+          fmtEurOrDash(d.perHourCents),
+        ]),
+        theme: "grid",
+      });
+      cursorY = lastY(doc) + 18;
+    }
   }
 
   // 5) Standort-Vergleich

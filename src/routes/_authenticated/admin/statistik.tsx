@@ -7,6 +7,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQueries, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   Area,
+  Bar,
   CartesianGrid,
   Cell,
   ComposedChart,
@@ -39,6 +40,8 @@ import { personnelRatioPct } from "@/lib/statistics/personnel-core";
 import {
   checkDonutSegments,
   computeChannelPercents,
+  computeTrend,
+  derivedKpis,
   takeawayDonutSegments,
 } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
@@ -113,7 +116,7 @@ type KpiCardProps = {
   /** EUR-Cents (Default-Unit "eur"). Rückwärtskompatibel zu U1. */
   cents?: number;
   trend?: Trend | null | undefined;
-  unit?: "eur" | "hours" | "pct";
+  unit?: "eur" | "hours" | "pct" | "eurOrDash";
   /** Für unit="hours" (Stunden) oder unit="pct" (Prozent oder null). */
   value?: number | null;
   /** Optionaler Trend-Renderer; überschreibt die Default-`TrendLine`. */
@@ -137,6 +140,9 @@ function KpiCard({
   let display: string;
   if (unit === "eur") {
     display = fmtEuro(cents ?? 0);
+  } else if (unit === "eurOrDash") {
+    // STAT2 — Nenner 0 ⇒ „—" (kein NaN, kein 0-Fake).
+    display = value === null || value === undefined ? "—" : fmtEuro(value);
   } else if (unit === "hours") {
     display = value === null || value === undefined ? "—" : `${value.toFixed(2)} h`;
   } else {
@@ -298,6 +304,12 @@ function StatistikPage() {
     const staffWithoutRateNames = per.staffWithoutRate.map(
       (id) => per.perStaff.find((p) => p.staffId === id)?.name ?? id,
     );
+    const pdfKpis = derivedKpis({
+      houseCents: rev.summary.houseCents,
+      totalCents: rev.summary.totalCents,
+      guestCount: rev.guestTotal,
+      workMinutes: rev.workMinutesTotal,
+    });
 
     const comparison: StatistikPdfData["comparison"] = [];
     locations.forEach((loc, i) => {
@@ -349,6 +361,28 @@ function StatistikPage() {
         takeawayCents: d.takeawayCents,
         totalCents: d.totalCents,
       })),
+      // STAT2 — gleiche Quelle wie die Kacheln/das Panel; keine eigene Summierung.
+      guestHours: {
+        guestTotal: rev.guestTotal,
+        workHours: pdfKpis.workHours,
+        revenuePerGuestCents: pdfKpis.revenuePerGuestCents,
+        revenuePerWorkHourCents: pdfKpis.revenuePerWorkHourCents,
+        daily: rev.daily.map((d) => {
+          const k = derivedKpis({
+            houseCents: d.houseCents,
+            totalCents: d.totalCents,
+            guestCount: d.guestCount,
+            workMinutes: d.workMinutes,
+          });
+          return {
+            businessDate: d.businessDate,
+            guestCount: d.guestCount,
+            workHours: k.workHours,
+            perGuestCents: k.revenuePerGuestCents,
+            perHourCents: k.revenuePerWorkHourCents,
+          };
+        }),
+      },
       comparison,
     };
 
@@ -554,6 +588,31 @@ function StatsView({ data }: { data: RevenueStats }) {
   const cmp = formatComparisonRange(data.previousRange, { partial: data.coverage.isPartial });
   const hasDaily = data.daily.length > 0;
   const hasTakeaway = data.takeawayByChannel.length > 0 && data.summary.takeawayCents > 0;
+  // STAT2 — Kennzahlen kommen aus der reinen Funktion; die UI rechnet nicht.
+  const kpis = derivedKpis({
+    houseCents: data.summary.houseCents,
+    totalCents: data.summary.totalCents,
+    guestCount: data.guestTotal,
+    workMinutes: data.workMinutesTotal,
+  });
+  const prevKpis =
+    data.previous && data.previousDerived
+      ? derivedKpis({
+          houseCents: data.previous.houseCents,
+          totalCents: data.previous.totalCents,
+          guestCount: data.previousDerived.guestTotal,
+          workMinutes: data.previousDerived.workMinutesTotal,
+        })
+      : null;
+  // Trend nur, wenn BEIDE Fenster einen validen Nenner haben.
+  const guestTrend =
+    kpis.revenuePerGuestCents !== null && prevKpis?.revenuePerGuestCents != null
+      ? computeTrend(kpis.revenuePerGuestCents, prevKpis.revenuePerGuestCents)
+      : null;
+  const hourTrend =
+    kpis.revenuePerWorkHourCents !== null && prevKpis?.revenuePerWorkHourCents != null
+      ? computeTrend(kpis.revenuePerWorkHourCents, prevKpis.revenuePerWorkHourCents)
+      : null;
   return (
     <div className="space-y-6">
       <div className="grid gap-4 md:grid-cols-3">
@@ -577,11 +636,45 @@ function StatsView({ data }: { data: RevenueStats }) {
         />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <KpiCard
+          title="Ø Umsatz je Gast"
+          unit="eurOrDash"
+          value={kpis.revenuePerGuestCents}
+          trend={guestTrend}
+          comparisonLabel={cmp}
+          caption={`${data.guestTotal.toLocaleString("de-DE")} Gäste`}
+        />
+        <KpiCard
+          title="Umsatz je Arbeitsstunde"
+          unit="eurOrDash"
+          value={kpis.revenuePerWorkHourCents}
+          trend={hourTrend}
+          comparisonLabel={cmp}
+          caption={`${kpis.workHours.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} h erfasst`}
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Umsatzverlauf</CardTitle>
         </CardHeader>
         <CardContent>{hasDaily ? <RevenueChart daily={data.daily} /> : <EmptyChart />}</CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Gäste &amp; Arbeitsstunden</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {hasDaily ? (
+            <GuestHoursChart daily={data.daily} />
+          ) : (
+            <div className="flex h-[280px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
+              Keine Daten in diesem Zeitraum.
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       <Card>
@@ -687,6 +780,114 @@ type TipPayload = {
     };
   }>;
 };
+
+// STAT2 — Gäste (Balken, linke Achse) und Arbeitsstunden (Linie, rechte
+// Achse) auf derselben X-Achse wie der Umsatzverlauf (gleiche Fill-Logik,
+// kein Interpolieren). Die €-Kennzahlen je Tag kommen aus `derivedKpis`.
+type GuestHoursRow = {
+  day: string;
+  fullDate: string;
+  guests: number;
+  hours: number;
+  perGuestCents: number | null;
+  perHourCents: number | null;
+};
+
+function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
+  const rows: GuestHoursRow[] = fillDailyGaps(daily).map((d) => {
+    const k = derivedKpis({
+      houseCents: d.houseCents,
+      totalCents: d.totalCents,
+      guestCount: d.guestCount ?? 0,
+      workMinutes: d.workMinutes ?? 0,
+    });
+    return {
+      day: d.businessDate.slice(8, 10),
+      fullDate: d.businessDate,
+      guests: d.guestCount ?? 0,
+      hours: k.workHours,
+      perGuestCents: k.revenuePerGuestCents,
+      perHourCents: k.revenuePerWorkHourCents,
+    };
+  });
+
+  return (
+    <div className="h-[300px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+          <YAxis
+            yAxisId="guests"
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+            width={48}
+            tickFormatter={(v: number) => String(Math.round(v))}
+          />
+          <YAxis
+            yAxisId="hours"
+            orientation="right"
+            tickLine={false}
+            axisLine={false}
+            fontSize={11}
+            width={56}
+            tickFormatter={(v: number) => `${Math.round(v)} h`}
+          />
+          <Tooltip content={<GuestHoursTip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar
+            yAxisId="guests"
+            dataKey="guests"
+            name="Gäste"
+            fill="#2563eb"
+            fillOpacity={0.35}
+            radius={[2, 2, 0, 0]}
+          />
+          <Line
+            yAxisId="hours"
+            type="monotone"
+            dataKey="hours"
+            name="Arbeitsstunden"
+            stroke="#f59e0b"
+            strokeWidth={2}
+            dot={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function GuestHoursTip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: GuestHoursRow }>;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0].payload;
+  return (
+    <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-md">
+      <div className="font-medium">{row.fullDate}</div>
+      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
+        <span className="text-muted-foreground">Gäste</span>
+        <span className="text-right">{row.guests.toLocaleString("de-DE")}</span>
+        <span className="text-muted-foreground">Stunden</span>
+        <span className="text-right">{row.hours.toFixed(2)}</span>
+        <span className="text-muted-foreground">€/Gast</span>
+        <span className="text-right">
+          {row.perGuestCents === null ? "—" : fmtEuro(row.perGuestCents)}
+        </span>
+        <span className="text-muted-foreground">€/Std</span>
+        <span className="text-right">
+          {row.perHourCents === null ? "—" : fmtEuro(row.perHourCents)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function ChartTip({ active, payload }: TipPayload) {
   if (!active || !payload || payload.length === 0) return null;

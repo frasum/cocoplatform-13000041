@@ -25,12 +25,15 @@ import {
   computeTrend,
   groupTakeawayByChannel,
   summarize,
+  sumGuestsByDate,
   type DailyRevenue,
   type TakeawayChannel,
   type PeriodSummary,
   type Trend,
 } from "./revenue-core";
 import { mapToSessionInputs, type ChannelAmountRow, type SessionRow } from "./revenue-map";
+import { loadPausenBezahlt, loadWorkMinutesEntries } from "./work-minutes.server";
+import { totalWorkMinutes, workMinutesByDate } from "./work-minutes";
 import {
   currentMonth,
   monthRange,
@@ -48,6 +51,9 @@ type ChannelAmountQueryRow = {
 };
 
 type Window = { startDate: string; endDate: string };
+
+/** STAT2 — Tageszeile mit Gästen und Arbeitsminuten. */
+type DailyRow = DailyRevenue & { guestCount: number; workMinutes: number };
 
 export const getRevenueStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -69,6 +75,11 @@ export const getRevenueStats = createServerFn({ method: "GET" })
     ]);
     const org = caller.organizationId;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // STAT2 — Arbeitsstunden kommen aus derselben Quelle wie die
+    // Personalquote (work-minutes.server + paidMinutes). Keine zweite
+    // Stundenformel; siehe KGL-Begründung in work-minutes.ts.
+    const pausenBezahlt = await loadPausenBezahlt(supabaseAdmin, org);
 
     // Zeitraum + Vorperiode auflösen (identisch zu getTipStats).
     let current: Window;
@@ -102,14 +113,16 @@ export const getRevenueStats = createServerFn({ method: "GET" })
 
     // 3) Fenster laden: Sessions + Channel-Amounts.
     async function loadWindow(win: Window): Promise<{
-      daily: DailyRevenue[];
+      daily: DailyRow[];
       summary: PeriodSummary;
       takeawayByChannel: TakeawayChannel[];
       takeawayComponents: { markerSumCents: number; souseSumCents: number };
+      guestTotal: number;
+      workMinutesTotal: number;
     }> {
       let sessionQuery = supabaseAdmin
         .from("sessions")
-        .select("id, business_date, location_id, vectron_daily_total_cents")
+        .select("id, business_date, location_id, vectron_daily_total_cents, guest_count")
         .eq("organization_id", org)
         .gte("business_date", win.startDate)
         .lte("business_date", win.endDate);
@@ -125,6 +138,15 @@ export const getRevenueStats = createServerFn({ method: "GET" })
         locationId: r.location_id as string,
         vectronCents: (r.vectron_daily_total_cents as number | null) ?? 0,
       }));
+
+      // STAT2 — Gäste je Geschäftstag: Σ über alle Sessions des Tages
+      // (mehrere Standorte im Filter „alle" summieren korrekt auf).
+      const { byDate: guestsByDate, total: guestTotal } = sumGuestsByDate(
+        (sessRows ?? []).map((r) => ({
+          businessDate: r.business_date as string,
+          guestCount: (r.guest_count as number | null) ?? 0,
+        })),
+      );
 
       let channels: ChannelAmountRow[] = [];
       const takeawayRaw: { name: string; amountCents: number }[] = [];
@@ -177,12 +199,30 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       }
 
       const inputs = mapToSessionInputs(sessions, channels);
-      const daily = aggregateByBusinessDate(inputs, cardBySession);
+      const dailyBase = aggregateByBusinessDate(inputs, cardBySession);
+
+      const workEntries = await loadWorkMinutesEntries(supabaseAdmin, {
+        organizationId: org,
+        startDate: win.startDate,
+        endDate: win.endDate,
+        locationId: data.locationId,
+        pausenBezahlt,
+      });
+      const minutesByDate = workMinutesByDate(workEntries);
+      const workMinutesTotal = totalWorkMinutes(workEntries);
+
+      const daily: DailyRow[] = dailyBase.map((d) => ({
+        ...d,
+        guestCount: guestsByDate.get(d.businessDate) ?? 0,
+        workMinutes: minutesByDate.get(d.businessDate) ?? 0,
+      }));
       return {
         daily,
-        summary: summarize(daily),
+        summary: summarize(dailyBase),
         takeawayByChannel: groupTakeawayByChannel(takeawayRaw),
         takeawayComponents: { markerSumCents, souseSumCents },
+        guestTotal,
+        workMinutesTotal,
       };
     }
 
@@ -221,7 +261,13 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       summary: cur.summary,
       takeawayByChannel: cur.takeawayByChannel,
       takeawayComponents: cur.takeawayComponents,
+      // STAT2 — Summen für die Kacheln „Ø Umsatz je Gast" / „je Arbeitsstunde".
+      guestTotal: cur.guestTotal,
+      workMinutesTotal: cur.workMinutesTotal,
       previous: prev ? prev.summary : null,
+      previousDerived: prev
+        ? { guestTotal: prev.guestTotal, workMinutesTotal: prev.workMinutesTotal }
+        : null,
       // Vergleichsfenster (nach U5a-Klemmung) für die UI-Untertitel.
       previousRange:
         prev && previous ? { startDate: previous.startDate, endDate: previous.endDate } : null,

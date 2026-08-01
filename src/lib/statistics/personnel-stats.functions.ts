@@ -19,11 +19,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
-import { grossMinutesBetween } from "@/lib/time/break-rules";
-import { paidMinutes } from "@/lib/time/paid-hours";
-import { selectAllPaged } from "@/lib/supabase/select-all";
 import { loadPersonnelAttributionContext } from "./personnel-load.server";
-import type { Department } from "@/lib/time/primary-department";
+import { loadPausenBezahlt, loadWorkMinutesEntries } from "./work-minutes.server";
+import { totalWorkMinutes } from "./work-minutes";
 import { computeTrend, type Trend } from "./revenue-core";
 import {
   currentMonth,
@@ -66,16 +64,10 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
     const org = caller.organizationId;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // PB2 — Vergütungsminuten der Personalquote folgen dem Org-Schalter
-    // `pausen_bezahlt` (Default TRUE). Einmal je Request geladen; SFN-Töpfe
-    // sind hier nicht beteiligt.
-    const { data: orgSet, error: orgSetErr } = await supabaseAdmin
-      .from("organization_settings")
-      .select("pausen_bezahlt")
-      .eq("organization_id", org)
-      .maybeSingle();
-    if (orgSetErr) throw orgSetErr;
-    const pausenBezahlt = orgSet?.pausen_bezahlt ?? true;
+    // PB2/STAT2 — Vergütungsminuten folgen dem Org-Schalter `pausen_bezahlt`
+    // (Default TRUE). Einmal je Request geladen; SFN-Töpfe sind hier nicht
+    // beteiligt. Gemeinsame Quelle mit dem Umsatz-Tab (work-minutes.server).
+    const pausenBezahlt = await loadPausenBezahlt(supabaseAdmin, org);
 
     // Zeitraum + Vorperiode auflösen (identisch zu getTipStats).
     let current: Window;
@@ -106,59 +98,24 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
     }
 
     async function loadWindow(win: Window): Promise<WindowResult> {
-      // BFIX3: PostgREST kappt bei 1000 Zeilen — paginieren, sonst fehlen
-      // Zeilen bei größeren Zeiträumen/Belegschaften und die Statistik
-      // wird still unvollständig.
-      const rows = await selectAllPaged<{
-        staff_id: string | null;
-        started_at: string | null;
-        ended_at: string | null;
-        break_minutes: number | null;
-        business_date: string | null;
-        location_id: string | null;
-        department: string | null;
-        id: string;
-      }>((from, to) => {
-        let q = supabaseAdmin
-          .from("time_entries")
-          .select(
-            "id, staff_id, started_at, ended_at, break_minutes, business_date, location_id, department",
-          )
-          .eq("organization_id", org)
-          .gte("business_date", win.startDate)
-          .lte("business_date", win.endDate)
-          .not("ended_at", "is", null)
-          .order("id", { ascending: true });
-        if (data.locationId) q = q.eq("location_id", data.locationId);
-        return q.range(from, to);
+      // STAT2 — gemeinsamer Loader (identische Minuten wie der Umsatz-Tab).
+      const raw = await loadWorkMinutesEntries(supabaseAdmin, {
+        organizationId: org,
+        startDate: win.startDate,
+        endDate: win.endDate,
+        locationId: data.locationId,
+        pausenBezahlt,
       });
 
-      type RawEntry = {
-        staffId: string;
-        businessDate: string;
-        netMinutes: number;
-        rawDepartment: Department | null;
-      };
-      const raw: RawEntry[] = [];
       const staffIdSet = new Set<string>();
-      let totalNetMinutes = 0;
       let lastDataDay: string | null = null;
-      for (const r of rows ?? []) {
-        if (!r.ended_at || !r.started_at || !r.business_date || !r.staff_id) continue;
-        const gross = grossMinutesBetween(new Date(r.started_at), new Date(r.ended_at));
-        const net = paidMinutes(gross, r.break_minutes ?? 0, pausenBezahlt);
-        totalNetMinutes += net;
-        staffIdSet.add(r.staff_id);
-        if (net > 0 && (lastDataDay === null || r.business_date > lastDataDay)) {
-          lastDataDay = r.business_date;
+      for (const e of raw) {
+        staffIdSet.add(e.staffId);
+        if (e.netMinutes > 0 && (lastDataDay === null || e.businessDate > lastDataDay)) {
+          lastDataDay = e.businessDate;
         }
-        raw.push({
-          staffId: r.staff_id,
-          businessDate: r.business_date,
-          netMinutes: net,
-          rawDepartment: (r.department as Department | null) ?? null,
-        });
       }
+      const totalNetMinutes = totalWorkMinutes(raw);
       const staffIds = Array.from(staffIdSet);
 
       // ST1-A — Bereichs-Sätze + LG3b-Attribution je Eintrag.

@@ -212,6 +212,53 @@ export function computeTrend(currentCents: number, previousCents: number): Trend
   return { deltaCents, pct };
 }
 
+// STAT2 — abgeleitete Kennzahlen „Ø Umsatz je Gast" und „Umsatz je
+// Arbeitsstunde". Rein und getestet; die UI rechnet nicht.
+//
+// Fachentscheid 01.08.2026: € je Gast bezieht sich auf den HAUS-Umsatz —
+// Takeaway-Besteller sind keine Gäste am Tisch. € je Stunde bezieht sich auf
+// den Gesamtumsatz (die Arbeitszeit trägt beide Kanäle).
+//
+// Nenner 0 ⇒ `null` (die UI zeigt „—"; kein NaN, kein Infinity, kein 0-Fake).
+export type DerivedKpis = {
+  /** Haus-Umsatz je Gast in ganzen Cent, oder null bei 0 Gästen. */
+  revenuePerGuestCents: number | null;
+  /** Gesamtumsatz je Arbeitsstunde in ganzen Cent, oder null bei 0 Minuten. */
+  revenuePerWorkHourCents: number | null;
+  /** Arbeitsstunden (Minuten/60), auf zwei Dezimalen gerundet. */
+  workHours: number;
+};
+
+export function derivedKpis(input: {
+  houseCents: number;
+  totalCents: number;
+  guestCount: number;
+  workMinutes: number;
+}): DerivedKpis {
+  const guests = input.guestCount > 0 ? input.guestCount : 0;
+  const minutes = input.workMinutes > 0 ? input.workMinutes : 0;
+  return {
+    revenuePerGuestCents: guests === 0 ? null : Math.round(input.houseCents / guests),
+    revenuePerWorkHourCents: minutes === 0 ? null : Math.round((input.totalCents * 60) / minutes),
+    workHours: Math.round((minutes / 60) * 100) / 100,
+  };
+}
+
+// STAT2 — Gäste je Geschäftstag. Mehrere Sessions am selben Tag (z. B. zwei
+// Standorte im Filter „alle") summieren auf; fehlende Zählungen gelten als 0.
+export function sumGuestsByDate(
+  rows: readonly { businessDate: string; guestCount: number | null }[],
+): { byDate: Map<string, number>; total: number } {
+  const byDate = new Map<string, number>();
+  let total = 0;
+  for (const r of rows) {
+    const guests = r.guestCount ?? 0;
+    byDate.set(r.businessDate, (byDate.get(r.businessDate) ?? 0) + guests);
+    total += guests;
+  }
+  return { byDate, total };
+}
+
 // STAT-U2 — Take-Away je Kanal.
 // Summiert `amountCents` je Kanal-Name und sortiert absteigend. Reihenfolge
 // bei Gleichstand: stabil nach Kanal-Name (aufsteigend), damit die UI und

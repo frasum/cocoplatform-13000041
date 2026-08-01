@@ -238,7 +238,8 @@ function GenerationAssistent({
   }
 
   const unresolvedCount = preview?.unresolved.length ?? 0;
-  const canSave = preview !== null && (unresolvedCount === 0 || forceSave);
+  const canSave =
+    preview !== null && vorgangMissing.length === 0 && (unresolvedCount === 0 || forceSave);
 
   return (
     <div className="space-y-4">

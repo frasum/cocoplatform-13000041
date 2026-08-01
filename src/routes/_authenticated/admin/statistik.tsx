@@ -44,10 +44,11 @@ import {
   computeTrend,
   derivedKpis,
   takeawayDonutSegments,
+  tipRatePct,
 } from "@/lib/statistics/revenue-core";
 import { shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
 import { compareKpi } from "@/lib/statistics/kpi-compare";
-import { leadDelta, previousTrendLabel } from "@/lib/statistics/comparison-labels";
+import { leadDelta, previousTrendLabel, ppTrendLabel } from "@/lib/statistics/comparison-labels";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { takeawayMatrix, takeawaySharePctOfTotal } from "@/lib/statistics/takeaway-channels";

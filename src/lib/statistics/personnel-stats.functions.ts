@@ -249,6 +249,9 @@ export const getPersonnelStats = createServerFn({ method: "GET" })
             laborCostCents: prev.agg.totalLaborCostCents,
           }
         : null,
+      // Vergleichsfenster (nach U5a-Klemmung) für die UI-Untertitel.
+      previousRange:
+        prev && previous ? { startDate: previous.startDate, endDate: previous.endDate } : null,
       trend,
       coverage: { lastDataDay: cur.lastDataDay, isPartial },
     };

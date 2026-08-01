@@ -564,6 +564,7 @@ function StatsView({ data }: { data: RevenueStats }) {
             <TakeawayChannelsDonut
               channels={data.takeawayByChannel}
               totalCents={data.summary.takeawayCents}
+              woltInfoCents={data.summary.woltInfoCents}
             />
           ) : (
             <div className="flex h-[220px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
@@ -690,9 +691,11 @@ const CHANNEL_COLORS = [
 function TakeawayChannelsDonut({
   channels,
   totalCents,
+  woltInfoCents,
 }: {
   channels: RevenueStats["takeawayByChannel"];
   totalCents: number;
+  woltInfoCents: number;
 }) {
   const withPct = computeChannelPercents(channels);
   return (
@@ -739,6 +742,16 @@ function TakeawayChannelsDonut({
             </li>
           ))}
         </ul>
+        {woltInfoCents > 0 ? (
+          // STAT1: Wolt ist im Vectron-Takeaway-Marker enthalten — reine
+          // „davon"-Zeile ohne eigenes Donut-Segment.
+          <div className="pl-[18px] text-xs text-muted-foreground">
+            <span className="flex items-center gap-2">
+              <span className="flex-1 truncate">davon Wolt</span>
+              <span className="tabular-nums">{fmtEuro(woltInfoCents)}</span>
+            </span>
+          </div>
+        ) : null}
         <div className="border-t border-border pt-2 text-xs text-muted-foreground">
           Gesamt Takeaway: <span className="tabular-nums">{fmtEuro(totalCents)}</span>
         </div>

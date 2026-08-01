@@ -10,54 +10,116 @@ import {
   type SessionRevenueInput,
 } from "./revenue-core";
 
-describe("sessionRevenue", () => {
-  it("YUM-Stil: vectron + ein Takeaway-Kanal, keine Nicht-Takeaway-Kanäle", () => {
+describe("sessionRevenue — STAT1 (N14-Zerlegung)", () => {
+  // STAT1: Erwartungswerte angepasst. Die alte Fassung rechnete Kanäle
+  // additiv (Gesamt = vectron + Σ Kanäle) und zählte Takeaway doppelt.
+  it("Fixture 18.07. Spicery (echte Zahlen): Marker + Wolt", () => {
     const input: SessionRevenueInput = {
       sessionId: "s1",
-      businessDate: "2026-06-01",
-      locationId: "yum",
-      vectronCents: 551830,
-      channels: [{ amountCents: 58550, isTakeaway: true }],
-    };
-    expect(sessionRevenue(input)).toEqual({
-      houseCents: 551830,
-      takeawayCents: 58550,
-      totalCents: 610380,
-    });
-  });
-
-  // TSB-Stil: dokumentiert das „eine-Quelle"-Verhalten der reinen Funktion.
-  // OFFENE VERIFIKATION: ob TSB in der Realität vectronCents UND den
-  // pos-Kanal „Kasse" gleichzeitig füllt — wenn ja, muss die Server-Fn
-  // das auflösen, nicht diese reine Funktion.
-  it("TSB-Stil: Nicht-Takeaway-Kanal + Takeaway-Kanal, vectron=0", () => {
-    const input: SessionRevenueInput = {
-      sessionId: "s2",
-      businessDate: "2026-06-01",
-      locationId: "tsb",
-      vectronCents: 0,
+      businessDate: "2026-07-18",
+      locationId: "spicery",
+      vectronCents: 667250,
       channels: [
-        { amountCents: 200000, isTakeaway: false }, // Kasse
-        { amountCents: 50000, isTakeaway: true }, // Wolt
+        { kind: "delivery_vectron", amountCents: 36510 },
+        { kind: "delivery_wolt", amountCents: 17210 },
       ],
     };
     expect(sessionRevenue(input)).toEqual({
-      houseCents: 200000,
-      takeawayCents: 50000,
-      totalCents: 250000,
+      totalCents: 667250,
+      takeawayCents: 36510,
+      houseCents: 630740,
+      woltInfoCents: 17210,
     });
+  });
+
+  // STAT1: SOUSE ist NICHT im Marker enthalten und wird zusätzlich
+  // abgezogen; Wolt bleibt reine Info.
+  it("Tag mit SOUSE: Takeaway = Marker + SoUse, Wolt nie Summand", () => {
+    expect(
+      sessionRevenue({
+        sessionId: "s2",
+        businessDate: "2026-07-19",
+        locationId: "spicery",
+        vectronCents: 500000,
+        channels: [
+          { kind: "delivery_vectron", amountCents: 40000 },
+          { kind: "delivery_wolt", amountCents: 15000 },
+          { kind: "delivery_souse", amountCents: 10000 },
+        ],
+      }),
+    ).toEqual({
+      totalCents: 500000,
+      takeawayCents: 50000,
+      houseCents: 450000,
+      woltInfoCents: 15000,
+    });
+  });
+
+  // STAT1: `pos` ist additive Zweitkasse (TSB) — Adapter-Semantik.
+  it("TSB-Form: vectron + pos-Kanal → Gesamt = vectron + pos", () => {
+    expect(
+      sessionRevenue({
+        sessionId: "s3",
+        businessDate: "2026-06-01",
+        locationId: "tsb",
+        vectronCents: 120000,
+        channels: [{ kind: "pos", amountCents: 200000 }],
+      }),
+    ).toEqual({
+      totalCents: 320000,
+      takeawayCents: 0,
+      houseCents: 320000,
+      woltInfoCents: 0,
+    });
+  });
+
+  it("Guard: Marker + SoUse > vectron → Takeaway gedeckelt, Haus ≥ 0", () => {
+    const res = sessionRevenue({
+      sessionId: "s4",
+      businessDate: "2026-06-02",
+      locationId: "x",
+      vectronCents: 10000,
+      channels: [
+        { kind: "delivery_vectron", amountCents: 9000 },
+        { kind: "delivery_souse", amountCents: 5000 },
+      ],
+    });
+    expect(res).toEqual({
+      totalCents: 10000,
+      takeawayCents: 10000,
+      houseCents: 0,
+      woltInfoCents: 0,
+    });
+    expect(res.houseCents).toBeGreaterThanOrEqual(0);
+  });
+
+  it("unbekannter kind wirft", () => {
+    expect(() =>
+      sessionRevenue({
+        sessionId: "s5",
+        businessDate: "2026-06-02",
+        locationId: "x",
+        vectronCents: 100,
+        channels: [{ kind: "voucher_sold", amountCents: 50 }],
+      }),
+    ).toThrow(/unbekannter kind/);
   });
 
   it("leere Kanäle: nur vectron", () => {
     expect(
       sessionRevenue({
-        sessionId: "s3",
+        sessionId: "s6",
         businessDate: "2026-06-01",
         locationId: "x",
         vectronCents: 12345,
         channels: [],
       }),
-    ).toEqual({ houseCents: 12345, takeawayCents: 0, totalCents: 12345 });
+    ).toEqual({
+      houseCents: 12345,
+      takeawayCents: 0,
+      totalCents: 12345,
+      woltInfoCents: 0,
+    });
   });
 });
 
@@ -69,22 +131,24 @@ describe("aggregateByBusinessDate", () => {
         businessDate: "2026-06-01",
         locationId: "yum",
         vectronCents: 100000,
-        channels: [{ amountCents: 20000, isTakeaway: true }],
+        channels: [{ kind: "delivery_vectron", amountCents: 20000 }],
       },
       {
         sessionId: "b",
         businessDate: "2026-06-01",
         locationId: "spicery",
         vectronCents: 50000,
-        channels: [{ amountCents: 10000, isTakeaway: true }],
+        channels: [{ kind: "delivery_vectron", amountCents: 10000 }],
       },
     ];
     expect(aggregateByBusinessDate(sessions)).toEqual([
       {
         businessDate: "2026-06-01",
-        houseCents: 150000,
+        // STAT1: Gesamt = Σ vectron (150.000), Takeaway ist darin enthalten.
+        houseCents: 120000,
         takeawayCents: 30000,
-        totalCents: 180000,
+        totalCents: 150000,
+        woltInfoCents: 0,
         cardCents: 0,
         sessionCount: 2,
       },
@@ -131,6 +195,7 @@ describe("summarize", () => {
         houseCents: 100,
         takeawayCents: 50,
         totalCents: 150,
+        woltInfoCents: 0,
         cardCents: 0,
         sessionCount: 1,
       },
@@ -139,6 +204,7 @@ describe("summarize", () => {
         houseCents: 0,
         takeawayCents: 0,
         totalCents: 0,
+        woltInfoCents: 0,
         cardCents: 0,
         sessionCount: 1,
       },
@@ -147,6 +213,7 @@ describe("summarize", () => {
         houseCents: 200,
         takeawayCents: 0,
         totalCents: 200,
+        woltInfoCents: 0,
         cardCents: 0,
         sessionCount: 1,
       },
@@ -155,6 +222,7 @@ describe("summarize", () => {
       houseCents: 300,
       takeawayCents: 50,
       totalCents: 350,
+      woltInfoCents: 0,
       daysWithRevenue: 2,
     });
   });
@@ -164,6 +232,7 @@ describe("summarize", () => {
       houseCents: 0,
       takeawayCents: 0,
       totalCents: 0,
+      woltInfoCents: 0,
       daysWithRevenue: 0,
     });
   });

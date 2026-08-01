@@ -2,13 +2,11 @@
  * M-Statistik — DB-Row → reine `SessionRevenueInput[]`-Liste.
  *
  * Keine DB-Zugriffe, keine Seiteneffekte. Wandelt die rohen DB-Zeilen
- * (sessions + session_channel_amounts joined revenue_channels.is_takeaway)
+ * (sessions + session_channel_amounts joined revenue_channels.kind)
  * in die Eingabe-Struktur der reinen Funktionen aus `revenue-core.ts`.
  *
- * TSB-Hinweis (offen): TSB hat zusätzlich einen `pos`-Kanal „Kasse". Ob TSB
- * `vectronCents` UND diesen Kanal gleichzeitig füllt, ist noch zu
- * verifizieren. Diese Funktion behandelt das NICHT speziell — sie reicht
- * 1:1 weiter, was die Server-Fn aus der DB liest.
+ * STAT1: maßgeblich ist der Kanal-`kind` (N14-Zerlegung in
+ * `decomposeRevenue`), nicht mehr das additive `is_takeaway`-Flag.
  */
 
 import type { SessionRevenueInput } from "./revenue-core";
@@ -23,17 +21,17 @@ export type SessionRow = {
 export type ChannelAmountRow = {
   sessionId: string;
   amountCents: number;
-  isTakeaway: boolean;
+  kind: string;
 };
 
 export function mapToSessionInputs(
   sessions: SessionRow[],
   channelAmounts: ChannelAmountRow[],
 ): SessionRevenueInput[] {
-  const bySession = new Map<string, { amountCents: number; isTakeaway: boolean }[]>();
+  const bySession = new Map<string, { kind: string; amountCents: number }[]>();
   for (const ca of channelAmounts) {
     const list = bySession.get(ca.sessionId);
-    const entry = { amountCents: ca.amountCents, isTakeaway: ca.isTakeaway };
+    const entry = { kind: ca.kind, amountCents: ca.amountCents };
     if (list) list.push(entry);
     else bySession.set(ca.sessionId, [entry]);
   }

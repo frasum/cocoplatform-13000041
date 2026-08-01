@@ -9,7 +9,6 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { fmtCents } from "@/lib/format";
 import {
   aggregateByBusinessDate,
   summarize,
@@ -19,7 +18,9 @@ import {
 import { takeawayMatrix, takeawaySharePctOfTotal } from "./takeaway-channels";
 import {
   fmtDeltaPctDe,
+  fmtEurRounded,
   fmtHoursDe,
+  fmtHoursRoundedDe,
   fmtPctDe,
   generateStatistikPdf,
   type StatistikPdfData,
@@ -89,7 +90,9 @@ function drawn(...parts: string[]): string {
   return hit;
 }
 
-const eur = (c: number) => `${fmtCents(c)} €`;
+// STAT3d — im PDF stehen gerundete Beträge; der Wächter vergleicht deshalb
+// die gerundete Darstellung des centgenauen Kernwerts.
+const eur = (c: number) => fmtEurRounded(c);
 
 function baseData(over: Partial<StatistikPdfData> = {}): StatistikPdfData {
   return {
@@ -320,7 +323,7 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       eur(5_000),
       "2,5 %",
       "28,8 %",
-      "5.464,48 h",
+      "5.464 h",
       eur(2_500),
       eur(6_500),
     ]);
@@ -388,5 +391,61 @@ describe("statistik-pdf — deutsche Zahlformate", () => {
     expect(fmtDeltaPctDe(-12.05)).toBe("-12,1 %");
     expect(fmtDeltaPctDe(0)).toBe("±0,0 %");
     expect(fmtDeltaPctDe(null)).toBe("—");
+  });
+});
+
+// STAT3d — Rundung ist reine Formatschicht.
+describe("statistik-pdf — gerundete Beträge (STAT3d)", () => {
+  it("Euro kaufmännisch auf ganze Euro", () => {
+    expect(fmtEurRounded(34_477_418)).toBe("344.774 €");
+    expect(fmtEurRounded(250)).toBe("3 €");
+    expect(fmtEurRounded(4_260)).toBe("43 €");
+    expect(fmtEurRounded(-250)).toBe("-3 €");
+    expect(fmtEurRounded(-4_260)).toBe("-43 €");
+    expect(fmtEurRounded(null)).toBe("—");
+  });
+
+  it("Stunden ohne Nachkommastellen", () => {
+    expect(fmtHoursRoundedDe(5_464.48)).toBe("5.464 h");
+    expect(fmtHoursRoundedDe(5_464.5)).toBe("5.465 h");
+    expect(fmtHoursRoundedDe(null)).toBe("—");
+  });
+
+  it("Standort-Tabelle ohne Cent-Nachkommastellen, Quoten bleiben einstellig", async () => {
+    captured.length = 0;
+    texts.length = 0;
+    await generateStatistikPdf(
+      baseData({
+        comparison: [
+          {
+            locationName: "Spicery",
+            totalCents: 34_477_418,
+            tipTotalCents: 3_073_912,
+            ratioPct: 28.8,
+            netHours: 5_464.475,
+            laborCostCents: 74_880,
+            hasMissingRate: false,
+            guestTotal: 80,
+            perGuestCents: 4_260,
+            perHourCents: 6_512,
+            tipRatePct: 8.9,
+          },
+        ],
+      }),
+    );
+    const row = findRow("Spicery");
+    expect(row).toEqual([
+      "Spicery",
+      "344.774 €",
+      "—",
+      "—",
+      "30.739 €",
+      "8,9 %",
+      "28,8 %",
+      "5.464 h",
+      "43 €",
+      "65 €",
+    ]);
+    expect(row.some((c) => /\d,\d{2}\s*€/.test(c))).toBe(false);
   });
 });

@@ -7,11 +7,10 @@
 // zählt), weicht sie hier von Gesamt/Takeaway/Haus ab und der Test bricht.
 
 import { describe, expect, it, vi } from "vitest";
-import { fmtCents } from "@/lib/format";
 import { fillDailyGaps } from "./chart-fill";
 import { aggregateByBusinessDate, summarize, takeawayDonutSegments } from "./revenue-core";
 import { mapToSessionInputs, type ChannelAmountRow, type SessionRow } from "./revenue-map";
-import { generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
+import { fmtEurRounded, generateStatistikPdf, type StatistikPdfData } from "./statistik-pdf";
 import { takeawayMatrix, takeawaySharePctOfTotal } from "./takeaway-channels";
 
 type Cell = string | { content: string };
@@ -70,7 +69,8 @@ function drawn(...parts: string[]): string {
   return hit;
 }
 
-const eur = (c: number) => `${fmtCents(c)} €`;
+// STAT3d — im PDF stehen gerundete Beträge (reine Formatschicht).
+const eurPdf = (c: number) => fmtEurRounded(c);
 
 // Fixture 18.07. Spicery: Vectron-Tagesumsatz 6.672,50 €, Marker 365,10 €,
 // Wolt 172,10 € (im Marker enthalten, reine Info).
@@ -160,21 +160,23 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
 
     // STAT3 — Summen und Segmente stehen im gezeichneten Einseiter-Text.
     const split = drawn("Haus ", "Takeaway ");
-    expect(split).toContain(`Haus ${eur(EXPECTED.houseCents)}`);
-    expect(split).toContain(`Takeaway ${eur(EXPECTED.takeawayCents)}`);
-    expect(texts).toContain(eur(EXPECTED.totalCents));
+    expect(split).toContain(`Haus ${eurPdf(EXPECTED.houseCents)}`);
+    expect(split).toContain(`Takeaway ${eurPdf(EXPECTED.takeawayCents)}`);
+    expect(texts).toContain(eurPdf(EXPECTED.totalCents));
 
     // STAT3b — Kanalzeilen stehen in der Tabelle und stammen aus demselben Donut.
     const cells = captured.flatMap((t) => t.body.map((r) => r.map(cell)));
     const woltRow = cells.find((r) => r[0] === "Wolt");
     const directRow = cells.find((r) => r[0] === "Takeaway direkt (Telefon/Abholung)");
-    expect(woltRow?.[1]).toBe(eur(donut.segments[0]!.amountCents));
-    expect(directRow?.[1]).toBe(eur(donut.segments[1]!.amountCents));
-    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(eur(EXPECTED.takeawayCents));
+    expect(woltRow?.[1]).toBe(eurPdf(donut.segments[0]!.amountCents));
+    expect(directRow?.[1]).toBe(eurPdf(donut.segments[1]!.amountCents));
+    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(
+      eurPdf(EXPECTED.takeawayCents),
+    );
 
     // 6) Kein Pfad zeigt die Wolt-additive Altsumme (667.250 + 17.210).
     const allPdfCells = captured.flatMap((t) => t.body.flatMap((r) => r.map(cell)));
-    expect(allPdfCells).not.toContain(eur(667_250 + 17_210));
-    expect(texts.join(" ")).not.toContain(eur(667_250 + 17_210));
+    expect(allPdfCells).not.toContain(eurPdf(667_250 + 17_210));
+    expect(texts.join(" ")).not.toContain(eurPdf(667_250 + 17_210));
   });
 });

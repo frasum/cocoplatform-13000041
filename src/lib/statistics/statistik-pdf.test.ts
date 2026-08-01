@@ -180,6 +180,9 @@ describe("statistik-pdf — Standort-Vergleich (STAT2b)", () => {
           workHours: kA.workHours,
           perGuestCents: kA.revenuePerGuestCents,
           perHourCents: kA.revenuePerWorkHourCents,
+          previousRange: { startDate: "2026-06-01", endDate: "2026-06-30" },
+          previousPartial: false,
+          prevTotalCents: 200_000,
         },
         {
           locationName: "TSB",
@@ -200,10 +203,15 @@ describe("statistik-pdf — Standort-Vergleich (STAT2b)", () => {
     await generateStatistikPdf(data);
 
     const rowA = findRow("Spicery");
-    expect(rowA.slice(6)).toEqual(["80", "40.00", `${fmtCents(2_500)} €`, `${fmtCents(6_500)} €`]);
+    expect(rowA.slice(7)).toEqual(["80", "40.00", `${fmtCents(2_500)} €`, `${fmtCents(6_500)} €`]);
+
+    // STAT2c — Trendspalte gegen das eigene Vormonatsfenster.
+    expect(rowA[2]).toBe("+30,0 % vs. 01.–30.06.2026");
+    // Ohne Vormonatswert bleibt die Spalte ein Gedankenstrich.
+    expect(findRow("TSB")[2]).toBe("—");
 
     // TSB: beide Nenner 0 ⇒ beide Kennzahlen „—", Rohsummen bleiben 0.
     const rowB = findRow("TSB");
-    expect(rowB.slice(6)).toEqual(["0", "0.00", "—", "—"]);
+    expect(rowB.slice(7)).toEqual(["0", "0.00", "—", "—"]);
   });
 });

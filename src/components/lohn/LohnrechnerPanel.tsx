@@ -580,6 +580,118 @@ function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
 }
 
 /**
+ * UK2 — Erfassung der harten U/K-Tage der gewählten Periode. Die Felder sind
+ * mit den gespeicherten Werten vorbelegt; der Kalender-Vorschlag füllt nur
+ * die Felder (gespeichert wird erst per Knopf). 0/0 speichern = löschen.
+ */
+function AbsenceDaysCard({
+  staffId,
+  periodStart,
+  usedUrlaubTage,
+  usedKrankTage,
+  estUrlaubTage,
+  estKrankTage,
+  onSaved,
+}: {
+  staffId: string;
+  periodStart: string;
+  usedUrlaubTage: number;
+  usedKrankTage: number;
+  estUrlaubTage: number;
+  estKrankTage: number;
+  onSaved: () => void;
+}) {
+  const [urlaub, setUrlaub] = useState<string>(String(usedUrlaubTage));
+  const [krank, setKrank] = useState<string>(String(usedKrankTage));
+
+  useEffect(() => {
+    setUrlaub(String(usedUrlaubTage));
+    setKrank(String(usedKrankTage));
+  }, [staffId, periodStart, usedUrlaubTage, usedKrankTage]);
+
+  const saveFn = useServerFn(saveAbsenceDays);
+  const save = useMutation({
+    mutationFn: () =>
+      saveFn({
+        data: {
+          staffId,
+          periodStart,
+          urlaubTage: Number(urlaub || 0),
+          krankTage: Number(krank || 0),
+        },
+      }),
+    onSuccess: () => {
+      toast.success("U/K-Tage gespeichert.");
+      onSaved();
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Speichern fehlgeschlagen."),
+  });
+
+  return (
+    <Card className="space-y-3 p-4">
+      <h2 className="text-base font-semibold">U/K-Tage (Abrechnung)</h2>
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="uk-urlaub">Urlaubstage</Label>
+          <Input
+            id="uk-urlaub"
+            type="number"
+            min={0}
+            max={MAX_ABSENCE_TAGE}
+            step={1}
+            className="w-28"
+            value={urlaub}
+            onChange={(e) => setUrlaub(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="uk-krank">Kranktage</Label>
+          <Input
+            id="uk-krank"
+            type="number"
+            min={0}
+            max={MAX_ABSENCE_TAGE}
+            step={1}
+            className="w-28"
+            value={krank}
+            onChange={(e) => setKrank(e.target.value)}
+          />
+        </div>
+        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? "Speichere…" : "Speichern"}
+        </Button>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>
+          Vorschlag aus Kalender: U {estUrlaubTage} / K {estKrankTage}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setUrlaub(String(estUrlaubTage));
+            setKrank(String(estKrankTage));
+          }}
+        >
+          Übernehmen
+        </Button>
+        <span>0 / 0 speichern entfernt die Vorgabe.</span>
+      </div>
+    </Card>
+  );
+}
+
+function KVUnused({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border/40 py-1 last:border-b-0">
+      <span className="text-muted-foreground">{k}</span>
+      <span className={"tabular-nums " + (strong ? "font-semibold text-foreground" : "")}>{v}</span>
+    </div>
+  );
+}
+
+/**
  * LG3b A4 — Blocker-Banner. Zeigt fehlende Personalnummern, Bereichs-Sätze
  * und unresolved WZ2-Attributionen; keine Rechenwirkung, nur Anzeige.
  */

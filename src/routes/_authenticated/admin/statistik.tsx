@@ -50,10 +50,7 @@ import { compareKpi } from "@/lib/statistics/kpi-compare";
 import { leadDelta, previousTrendLabel } from "@/lib/statistics/comparison-labels";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
-import {
-  takeawayMatrix,
-  takeawaySharePctOfTotal,
-} from "@/lib/statistics/takeaway-channels";
+import { takeawayMatrix, takeawaySharePctOfTotal } from "@/lib/statistics/takeaway-channels";
 import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
@@ -446,10 +443,7 @@ function StatistikPage() {
       previousYearTotalCents: matrixCents(scopeSeriesId, focusYear - 1, focusMonthNo),
       previousPeriodTotalCents: rev.previous?.totalCents ?? null,
       takeaway,
-      takeawaySharePct: takeawaySharePctOfTotal(
-        rev.summary.takeawayCents,
-        rev.summary.totalCents,
-      ),
+      takeawaySharePct: takeawaySharePctOfTotal(rev.summary.takeawayCents, rev.summary.totalCents),
       tips: {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,

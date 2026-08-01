@@ -170,9 +170,7 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     const directRow = cells.find((r) => r[0] === "Takeaway direkt (Telefon/Abholung)");
     expect(woltRow?.[1]).toBe(eur(donut.segments[0]!.amountCents));
     expect(directRow?.[1]).toBe(eur(donut.segments[1]!.amountCents));
-    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(
-      eur(EXPECTED.takeawayCents),
-    );
+    expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(eur(EXPECTED.takeawayCents));
 
     // 6) Kein Pfad zeigt die Wolt-additive Altsumme (667.250 + 17.210).
     const allPdfCells = captured.flatMap((t) => t.body.flatMap((r) => r.map(cell)));

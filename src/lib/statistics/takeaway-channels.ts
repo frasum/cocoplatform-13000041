@@ -156,9 +156,6 @@ export function takeawayMatrix(
 }
 
 /** Anteil des Take-Away am Gesamtumsatz (für die PDF-Kopfzeile). */
-export function takeawaySharePctOfTotal(
-  takeawayCents: number,
-  totalCents: number,
-): number | null {
+export function takeawaySharePctOfTotal(takeawayCents: number, totalCents: number): number | null {
   return sharePct(takeawayCents, totalCents);
 }

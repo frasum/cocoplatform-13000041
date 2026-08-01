@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { mapToSessionInputs, type SessionRow, type ChannelAmountRow } from "./revenue-map";
 
 describe("mapToSessionInputs", () => {
-  it("Session mit zwei Kanälen (takeaway + nicht-takeaway) wird korrekt aufgebaut", () => {
+  // STAT1: Kanalzeilen tragen jetzt `kind` (N14-Zerlegung) statt `isTakeaway`.
+  it("Session mit zwei Kanälen (Marker + pos) wird korrekt aufgebaut", () => {
     const sessions: SessionRow[] = [
       {
         id: "s1",
@@ -12,8 +13,8 @@ describe("mapToSessionInputs", () => {
       },
     ];
     const channels: ChannelAmountRow[] = [
-      { sessionId: "s1", amountCents: 58550, isTakeaway: true },
-      { sessionId: "s1", amountCents: 12000, isTakeaway: false },
+      { sessionId: "s1", amountCents: 58550, kind: "delivery_vectron" },
+      { sessionId: "s1", amountCents: 12000, kind: "pos" },
     ];
     expect(mapToSessionInputs(sessions, channels)).toEqual([
       {
@@ -22,8 +23,8 @@ describe("mapToSessionInputs", () => {
         locationId: "yum",
         vectronCents: 551830,
         channels: [
-          { amountCents: 58550, isTakeaway: true },
-          { amountCents: 12000, isTakeaway: false },
+          { kind: "delivery_vectron", amountCents: 58550 },
+          { kind: "pos", amountCents: 12000 },
         ],
       },
     ]);
@@ -54,12 +55,12 @@ describe("mapToSessionInputs", () => {
       { id: "s1", businessDate: "2026-06-01", locationId: "x", vectronCents: 0 },
     ];
     const channels: ChannelAmountRow[] = [
-      { sessionId: "s1", amountCents: 50, isTakeaway: false },
-      { sessionId: "ghost", amountCents: 999, isTakeaway: true },
+      { sessionId: "s1", amountCents: 50, kind: "pos" },
+      { sessionId: "ghost", amountCents: 999, kind: "delivery_vectron" },
     ];
     const out = mapToSessionInputs(sessions, channels);
     expect(out).toHaveLength(1);
-    expect(out[0].channels).toEqual([{ amountCents: 50, isTakeaway: false }]);
+    expect(out[0].channels).toEqual([{ kind: "pos", amountCents: 50 }]);
   });
 
   it("Output-Reihenfolge entspricht Sessions-Eingabereihenfolge", () => {

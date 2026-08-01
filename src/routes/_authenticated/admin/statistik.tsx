@@ -119,6 +119,8 @@ type KpiCardProps = {
   trendRenderer?: () => React.ReactNode;
   /** Optionale Caption unter dem Wert (kleine, gedämpfte Zeile). */
   caption?: React.ReactNode;
+  /** Untertitel „vs. …" — nur wenn eine Vorperiode verglichen wurde. */
+  comparisonLabel?: string | null;
 };
 
 function KpiCard({
@@ -129,6 +131,7 @@ function KpiCard({
   value,
   trendRenderer,
   caption,
+  comparisonLabel,
 }: KpiCardProps) {
   let display: string;
   if (unit === "eur") {
@@ -146,6 +149,11 @@ function KpiCard({
       <CardContent className="space-y-1">
         <div className="text-2xl font-semibold tabular-nums">{display}</div>
         {trendRenderer ? trendRenderer() : <TrendLine trend={trend} />}
+        {comparisonLabel ? (
+          <div className="text-[11px] leading-tight text-muted-foreground/80">
+            {comparisonLabel}
+          </div>
+        ) : null}
         {caption ? <div className="text-xs text-muted-foreground">{caption}</div> : null}
       </CardContent>
     </Card>

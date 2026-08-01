@@ -395,6 +395,7 @@ export async function generateStatistikPdf(
         [
           "Standort",
           "Umsatz",
+          "Umsatz vs. Vormonat",
           "Trinkgeld",
           "Personalquote",
           "Netto-Std.",
@@ -408,6 +409,9 @@ export async function generateStatistikPdf(
       body: data.comparison.map((c) => [
         c.locationName,
         fmtEur(c.totalCents),
+        previousTrendLabel(c.totalCents, c.prevTotalCents ?? null, c.previousRange ?? null, {
+          partial: c.previousPartial ?? false,
+        }).text,
         fmtEur(c.tipTotalCents),
         `${fmtPct(c.ratioPct)}${c.hasMissingRate ? " *" : ""}`,
         fmtHours(c.netHours),
@@ -420,6 +424,22 @@ export async function generateStatistikPdf(
       theme: "grid",
     });
     cursorY = lastY(doc) + 10;
+    // STAT2c — ehrliches Standort-gegen-Standort-Delta, benannter Bezug.
+    const top = pickTopTwoByTotal(
+      data.comparison.map((c) => ({ name: c.locationName, totalCents: c.totalCents })),
+    );
+    if (top.length === 2) {
+      const lead = leadDelta({
+        aName: top[0]!.name,
+        bName: top[1]!.name,
+        aValue: top[0]!.totalCents,
+        bValue: top[1]!.totalCents,
+      });
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text(`Umsatz: ${lead.text}`, marginX, cursorY);
+      cursorY += 12;
+    }
     if (hasMissingAny) {
       doc.setFontSize(8);
       doc.setFont("helvetica", "italic");

@@ -301,3 +301,49 @@ export function checkDonutSegments(input: {
   }
   return { ok: true, capped: false, message: null };
 }
+
+// STAT1b — Darstellungszerlegung der Take-Away-Segmente (rein, ohne UI).
+// Der Vectron-Takeaway-Marker enthält Wolt; fachlich zerfällt er in
+// „Wolt" und „Takeaway direkt (Telefon/Abholung)". SoUse bleibt unverändert.
+// Die Segmentsumme ist per Konstruktion immer `markerSum + souseSum` — es
+// wird nichts neu gerechnet, nur aufgeteilt.
+export const TAKEAWAY_SEGMENT_WOLT = "Wolt";
+export const TAKEAWAY_SEGMENT_DIRECT = "Takeaway direkt (Telefon/Abholung)";
+export const TAKEAWAY_SEGMENT_SOUSE = "SoUse";
+
+export type TakeawayDonutResult = {
+  segments: TakeawayChannel[];
+  segmentSumCents: number;
+  /** true, wenn `woltInfoCents` den Marker übersteigt (Erfassungsfehler). */
+  woltExceedsMarker: boolean;
+  warning: string | null;
+};
+
+export function takeawayDonutSegments(
+  markerSumCents: number,
+  souseSumCents: number,
+  woltInfoCents: number,
+): TakeawayDonutResult {
+  const marker = Math.max(0, markerSumCents);
+  const souse = Math.max(0, souseSumCents);
+  const woltRaw = Math.max(0, woltInfoCents);
+  const woltExceedsMarker = woltRaw > marker;
+  // Guard: Wolt-Segment auf den Marker deckeln, Direkt-Segment nie negativ.
+  const wolt = Math.min(woltRaw, marker);
+  const direct = marker - wolt;
+
+  const segments: TakeawayChannel[] = [];
+  if (wolt > 0) segments.push({ name: TAKEAWAY_SEGMENT_WOLT, amountCents: wolt });
+  if (direct > 0) segments.push({ name: TAKEAWAY_SEGMENT_DIRECT, amountCents: direct });
+  if (souse > 0) segments.push({ name: TAKEAWAY_SEGMENT_SOUSE, amountCents: souse });
+
+  return {
+    segments,
+    segmentSumCents: marker + souse,
+    woltExceedsMarker,
+    warning: woltExceedsMarker
+      ? `Wolt-Betrag (${fmtCents(woltRaw)} €) übersteigt den Takeaway-Marker ` +
+        `(${fmtCents(marker)} €) — Erfassung prüfen.`
+      : null,
+  };
+}

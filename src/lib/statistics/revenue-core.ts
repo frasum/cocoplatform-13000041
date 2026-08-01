@@ -20,6 +20,8 @@
  * Unbekannte/leere `kind` werfen absichtlich — kein stilles No-op.
  */
 
+import { fmtCents } from "@/lib/format";
+
 export type ChannelAmount = { kind: string; amountCents: number };
 
 export type SessionRevenueInput = {
@@ -273,6 +275,7 @@ export function checkDonutSegments(input: {
   souseSumCents: number;
   takeawayCents: number;
 }): DonutCheck {
+  const eur = (c: number) => `${fmtCents(c)} €`;
   const expected = input.markerSumCents + input.souseSumCents;
   const capped = expected > input.takeawayCents;
   if (input.segmentSumCents !== expected) {
@@ -281,8 +284,8 @@ export function checkDonutSegments(input: {
       ok: false,
       capped,
       message:
-        `Donut-Prüfung fehlgeschlagen: Segmentsumme ${input.segmentSumCents} Cent ` +
-        `≠ Marker + SoUse ${expected} Cent (Differenz ${diff > 0 ? "+" : ""}${diff} Cent). ` +
+        `Donut-Prüfung fehlgeschlagen: Segmentsumme ${eur(input.segmentSumCents)} ` +
+        `≠ Marker + SoUse ${eur(expected)} (Differenz ${diff > 0 ? "+" : "−"}${eur(Math.abs(diff))}). ` +
         `Die angezeigten Kanäle passen nicht zur Take-Away-Zerlegung — Zahlen nicht verwenden.`,
     };
   }
@@ -291,8 +294,8 @@ export function checkDonutSegments(input: {
       ok: true,
       capped: true,
       message:
-        `Hinweis: Marker + SoUse (${expected} Cent) übersteigen den Vectron-Tagesumsatz; ` +
-        `Take-Away ist auf ${input.takeawayCents} Cent gedeckelt (Haus ≥ 0). ` +
+        `Hinweis: Marker + SoUse (${eur(expected)}) übersteigen den Vectron-Tagesumsatz; ` +
+        `Take-Away ist auf ${eur(input.takeawayCents)} gedeckelt (Haus ≥ 0). ` +
         `Die Segment-Prozente beziehen sich auf die ungedeckelte Summe.`,
     };
   }

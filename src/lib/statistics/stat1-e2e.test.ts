@@ -57,15 +57,6 @@ function cell(c: Cell): string {
   return typeof c === "string" ? c : c.content;
 }
 
-function pdfRow(label: string): string[] {
-  for (const t of captured) {
-    for (const row of t.body) {
-      if (cell(row[0]) === label) return row.map(cell);
-    }
-  }
-  throw new Error(`Zeile "${label}" nicht im PDF gefunden`);
-}
-
 /** Ein gezeichneter Textblock, der alle Teilstrings enthält. */
 function drawn(...parts: string[]): string {
   const hit = texts.find((t) => parts.every((p) => t.includes(p)));

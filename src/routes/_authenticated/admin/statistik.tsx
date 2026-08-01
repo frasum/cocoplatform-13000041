@@ -51,10 +51,7 @@ import { leadDelta, previousTrendLabel } from "@/lib/statistics/comparison-label
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
-import {
-  getMonthlyRevenueMatrix,
-  ALL_LOCATIONS,
-} from "@/lib/statistics/monthly-revenue.functions";
+import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
 import { fillDailyGaps } from "@/lib/statistics/chart-fill";
@@ -393,7 +390,9 @@ function StatistikPage() {
                 if (!series) return null;
                 return {
                   name: series.locationName,
-                  values: window13.map((m) => findCell(series.cells, m.year, m.month)?.totalCents ?? null),
+                  values: window13.map(
+                    (m) => findCell(series.cells, m.year, m.month)?.totalCents ?? null,
+                  ),
                 };
               })
               .filter((s): s is { name: string; values: Array<number | null> } => s !== null),

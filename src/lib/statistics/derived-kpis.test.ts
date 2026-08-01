@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { derivedKpis } from "./revenue-core";
+import { derivedKpis, ppDelta, tipRatePct } from "./revenue-core";
 
 describe("derivedKpis (STAT2)", () => {
   it("Normalfall: € je Gast aus HAUS, € je Stunde aus GESAMT", () => {

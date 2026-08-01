@@ -3,13 +3,14 @@
 // `berechneLohnFuerMitarbeiter` (read-only) und zeigt Zeilen, Person und
 // Ergebnis tabellarisch an, damit Frank Zeile für Zeile gegen edlohn vergleichen kann.
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { todayIso } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -31,6 +32,9 @@ import {
   berechneLohnFuerMitarbeiter,
   berechneLohnUebersicht,
 } from "@/lib/lohn/lohn-rechner.functions";
+import { saveAbsenceDays } from "@/lib/lohn/lohn-absence.functions";
+import { MAX_ABSENCE_TAGE } from "@/lib/lohn/absence-days";
+import { useAuth } from "@/hooks/use-auth";
 import { buildLohnFileName, buildLohnXlsx, downloadBlob } from "@/lib/lohn/lohn-excel-export";
 import {
   buildLohnZip,
@@ -74,6 +78,10 @@ function defaultFromTo(): { from: string; to: string } {
 
 export function LohnrechnerPanel() {
   const def = useMemo(defaultFromTo, []);
+  const qc = useQueryClient();
+  const { identity } = useAuth();
+  // UK2 — Schreibrecht wie in der Server-Function: admin + payroll.
+  const canEditAbsence = identity?.role === "admin" || identity?.role === "payroll";
   const periodsCallFn = useServerFn(listPeriods);
   const periodsQ = useQuery({
     queryKey: ["lohn-periods"],

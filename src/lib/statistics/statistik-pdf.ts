@@ -5,6 +5,8 @@
 
 import type jsPDF from "jspdf";
 import { fmtCents } from "@/lib/format";
+import { leadDelta, previousTrendLabel } from "./comparison-labels";
+import { pickTopTwoByTotal } from "./comparison-core";
 
 export type StatistikPdfData = {
   monthLabel: string;

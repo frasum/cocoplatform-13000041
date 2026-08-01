@@ -31,7 +31,9 @@ describe("buildLohnZip", () => {
   it("bündelt drei Personen mit den buildLohnFileName-Namen", async () => {
     const zip = await buildLohnZip([person("LAM"), person("GERARD"), person("DERAU")]);
     expect(await names(zip)).toEqual(
-      ["LAM", "GERARD", "DERAU"].map((l) => buildLohnFileName(l, "2026-07-01", "2026-07-31")).sort(),
+      ["LAM", "GERARD", "DERAU"]
+        .map((l) => buildLohnFileName(l, "2026-07-01", "2026-07-31"))
+        .sort(),
     );
   });
 

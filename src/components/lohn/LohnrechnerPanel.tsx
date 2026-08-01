@@ -317,32 +317,32 @@ export function LohnrechnerPanel() {
           </h2>
           <div className="flex items-center gap-2">
             <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCsvExport}
-            disabled={uebersichtQ.isLoading || !uebersichtQ.data?.rows.length || exportBlocked}
-            title={exportBlocked ? "Export blockiert — bitte Banner oben prüfen." : undefined}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            CSV exportieren
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZipExport}
-            disabled={
-              uebersichtQ.isLoading ||
-              !uebersichtQ.data?.rows.length ||
-              exportBlocked ||
-              zipProgress != null
-            }
-            title={exportBlocked ? "Export blockiert — bitte Banner oben prüfen." : undefined}
-          >
-            <FileArchive className="mr-2 h-4 w-4" />
-            {zipProgress
-              ? `Exportiere … (${zipProgress.done}/${zipProgress.total})`
-              : "Excel-ZIP exportieren"}
-          </Button>
+              variant="outline"
+              size="sm"
+              onClick={handleCsvExport}
+              disabled={uebersichtQ.isLoading || !uebersichtQ.data?.rows.length || exportBlocked}
+              title={exportBlocked ? "Export blockiert — bitte Banner oben prüfen." : undefined}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              CSV exportieren
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleZipExport}
+              disabled={
+                uebersichtQ.isLoading ||
+                !uebersichtQ.data?.rows.length ||
+                exportBlocked ||
+                zipProgress != null
+              }
+              title={exportBlocked ? "Export blockiert — bitte Banner oben prüfen." : undefined}
+            >
+              <FileArchive className="mr-2 h-4 w-4" />
+              {zipProgress
+                ? `Exportiere … (${zipProgress.done}/${zipProgress.total})`
+                : "Excel-ZIP exportieren"}
+            </Button>
           </div>
         </div>
         {uebersichtQ.isLoading ? (

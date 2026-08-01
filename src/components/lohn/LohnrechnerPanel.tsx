@@ -502,9 +502,23 @@ export function LohnrechnerPanel() {
             </div>
           </Card>
 
+          {canEditAbsence && (
+            <AbsenceDaysCard
+              staffId={staffId}
+              periodStart={fromDate}
+              usedUrlaubTage={result.usedUrlaubTage}
+              usedKrankTage={result.usedKrankTage}
+              estUrlaubTage={result.diagnose.urlaubTage}
+              estKrankTage={result.diagnose.krankTage}
+              onSaved={() => {
+                void qc.invalidateQueries({ queryKey: ["lohn-uebersicht"] });
+                mut.mutate(staffId);
+              }}
+            />
+          )}
+
           <Card className="p-4">
             <h2 className="mb-3 text-base font-semibold">Entgeltzeilen</h2>
-            {/* Platzhalter-Anker: der U/K-Block steht oberhalb (siehe unten). */}
             <Table>
               <TableHeader>
                 <TableRow>

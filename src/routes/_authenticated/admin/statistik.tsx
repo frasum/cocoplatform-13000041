@@ -1510,50 +1510,64 @@ function LocationCompareSection({
                 </Card>
               ) : null}
 
-              {/* Sechs Vergleichskarten */}
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <ComparisonCard
-                  title="Gesamtumsatz"
-                  a={a}
-                  b={b}
-                  valueOf={(r) => r.totalCents}
-                  prevOf={(r) => r.prevTotalCents}
-                />
-                <ComparisonCard
-                  title="Ø Tagesumsatz"
-                  a={a}
-                  b={b}
-                  valueOf={(r) => r.avgDailyCents}
-                  prevOf={(r) => r.prevAvgDailyCents}
-                />
-                <ComparisonCard
-                  title="Lieferumsatz"
-                  a={a}
-                  b={b}
-                  valueOf={(r) => r.takeawayCents}
-                  prevOf={(r) => r.prevTakeawayCents}
-                />
-                <ComparisonCard
-                  title="Service-Trinkgeld"
-                  a={a}
-                  b={b}
-                  valueOf={(r) => r.serviceTipCents}
-                  prevOf={(r) => r.prevServiceTipCents}
-                />
-                <ComparisonCard
-                  title="Küchen-Trinkgeld"
-                  a={a}
-                  b={b}
-                  valueOf={(r) => r.kitchenTipCents}
-                  prevOf={(r) => r.prevKitchenTipCents}
-                />
-                <ComparisonCard
-                  title="Ø Trinkgeld / Tag"
-                  a={a}
-                  b={b}
-                  valueOf={(r) => r.avgTipPerDayCents}
-                  prevOf={(r) => r.prevAvgTipPerDayCents}
-                />
+              {/* Abschnitt 1 — Umsatzvergleich */}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold tracking-tight text-foreground">
+                  Umsatzvergleich
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ComparisonCard
+                    title="Gesamtumsatz"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.totalCents}
+                    prevOf={(r) => r.prevTotalCents}
+                  />
+                  <ComparisonCard
+                    title="Ø Tagesumsatz"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.avgDailyCents}
+                    prevOf={(r) => r.prevAvgDailyCents}
+                  />
+                  <ComparisonCard
+                    title="Lieferumsatz"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.takeawayCents}
+                    prevOf={(r) => r.prevTakeawayCents}
+                  />
+                </div>
+              </div>
+
+              {/* Abschnitt 2 — Trinkgelder */}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold tracking-tight text-foreground">
+                  Trinkgelder
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <ComparisonCard
+                    title="Service-Trinkgeld"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.serviceTipCents}
+                    prevOf={(r) => r.prevServiceTipCents}
+                  />
+                  <ComparisonCard
+                    title="Küchen-Trinkgeld"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.kitchenTipCents}
+                    prevOf={(r) => r.prevKitchenTipCents}
+                  />
+                  <ComparisonCard
+                    title="Ø Trinkgeld / Tag"
+                    a={a}
+                    b={b}
+                    valueOf={(r) => r.avgTipPerDayCents}
+                    prevOf={(r) => r.prevAvgTipPerDayCents}
+                  />
+                </div>
               </div>
 
               {/* STAT2b — Gäste & Personal: Rohsummen mit Anteils-Balken,

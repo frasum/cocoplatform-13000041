@@ -287,7 +287,10 @@ function StatistikPage() {
     !tipsQ.data ||
     !personnelQ.data ||
     compareLoading ||
-    compareError !== null;
+    compareError !== null ||
+    // STAT3 — im Monatsmodus braucht das PDF die MB1-Matrix (Δ Vorjahr,
+    // 13-Monats-Verlauf); ohne sie stünden dort stillschweigend „—".
+    (mode === "month" && !matrixQ.data);
 
   const periodLabel = useMemo(() => {
     if (mode === "month") {

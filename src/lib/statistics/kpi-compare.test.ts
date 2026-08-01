@@ -26,7 +26,7 @@ describe("compareKpi (STAT2b)", () => {
     });
   });
 
-  it("beide null ⇒ zweimal „—" (alles null)", () => {
+  it("beide null ⇒ zweimal Gedankenstrich (alles null)", () => {
     expect(compareKpi(null, null)).toEqual({
       aValue: null,
       bValue: null,

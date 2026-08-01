@@ -200,9 +200,7 @@ export function MonatsentwicklungTab() {
                   onClick={() => setScope(s.locationId)}
                 >
                   {s.locationName}
-                  {s.inactive ? (
-                    <span className="ml-1 text-[10px] opacity-70">inaktiv</span>
-                  ) : null}
+                  {s.inactive ? <span className="ml-1 text-[10px] opacity-70">inaktiv</span> : null}
                 </Button>
               ))}
             </div>

@@ -682,15 +682,6 @@ function AbsenceDaysCard({
   );
 }
 
-function KVUnused({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-border/40 py-1 last:border-b-0">
-      <span className="text-muted-foreground">{k}</span>
-      <span className={"tabular-nums " + (strong ? "font-semibold text-foreground" : "")}>{v}</span>
-    </div>
-  );
-}
-
 /**
  * LG3b A4 — Blocker-Banner. Zeigt fehlende Personalnummern, Bereichs-Sätze
  * und unresolved WZ2-Attributionen; keine Rechenwirkung, nur Anzeige.

@@ -1653,259 +1653,71 @@ function PairSelector({
   );
 }
 
-function ComparisonCard({
-  title,
-  a,
-  b,
-  valueOf,
-}: {
-  title: string;
-  a: CompareLocation;
-  b: CompareLocation;
-  valueOf: (row: CompareLocation) => number;
-}) {
-  const av = valueOf(a);
-  const bv = valueOf(b);
-  const share = shareOf(av, bv);
-  const aPct = Math.round(share * 100);
-  const bPct = 100 - aPct;
-  const aDiff = pctDiff(av, bv);
-  const bDiff = pctDiff(bv, av);
+// ============ STAT2c — Vergleichskarten ============
+//
+// Ehrliche Beschriftung: EIN zentrales Standort-gegen-Standort-Delta mit
+// benanntem Bezug (aus `leadDelta`) plus je Standort eine Trendzeile gegen
+// das eigene Vormonatsfenster (aus `previousTrendLabel`). Die frühere
+// ±-Doppelanzeige je Seite ist entfallen — sie wurde als Vormonatstrend
+// missverstanden.
+
+function LeadDeltaLine({ text, tone }: { text: string; tone: "up" | "down" | "neutral" }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <ComparisonSide name={a.name} value={av} diff={aDiff} align="left" tone="a" />
-          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            VS
-          </div>
-          <ComparisonSide name={b.name} value={bv} diff={bDiff} align="right" tone="b" />
-        </div>
-        <div>
-          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-chart-1"
-              style={{ width: `${aPct}%` }}
-              aria-label={`${a.name} Anteil ${aPct} %`}
-            />
-            <div
-              className="h-full bg-chart-2"
-              style={{ width: `${bPct}%` }}
-              aria-label={`${b.name} Anteil ${bPct} %`}
-            />
-          </div>
-          <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-            <span>{aPct} %</span>
-            <span>{bPct} %</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div
+      className={cn(
+        "rounded-md bg-muted/60 px-2 py-1 text-center text-xs font-medium",
+        tone === "up"
+          ? "text-emerald-700"
+          : tone === "down"
+            ? "text-rose-700"
+            : "text-muted-foreground",
+      )}
+    >
+      {text}
+    </div>
   );
 }
 
-function ComparisonSide({
-  name,
-  value,
-  diff,
-  align,
-  tone,
-}: {
-  name: string;
-  value: number;
-  diff: number | null;
-  align: "left" | "right";
-  tone: "a" | "b";
-}) {
-  const isPos = diff !== null && diff > 0;
-  const isNeg = diff !== null && diff < 0;
-  const badgeCls = cn(
-    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-    isPos
-      ? "bg-emerald-50 text-emerald-700"
-      : isNeg
-        ? "bg-rose-50 text-rose-700"
-        : "bg-muted text-muted-foreground",
-  );
-  const dotCls = tone === "a" ? "bg-chart-1" : "bg-chart-2";
-  const diffLabel =
-    diff === null ? "—" : `${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${Math.abs(diff).toFixed(1)} %`;
+function ShareBar({ a, b, aPct, bPct }: { a: string; b: string; aPct: number; bPct: number }) {
   return (
-    <div className={cn("flex-1 min-w-0", align === "right" ? "text-right" : "text-left")}>
-      <div
-        className={cn(
-          "flex items-center gap-1.5 text-xs text-muted-foreground",
-          align === "right" ? "justify-end" : "",
-        )}
-      >
-        <span className={cn("h-2 w-2 rounded-full", dotCls)} aria-hidden />
-        <span className="truncate">{name}</span>
+    <div>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full bg-chart-1"
+          style={{ width: `${aPct}%` }}
+          aria-label={`${a} Anteil ${aPct} %`}
+        />
+        <div
+          className="h-full bg-chart-2"
+          style={{ width: `${bPct}%` }}
+          aria-label={`${b} Anteil ${bPct} %`}
+        />
       </div>
-      <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">
-        {fmtEuro(value)}
-      </div>
-      <div className={cn("mt-1", align === "right" ? "flex justify-end" : "")}>
-        <span className={badgeCls}>{diffLabel}</span>
+      <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
+        <span>{aPct} %</span>
+        <span>{bPct} %</span>
       </div>
     </div>
   );
 }
 
-// ============ STAT2b — Gäste & Personal ============
-
-/** Arbeitsminuten als Stunden („h"-Format wie im Umsatz-Tab-Panel). */
-function fmtMinutesAsHours(minutes: number): string {
-  return `${(minutes / 60).toFixed(1)} h`;
-}
-
-/**
- * Rohsummen-Vergleich (Gäste, Arbeitsstunden): gleiches Muster wie
- * `ComparisonCard` (Anteils-Balken + pctDiff), aber mit eigener Formatierung —
- * `ComparisonCard` rendert fest in Euro und bleibt unangetastet.
- */
-function SumCompareCard({
-  title,
-  a,
-  b,
-  valueOf,
-  format,
-}: {
-  title: string;
-  a: CompareLocation;
-  b: CompareLocation;
-  valueOf: (row: CompareLocation) => number;
-  format: (value: number) => string;
-}) {
-  const av = valueOf(a);
-  const bv = valueOf(b);
-  const share = shareOf(av, bv);
-  const aPct = Math.round(share * 100);
-  const bPct = 100 - aPct;
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <CompareSide
-            name={a.name}
-            text={format(av)}
-            diff={pctDiff(av, bv)}
-            align="left"
-            tone="a"
-          />
-          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            VS
-          </div>
-          <CompareSide
-            name={b.name}
-            text={format(bv)}
-            diff={pctDiff(bv, av)}
-            align="right"
-            tone="b"
-          />
-        </div>
-        <div>
-          <div className="flex h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full bg-chart-1"
-              style={{ width: `${aPct}%` }}
-              aria-label={`${a.name} Anteil ${aPct} %`}
-            />
-            <div
-              className="h-full bg-chart-2"
-              style={{ width: `${bPct}%` }}
-              aria-label={`${b.name} Anteil ${bPct} %`}
-            />
-          </div>
-          <div className="mt-1 flex justify-between text-[11px] tabular-nums text-muted-foreground">
-            <span>{aPct} %</span>
-            <span>{bPct} %</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/**
- * Dichte-Kennzahlen (€ je Gast, € je Arbeitsstunde): bewusst OHNE
- * Anteils-Balken — ein „Anteil" ist bei Verhältniszahlen irreführend.
- * Wertepaar und Differenz kommen aus `compareKpi`; Nenner-0 ⇒ „—".
- */
-function KpiCompareCard({
-  title,
-  a,
-  b,
-  valueOf,
-}: {
-  title: string;
-  a: CompareLocation;
-  b: CompareLocation;
-  valueOf: (row: CompareLocation) => number | null;
-}) {
-  const c = compareKpi(valueOf(a), valueOf(b));
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-start justify-between gap-3">
-          <CompareSide
-            name={a.name}
-            text={c.aValue === null ? "—" : fmtEuro(c.aValue)}
-            diff={c.aDiffPct}
-            align="left"
-            tone="a"
-          />
-          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            VS
-          </div>
-          <CompareSide
-            name={b.name}
-            text={c.bValue === null ? "—" : fmtEuro(c.bValue)}
-            diff={c.bDiffPct}
-            align="right"
-            tone="b"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Wie `ComparisonSide`, aber mit vorformatiertem Wert-Text. */
+/** Eine Standort-Seite: Name, Wert, Trendzeile gegen das eigene Vormonatsfenster. */
 function CompareSide({
   name,
   text,
-  diff,
+  trendText,
+  trendTone,
   align,
   tone,
 }: {
   name: string;
   text: string;
-  diff: number | null;
+  trendText: string;
+  trendTone: "up" | "down" | "neutral";
   align: "left" | "right";
   tone: "a" | "b";
 }) {
-  const isPos = diff !== null && diff > 0;
-  const isNeg = diff !== null && diff < 0;
-  const badgeCls = cn(
-    "inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium",
-    isPos
-      ? "bg-emerald-50 text-emerald-700"
-      : isNeg
-        ? "bg-rose-50 text-rose-700"
-        : "bg-muted text-muted-foreground",
-  );
   const dotCls = tone === "a" ? "bg-chart-1" : "bg-chart-2";
-  const diffLabel =
-    diff === null ? "—" : `${diff > 0 ? "+" : diff < 0 ? "−" : "±"}${Math.abs(diff).toFixed(1)} %`;
   return (
     <div className={cn("flex-1 min-w-0", align === "right" ? "text-right" : "text-left")}>
       <div
@@ -1918,9 +1730,159 @@ function CompareSide({
         <span className="truncate">{name}</span>
       </div>
       <div className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{text}</div>
-      <div className={cn("mt-1", align === "right" ? "flex justify-end" : "")}>
-        <span className={badgeCls}>{diffLabel}</span>
+      <div
+        className={cn(
+          "mt-1 text-[11px] tabular-nums",
+          trendTone === "up"
+            ? "text-emerald-700"
+            : trendTone === "down"
+              ? "text-rose-700"
+              : "text-muted-foreground",
+        )}
+      >
+        {trendText}
       </div>
     </div>
   );
+}
+
+/** Euro-Vergleich (Umsatz, Trinkgeld) mit Anteils-Balken. */
+function ComparisonCard({
+  title,
+  a,
+  b,
+  valueOf,
+  prevOf,
+}: {
+  title: string;
+  a: CompareLocation;
+  b: CompareLocation;
+  valueOf: (row: CompareLocation) => number;
+  prevOf: (row: CompareLocation) => number | null;
+}) {
+  return (
+    <SumCompareCard title={title} a={a} b={b} valueOf={valueOf} prevOf={prevOf} format={fmtEuro} />
+  );
+}
+
+/** Summen-Vergleich mit eigener Formatierung (Euro, Gäste, Stunden). */
+function SumCompareCard({
+  title,
+  a,
+  b,
+  valueOf,
+  prevOf,
+  format,
+}: {
+  title: string;
+  a: CompareLocation;
+  b: CompareLocation;
+  valueOf: (row: CompareLocation) => number;
+  prevOf: (row: CompareLocation) => number | null;
+  format: (value: number) => string;
+}) {
+  const av = valueOf(a);
+  const bv = valueOf(b);
+  const aPct = Math.round(shareOf(av, bv) * 100);
+  const lead = leadDelta({ aName: a.name, bName: b.name, aValue: av, bValue: bv });
+  const aTrend = previousTrendLabel(av, prevOf(a), a.previousRange, { partial: a.previousPartial });
+  const bTrend = previousTrendLabel(bv, prevOf(b), b.previousRange, { partial: b.previousPartial });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <CompareSide
+            name={a.name}
+            text={format(av)}
+            trendText={aTrend.text}
+            trendTone={aTrend.tone}
+            align="left"
+            tone="a"
+          />
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            VS
+          </div>
+          <CompareSide
+            name={b.name}
+            text={format(bv)}
+            trendText={bTrend.text}
+            trendTone={bTrend.tone}
+            align="right"
+            tone="b"
+          />
+        </div>
+        <LeadDeltaLine text={lead.text} tone={lead.tone} />
+        <ShareBar a={a.name} b={b.name} aPct={aPct} bPct={100 - aPct} />
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Dichte-Kennzahlen (€ je Gast, € je Arbeitsstunde): bewusst OHNE
+ * Anteils-Balken — ein „Anteil" ist bei Verhältniszahlen irreführend.
+ * Wertepaar kommt aus `compareKpi`; Nenner-0 ⇒ „—".
+ */
+function KpiCompareCard({
+  title,
+  a,
+  b,
+  valueOf,
+  prevOf,
+}: {
+  title: string;
+  a: CompareLocation;
+  b: CompareLocation;
+  valueOf: (row: CompareLocation) => number | null;
+  prevOf: (row: CompareLocation) => number | null;
+}) {
+  const c = compareKpi(valueOf(a), valueOf(b));
+  const lead = leadDelta({ aName: a.name, bName: b.name, aValue: c.aValue, bValue: c.bValue });
+  const aTrend = previousTrendLabel(c.aValue, prevOf(a), a.previousRange, {
+    partial: a.previousPartial,
+  });
+  const bTrend = previousTrendLabel(c.bValue, prevOf(b), b.previousRange, {
+    partial: b.previousPartial,
+  });
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <CompareSide
+            name={a.name}
+            text={c.aValue === null ? "—" : fmtEuro(c.aValue)}
+            trendText={aTrend.text}
+            trendTone={aTrend.tone}
+            align="left"
+            tone="a"
+          />
+          <div className="mt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            VS
+          </div>
+          <CompareSide
+            name={b.name}
+            text={c.bValue === null ? "—" : fmtEuro(c.bValue)}
+            trendText={bTrend.text}
+            trendTone={bTrend.tone}
+            align="right"
+            tone="b"
+          />
+        </div>
+        <LeadDeltaLine text={lead.text} tone={lead.tone} />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============ STAT2b — Gäste & Personal ============
+
+/** Arbeitsminuten als Stunden („h"-Format wie im Umsatz-Tab-Panel). */
+function fmtMinutesAsHours(minutes: number): string {
+  return `${(minutes / 60).toFixed(1)} h`;
 }

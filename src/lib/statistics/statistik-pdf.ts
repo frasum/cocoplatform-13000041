@@ -25,7 +25,7 @@ export type StatistikPdfData = {
   /** Erstellungsdatum, klein im Kopf. */
   generatedAtLabel: string;
   /**
-   * true = Kalendermonat-Modus. Nur dann tragen Δ Vorjahr, Δ Vormonat und der
+   * true = Kalendermonat-Modus. Nur dann tragen die Vorjahres-/Vormonatsspalten und der
    * 13-Monats-Verlauf; im freien Zeitraum stehen „—" bzw. entfällt Grafik B.
    */
   calendarMonth: boolean;
@@ -119,10 +119,11 @@ export function fmtPctDe(pct: number | null | undefined): string {
   return `${pct.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
 }
 
-/** STAT3 — vorzeichenbehaftetes Delta: „+3,4 %", „−12,1 %", „±0,0 %". */
+/** STAT3 — vorzeichenbehaftetes Delta: „+3,4 %", „-12,1 %", „±0,0 %". */
 export function fmtDeltaPctDe(pct: number | null | undefined): string {
   if (pct === null || pct === undefined || !Number.isFinite(pct)) return "—";
-  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "±";
+  // ASCII-Minus: die jsPDF-Standardschrift (WinAnsi) kennt U+2212 nicht.
+  const sign = pct > 0 ? "+" : pct < 0 ? "-" : "±";
   return `${sign}${fmtPctDe(Math.abs(pct))}`;
 }
 
@@ -292,8 +293,8 @@ export async function generateStatistikPdf(
         [
           "Standort",
           "Umsatz",
-          "Δ Vorjahr",
-          "Δ Vormonat",
+          "vs. Vorjahr",
+          "vs. Vormonat",
           "Trinkgeld ges.",
           "Quote",
           "Netto-Std.",
@@ -366,7 +367,12 @@ export async function generateStatistikPdf(
   doc.text("Tagesumsatz", marginX, cursorY);
   cursorY += 6;
   const axisW = 42;
-  const chartA: ChartArea = { x: marginX + axisW, y: cursorY, width: usable - axisW, height: 78 };
+  const chartA: ChartArea = {
+    x: marginX + axisW,
+    y: cursorY,
+    width: usable - axisW,
+    height: 120,
+  };
   if (data.dailyRevenue.length === 0) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
@@ -413,7 +419,12 @@ export async function generateStatistikPdf(
     doc.setFont("helvetica", "bold");
     doc.text("13-Monats-Verlauf", marginX, cursorY);
     cursorY += 6;
-    const chartB: ChartArea = { x: marginX + axisW, y: cursorY, width: usable - axisW, height: 78 };
+    const chartB: ChartArea = {
+      x: marginX + axisW,
+      y: cursorY,
+      width: usable - axisW,
+      height: 120,
+    };
     const geo = lineChartGeometry(mv.series, chartB, { tickCount: 3 });
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
@@ -445,11 +456,19 @@ export async function generateStatistikPdf(
         prev = p;
       }
       doc.setLineWidth(0.5);
-      // Legende rechts oben in Reihenfarbe.
-      doc.setFontSize(6.5);
-      doc.text(s.name, chartB.x + chartB.width, chartB.y - 2 - si * 8, { align: "right" });
-      doc.setTextColor(20);
     });
+    // Legende in der Titelzeile (Punkt + Name), damit sie die Fläche nicht überdeckt.
+    doc.setFontSize(6.5);
+    let legendX = marginX + 90;
+    geo.series.forEach((s, si) => {
+      const color = palette[si % palette.length]!;
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.circle(legendX, chartB.y - 8, 1.8, "F");
+      doc.setTextColor(60);
+      doc.text(s.name, legendX + 4, chartB.y - 6);
+      legendX += 12 + doc.getTextWidth(s.name);
+    });
+    doc.setTextColor(20);
     doc.setDrawColor(200);
     doc.setFontSize(5.5);
     doc.setTextColor(90);
@@ -476,7 +495,7 @@ export async function generateStatistikPdf(
     );
   }
   if (!cmp) {
-    notes.push("Freier Zeitraum: Δ Vorjahr/Δ Vormonat und der Monatsverlauf entfallen.");
+    notes.push("Freier Zeitraum: Vorjahres-/Vormonatsvergleich und der Monatsverlauf entfallen.");
   }
   for (const note of notes) {
     const lines = doc.splitTextToSize(note, usable);

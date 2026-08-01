@@ -116,8 +116,31 @@ export type StatistikPdfData = {
   }>;
 };
 
-function fmtEur(cents: number): string {
+/** Centgenaues Euro-Format — bleibt für Tests/andere Verbraucher bestehen. */
+export function fmtEur(cents: number): string {
   return `${fmtCents(cents)} €`;
+}
+
+/**
+ * STAT3d — PDF-Präsentation: Euro-Beträge kaufmännisch auf ganze Euro (Tausenderpunkt).
+ * Reine Formatschicht: es wird nichts nachjustiert, jede Zahl einzeln aus dem
+ * centgenauen Wert gerundet — die Fußnote trägt die ±1-€-Differenz.
+ * Quoten und Deltas behalten bewusst ihre Nachkommastelle, weil sonst z. B. die
+ * TG-Quoten-Aussage (8,9 vs. 9,0) im PDF verschwinden würde.
+ */
+export function fmtEurRounded(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined || !Number.isFinite(cents)) return "—";
+  const euro = cents / 100;
+  // Kaufmännisch, symmetrisch: ,50 immer weg von der Null (2,50 → 3; -2,50 → -3).
+  const rounded = Math.sign(euro) * Math.round(Math.abs(euro));
+  return `${rounded.toLocaleString("de-DE", { maximumFractionDigits: 0 })} €`;
+}
+
+/** STAT3d — Stunden im PDF ohne Nachkommastellen: „5.464 h". */
+export function fmtHoursRoundedDe(h: number | null | undefined): string {
+  if (h === null || h === undefined || !Number.isFinite(h)) return "—";
+  const rounded = Math.sign(h) * Math.round(Math.abs(h));
+  return `${rounded.toLocaleString("de-DE", { maximumFractionDigits: 0 })} h`;
 }
 
 /**

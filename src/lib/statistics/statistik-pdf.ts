@@ -16,6 +16,7 @@ import {
   barChartGeometry,
   formatTsd,
   lineChartGeometry,
+  stackedBarChartGeometry,
   type ChartArea,
 } from "./statistik-pdf-charts";
 import type { TakeawayMatrix } from "./takeaway-channels";
@@ -68,8 +69,17 @@ export type StatistikPdfData = {
     ratioPct: number | null;
     staffWithoutRateNames: string[];
   };
-  /** Grafik A — Tagesumsätze des Berichtszeitraums (Gesamt je Geschäftstag). */
-  dailyRevenue: Array<{ businessDate: string; totalCents: number }>;
+  /**
+   * Grafik A — Tagesumsätze des Berichtszeitraums (Gesamt je Geschäftstag).
+   * STAT3c: im Scope „Alle Standorte" trägt jeder Tag zusätzlich die
+   * Standort-Anteile (`byLocation`); daraus werden gestapelte Balken. Fehlt das
+   * Feld (Einzelstandort), bleibt der Balken einfarbig.
+   */
+  dailyRevenue: Array<{
+    businessDate: string;
+    totalCents: number;
+    byLocation?: Array<{ name: string; cents: number }>;
+  }>;
   /** STAT2 — Kennzahlen der Kacheln; Werte kommen fertig aus `derivedKpis`. */
   guestHours?: {
     guestTotal: number;

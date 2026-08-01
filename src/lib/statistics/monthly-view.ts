@@ -27,10 +27,7 @@ export function cellValueCents(cell: MonthlyCell | null, mode: MonthlyViewMode):
  * Takeaway-Wert als `totalCents`, Zellen ohne Takeaway-Wert fallen weg.
  * So rechnen YoY/YTD im TA-Modus nur über vorhandene Werte.
  */
-export function projectCells(
-  cells: readonly MonthlyCell[],
-  mode: MonthlyViewMode,
-): MonthlyCell[] {
+export function projectCells(cells: readonly MonthlyCell[], mode: MonthlyViewMode): MonthlyCell[] {
   if (mode === "total") return [...cells];
   return cells
     .filter((c) => c.takeawayCents !== null)

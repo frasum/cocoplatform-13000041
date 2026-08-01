@@ -421,8 +421,9 @@ function StatistikPage() {
         </p>
       </div>
 
-      <Card className="p-3">
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+      {activeTab === "monat" ? null : (
+        <Card className="p-3">
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <div className="space-y-1">
             <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Ansicht
@@ -521,20 +522,21 @@ function StatistikPage() {
               />
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="ml-auto h-10"
-            onClick={handleExport}
-            disabled={exportDisabled}
-          >
-            <Download className="h-4 w-4" />
-            PDF
-          </Button>
-        </div>
-      </Card>
+            <Button
+              type="button"
+              variant="outline"
+              className="ml-auto h-10"
+              onClick={handleExport}
+              disabled={exportDisabled}
+            >
+              <Download className="h-4 w-4" />
+              PDF
+            </Button>
+          </div>
+        </Card>
+      )}
 
-      <Tabs defaultValue="umsatz" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex h-auto flex-wrap">
           <TabsTrigger value="umsatz">Umsatz</TabsTrigger>
           <TabsTrigger value="trinkgeld">Trinkgeld</TabsTrigger>
@@ -580,7 +582,8 @@ function StatistikPage() {
         </TabsContent>
         <TabsContent value="monat">
           {/* MB1 — eigener Datenpfad (24-Jahre-Historie), unabhängig vom
-              Monats-/Zeitraum-Filter oben. */}
+              Monats-/Zeitraum-Filter oben; deshalb ist die globale Filterleiste
+              in diesem Tab ausgeblendet (MB3b). */}
           <MonatsentwicklungTab />
         </TabsContent>
       </Tabs>

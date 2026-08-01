@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { sumGuestsByDate } from "./revenue-core";
 
 describe("sumGuestsByDate (STAT2)", () => {
-  it("summiert mehrere Sessions am selben Tag (zwei Standorte, Filter „alle")", () => {
+  it("summiert mehrere Sessions am selben Tag (zwei Standorte, Filter alle)", () => {
     const { byDate, total } = sumGuestsByDate([
       { businessDate: "2026-07-01", guestCount: 42 }, // Spicery
       { businessDate: "2026-07-01", guestCount: 18 }, // TSB

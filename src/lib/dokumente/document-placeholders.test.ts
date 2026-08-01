@@ -3,6 +3,9 @@ import {
   buildPlaceholderData,
   fillTemplate,
   listPlaceholdersInTemplate,
+  resolveVorgangValues,
+  vorgangPlaceholdersInTemplate,
+  VORGANG_PLACEHOLDERS,
   type PlaceholderInput,
 } from "./document-placeholders";
 

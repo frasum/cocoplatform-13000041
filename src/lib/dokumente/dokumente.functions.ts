@@ -352,13 +352,9 @@ export const saveGeneratedDocument = createServerFn({ method: "POST" })
       // DL2 — Vorgangs-Platzhalter sind Pflicht: ohne Wert kein Dokument.
       const requiredVorgang = vorgangPlaceholdersInTemplate(tpl.content);
       if (requiredVorgang.length > 0) {
-        const stillOpen = requiredVorgang.filter((p) =>
-          data.content.includes(`{{${p.key}}}`),
-        );
+        const stillOpen = requiredVorgang.filter((p) => data.content.includes(`{{${p.key}}}`));
         if (stillOpen.length > 0) {
-          throw new Error(
-            `Pflichtangabe fehlt: ${stillOpen.map((p) => p.label).join(", ")}`,
-          );
+          throw new Error(`Pflichtangabe fehlt: ${stillOpen.map((p) => p.label).join(", ")}`);
         }
       }
 

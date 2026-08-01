@@ -261,6 +261,10 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       summary: cur.summary,
       takeawayByChannel: cur.takeawayByChannel,
       takeawayComponents: cur.takeawayComponents,
+      // STAT3b — Kanal-Bestandteile des (ggf. U5a-geklemmten) Vorfensters.
+      // `loadWindow` berechnet sie ohnehin; hier wird nur zurückgegeben.
+      previousTakeawayComponents: prev ? prev.takeawayComponents : null,
+      previousWoltInfoCents: prev ? prev.summary.woltInfoCents : null,
       // STAT2 — Summen für die Kacheln „Ø Umsatz je Gast" / „je Arbeitsstunde".
       guestTotal: cur.guestTotal,
       workMinutesTotal: cur.workMinutesTotal,

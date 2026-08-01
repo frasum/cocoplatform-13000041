@@ -311,6 +311,46 @@ export function MonatsentwicklungTab() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
+            {takeaway ? "Jahresverlauf — Takeaway" : "Jahresverlauf"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-[340px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+              <YAxis
+                tick={{ fontSize: 12 }}
+                tickFormatter={(v: number) => `${Math.round(v / 1000)} T€`}
+              />
+              <Tooltip
+                formatter={(v: number | string) =>
+                  typeof v === "number" ? fmtEuro(v * 100) : String(v)
+                }
+              />
+              <Legend />
+              {chartYears.map((year, idx) => (
+                <Line
+                  key={year}
+                  type="monotone"
+                  dataKey={String(year)}
+                  name={String(year)}
+                  stroke={
+                    year === currentYear ? "var(--primary)" : YEAR_COLORS[idx % YEAR_COLORS.length]
+                  }
+                  strokeWidth={year === currentYear ? 3 : 1.5}
+                  dot={false}
+                  connectNulls
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">
             {takeaway ? "Takeaway-Umsätze in T€" : "Monatsumsätze in T€"}
           </CardTitle>
         </CardHeader>
@@ -371,46 +411,6 @@ export function MonatsentwicklungTab() {
               ? " Takeaway ist Teilmenge des Gesamtumsatzes; leere Zellen bedeuten keine Takeaway-Daten (Historie erst ab 2021)."
               : ""}
           </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            {takeaway ? "Jahresverlauf — Takeaway" : "Jahresverlauf"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="h-[340px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis
-                tick={{ fontSize: 12 }}
-                tickFormatter={(v: number) => `${Math.round(v / 1000)} T€`}
-              />
-              <Tooltip
-                formatter={(v: number | string) =>
-                  typeof v === "number" ? fmtEuro(v * 100) : String(v)
-                }
-              />
-              <Legend />
-              {chartYears.map((year, idx) => (
-                <Line
-                  key={year}
-                  type="monotone"
-                  dataKey={String(year)}
-                  name={String(year)}
-                  stroke={
-                    year === currentYear ? "var(--primary)" : YEAR_COLORS[idx % YEAR_COLORS.length]
-                  }
-                  strokeWidth={year === currentYear ? 3 : 1.5}
-                  dot={false}
-                  connectNulls
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>

@@ -6,20 +6,21 @@
  * (Server-Fn, sessions/revenue_channels/session_channel_amounts) lebt
  * außerhalb und speist diese Funktionen mit bereits normalisierten Inputs.
  *
- * Verifizierte Umsatzdefinition (an echten COCO-Daten bestätigt):
- * - Kanäle sind disjunkte Zeilen (kein verschachteltes Summieren).
- * - Haus    = vectronCents + Σ(Kanäle mit isTakeaway=false)
- * - Takeaway= Σ(Kanäle mit isTakeaway=true)
- * - Gesamt  = Haus + Takeaway
+ * STAT1 — Umsatzdefinition (N14-Zerlegung, Fachentscheidung Frank 13.07.,
+ * einzige Wahrheit für Statistik UND Kasse). Kanäle sind KEINE additiven
+ * disjunkten Zeilen: `delivery_vectron` (Marker) und `delivery_souse` sind
+ * Teilmengen des Vectron-Tagesumsatzes und werden abgezogen, `delivery_wolt`
+ * steckt bereits im Marker (reine Info, nie Summand). `pos` ist eine
+ * additive Zweitkasse (TSB).
  *
- * TSB-Hinweis (offen, NICHT als Sonderlogik hier abbilden): TSB hat
- * zusätzlich einen `pos`-Kanal „Kasse". Ob TSB `vectronCents` UND diesen
- * Kanal gleichzeitig füllt, ist noch zu verifizieren. Diese reine Funktion
- * summiert nur, was sie bekommt — die Server-Fn muss TSB später korrekt
- * einspeisen (nie doppelt).
+ *   Gesamt   = vectronCents + posSum
+ *   Takeaway = min(vectronCents, markerSum + souseSum)   // Guard: Haus ≥ 0
+ *   Haus     = Gesamt − Takeaway
+ *
+ * Unbekannte/leere `kind` werfen absichtlich — kein stilles No-op.
  */
 
-export type ChannelAmount = { amountCents: number; isTakeaway: boolean };
+export type ChannelAmount = { kind: string; amountCents: number };
 
 export type SessionRevenueInput = {
   sessionId: string;
@@ -33,6 +34,8 @@ export type SessionRevenue = {
   houseCents: number;
   takeawayCents: number;
   totalCents: number;
+  /** Nur Anzeige („davon Wolt") — nie Summand. */
+  woltInfoCents: number;
 };
 
 export type DailyRevenue = {
@@ -40,6 +43,7 @@ export type DailyRevenue = {
   houseCents: number;
   takeawayCents: number;
   totalCents: number;
+  woltInfoCents: number;
   cardCents: number;
   sessionCount: number;
 };
@@ -48,6 +52,7 @@ export type PeriodSummary = {
   houseCents: number;
   takeawayCents: number;
   totalCents: number;
+  woltInfoCents: number;
   daysWithRevenue: number; // Tage mit totalCents > 0
 };
 
@@ -56,21 +61,67 @@ export type Trend = {
   pct: number | null; // null, wenn previous === 0 (kein definierter Prozentwert)
 };
 
-export function sessionRevenue(input: SessionRevenueInput): SessionRevenue {
-  let houseChannelCents = 0;
-  let takeawayCents = 0;
-  for (const ch of input.channels) {
-    if (ch.isTakeaway) {
-      takeawayCents += ch.amountCents;
-    } else {
-      houseChannelCents += ch.amountCents;
+/**
+ * STAT1 — Kernzerlegung (KGL). Einzige Stelle, an der Vectron-Betrag und
+ * Kanal-`kind` zu Gesamt/Takeaway/Haus verrechnet werden.
+ */
+export type RevenueDecomposition = {
+  posSum: number;
+  markerSum: number;
+  souseSum: number;
+  woltSum: number;
+  totalCents: number;
+  takeawayCents: number;
+  houseCents: number;
+};
+
+export function decomposeRevenue(input: {
+  vectronCents: number;
+  channels: readonly { kind: string; amountCents: number }[];
+}): RevenueDecomposition {
+  let posSum = 0;
+  let markerSum = 0;
+  let souseSum = 0;
+  let woltSum = 0;
+  for (const c of input.channels) {
+    switch (c.kind) {
+      case "pos":
+        posSum += c.amountCents;
+        break;
+      case "delivery_vectron":
+        markerSum += c.amountCents;
+        break;
+      case "delivery_souse":
+        souseSum += c.amountCents;
+        break;
+      case "delivery_wolt":
+        // Reine Info: steckt bereits im delivery_vectron-Marker.
+        woltSum += c.amountCents;
+        break;
+      default:
+        throw new Error(`decomposeRevenue: unbekannter kind "${c.kind}"`);
     }
   }
-  const houseCents = input.vectronCents + houseChannelCents;
+  const totalCents = input.vectronCents + posSum;
+  const takeawayCents = Math.min(input.vectronCents, markerSum + souseSum);
   return {
-    houseCents,
+    posSum,
+    markerSum,
+    souseSum,
+    woltSum,
+    totalCents,
     takeawayCents,
-    totalCents: houseCents + takeawayCents,
+    houseCents: totalCents - takeawayCents,
+  };
+}
+
+export function sessionRevenue(input: SessionRevenueInput): SessionRevenue {
+  const d = decomposeRevenue({ vectronCents: input.vectronCents, channels: input.channels });
+  return {
+    houseCents: d.houseCents,
+    takeawayCents: d.takeawayCents,
+    totalCents: d.totalCents,
+    woltInfoCents: d.woltSum,
   };
 }
 
@@ -87,44 +138,16 @@ export function isTakeawayKind(kind: string): boolean {
 }
 
 /**
- * Reiner Helfer für Kassen-UI/PDF/Print (N14, N14b — Kanal-Modell 19.07.):
- * `vectronCents` ist der komplette Vectron-Tagesregisterumsatz und enthält
- * Wolt und SoUse bereits, weil beide an der Vectron gebont werden. Der
- * Marker `delivery_vectron` deckt den eigenen Vectron-Außer-Haus-Anteil
- * PLUS die Wolt-Beträge ab; `delivery_souse` markiert SoUse separat und
- * ist NICHT in `delivery_vectron` enthalten. `delivery_wolt` wird deshalb
- * NICHT abgezogen — der Wolt-Anteil steckt bereits in `delivery_vectron`
- * und ein weiterer Abzug wäre Doppelabzug. `pos` bleibt Haus (TSB).
- * Unbekannte/leere `kind` werfen absichtlich — kein stilles No-op.
- * `sessionRevenue` (Statistik-Modell) bleibt unangetastet.
+ * Reiner Helfer für Kassen-UI/PDF/Print (N14, N14b — Kanal-Modell 19.07.).
+ * Seit STAT1 nur noch dünne Hülle über `decomposeRevenue` — Kasse und
+ * Statistik dürfen hier nicht auseinanderlaufen. Ergebnis unverändert:
+ * posSum + max(0, vectron − marker − souse).
  */
 export function sessionHouseCentsFromKasse(input: {
   vectronCents: number;
   channels: { kind: string; amountCents: number }[];
 }): number {
-  let posSum = 0;
-  let vectronMarkerSum = 0;
-  let souseSum = 0;
-  for (const c of input.channels) {
-    switch (c.kind) {
-      case "pos":
-        posSum += c.amountCents;
-        break;
-      case "delivery_vectron":
-        vectronMarkerSum += c.amountCents;
-        break;
-      case "delivery_souse":
-        souseSum += c.amountCents;
-        break;
-      case "delivery_wolt":
-        // Bewusst kein Abzug: Wolt steckt bereits im delivery_vectron-Marker.
-        break;
-      default:
-        throw new Error(`sessionHouseCentsFromKasse: unbekannter kind "${c.kind}"`);
-    }
-  }
-  const vectronHouse = Math.max(0, input.vectronCents - vectronMarkerSum - souseSum);
-  return posSum + vectronHouse;
+  return decomposeRevenue(input).houseCents;
 }
 
 export function aggregateByBusinessDate(
@@ -145,6 +168,7 @@ export function aggregateByBusinessDate(
       existing.houseCents += rev.houseCents;
       existing.takeawayCents += rev.takeawayCents;
       existing.totalCents += rev.totalCents;
+      existing.woltInfoCents += rev.woltInfoCents;
       existing.cardCents += card;
       existing.sessionCount += 1;
     } else {
@@ -153,6 +177,7 @@ export function aggregateByBusinessDate(
         houseCents: rev.houseCents,
         takeawayCents: rev.takeawayCents,
         totalCents: rev.totalCents,
+        woltInfoCents: rev.woltInfoCents,
         cardCents: card,
         sessionCount: 1,
       });
@@ -167,14 +192,16 @@ export function summarize(daily: DailyRevenue[]): PeriodSummary {
   let houseCents = 0;
   let takeawayCents = 0;
   let totalCents = 0;
+  let woltInfoCents = 0;
   let daysWithRevenue = 0;
   for (const d of daily) {
     houseCents += d.houseCents;
     takeawayCents += d.takeawayCents;
     totalCents += d.totalCents;
+    woltInfoCents += d.woltInfoCents;
     if (d.totalCents > 0) daysWithRevenue += 1;
   }
-  return { houseCents, takeawayCents, totalCents, daysWithRevenue };
+  return { houseCents, takeawayCents, totalCents, woltInfoCents, daysWithRevenue };
 }
 
 export function computeTrend(currentCents: number, previousCents: number): Trend {

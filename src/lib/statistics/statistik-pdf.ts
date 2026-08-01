@@ -342,31 +342,55 @@ export async function generateStatistikPdf(
   });
   cursorY = lastY(doc) + 12;
 
-  doc.setFontSize(8);
+  // ── STAT3b — Take-Away-Kanäle (je Standort, Gesamt, Δ Vorperiode) ───────
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("Umsatzaufteilung", marginX, cursorY);
+  doc.text("Take-Away-Kanäle", marginX, cursorY);
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  const segLine =
-    data.takeawaySegments.length === 0
-      ? "keine Take-Away-Umsätze im Zeitraum"
-      : data.takeawaySegments.map((s) => `${s.name} ${fmtEur(s.amountCents)}`).join(" · ");
-  // Umbruch statt Überlauf: bei vielen Take-Away-Kanälen wird die Zeile lang.
-  const splitX = marginX + 74;
-  const splitLines = doc.splitTextToSize(
+  const headLine = doc.splitTextToSize(
     `Haus ${fmtEur(data.revenue.houseCents)} · Takeaway ${fmtEur(
       data.revenue.takeawayCents,
-    )} · ${segLine}`,
-    marginX + usable - splitX,
+    )} (Anteil ${fmtPctDe(data.takeawaySharePct)})`,
+    usable - 90,
   );
-  doc.text(splitLines, splitX, cursorY);
-  cursorY += 11 + (splitLines.length - 1) * 9;
-  if (data.takeawaySegmentsWarning) {
+  doc.text(headLine, marginX + 90, cursorY);
+  const tw = data.takeaway;
+  const twRow = (r: (typeof tw)["rows"][number]): string[] => [
+    r.name,
+    ...r.perLocationCents.map((c) => fmtEur(c)),
+    fmtEur(r.totalCents),
+    fmtPctDe(r.sharePct),
+    fmtDeltaPctDe(r.deltaPct),
+  ];
+  const twBody = [...tw.rows.map(twRow), twRow(tw.sum)];
+  autoTable(doc, {
+    startY: cursorY + 5,
+    margin: { left: marginX, right: marginX },
+    styles: { fontSize: 7.5, cellPadding: 3, overflow: "visible", halign: "right" },
+    headStyles: { fillColor: [230, 230, 230], textColor: 20, fontSize: 7, halign: "right" },
+    columnStyles: {
+      0: { cellWidth: 116, halign: "left", fontStyle: "bold" },
+    },
+    head: [["Kanal", ...tw.locationNames, "Gesamt", "Anteil", "vs. Vorperiode"]],
+    body: twBody,
+    didParseCell: (hook) => {
+      if (hook.section === "body" && hook.row.index === twBody.length - 1) {
+        hook.cell.styles.fontStyle = "bold";
+      }
+      if (hook.section === "head" && hook.column.index === 0) {
+        hook.cell.styles.halign = "left";
+      }
+    },
+    theme: "grid",
+  });
+  cursorY = lastY(doc) + 10;
+  if (tw.warning) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
-    doc.text(data.takeawaySegmentsWarning, marginX, cursorY);
+    doc.text(tw.warning, marginX, cursorY);
     cursorY += 10;
   }
-  cursorY += 6;
 
   // ── Grafik A — Tagesumsatz-Balken ───────────────────────────────────────
   doc.setFontSize(10);
@@ -378,7 +402,7 @@ export async function generateStatistikPdf(
     x: marginX + axisW,
     y: cursorY,
     width: usable - axisW,
-    height: 120,
+    height: 100,
   };
   if (data.dailyRevenue.length === 0) {
     doc.setFontSize(8);
@@ -430,7 +454,7 @@ export async function generateStatistikPdf(
       x: marginX + axisW,
       y: cursorY,
       width: usable - axisW,
-      height: 120,
+      height: 100,
     };
     const geo = lineChartGeometry(mv.series, chartB, { tickCount: 3 });
     doc.setFontSize(6.5);

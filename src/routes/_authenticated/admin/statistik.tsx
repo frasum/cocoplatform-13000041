@@ -972,6 +972,9 @@ function PersonnelView({
   const netHours = personnel.totals.netHours;
   const revPerHourCents = netHours > 0 ? Math.round(revenue.summary.totalCents / netHours) : null;
   const trend = personnel.trend;
+  const cmp = formatComparisonRange(personnel.previousRange, {
+    partial: personnel.coverage.isPartial,
+  });
 
   if (netHours === 0) {
     return (
@@ -995,11 +998,13 @@ function PersonnelView({
           unit="hours"
           value={netHours}
           trendRenderer={() => <TrendLineHours trend={trend?.hours ?? null} />}
+          comparisonLabel={cmp}
         />
         <KpiCard
           title="Basis-Lohnkosten"
           cents={personnel.totals.laborCostCents}
           trend={trend?.cost ?? null}
+          comparisonLabel={cmp}
         />
         <KpiCard
           title="Umsatz / Stunde"

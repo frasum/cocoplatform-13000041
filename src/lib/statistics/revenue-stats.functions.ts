@@ -12,9 +12,9 @@
 // Monatsende), nicht die 26.–25.-Abrechnungsperiode. Lohn/Zeit nutzen
 // weiterhin `periods`. Diese Fn berührt `periods` NICHT.
 //
-// TSB-Verifikationspunkt (offen): vectron + `pos`-Kanal „Kasse" eventuell
-// gleichzeitig befüllt → doppelte Zählung. Diese Fn behandelt das NICHT
-// speziell; sie summiert nur, was die DB liefert.
+// STAT1: Die Umsatzableitung liegt vollständig in `decomposeRevenue`
+// (N14-Zerlegung). Diese Fn liefert nur Kanal-`kind` + Betrag zu; TSB-`pos`
+// ist dort als additive Zweitkasse abgebildet, Marker/SoUse als Abzug.
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
@@ -44,7 +44,7 @@ const MONTH_RE = /^\d{4}-\d{2}$/;
 type ChannelAmountQueryRow = {
   session_id: string;
   amount_cents: number;
-  revenue_channels: { is_takeaway: boolean; label: string } | null;
+  revenue_channels: { kind: string; label: string } | null;
 };
 
 type Window = { startDate: string; endDate: string };
@@ -130,12 +130,9 @@ export const getRevenueStats = createServerFn({ method: "GET" })
       const cardBySession = new Map<string, number>();
       if (sessions.length > 0) {
         const ids = sessions.map((s) => s.id);
-        // TSB-Hinweis (offen): pos-Kanal „Kasse" wird hier mitgeliefert, falls
-        // er existiert; doppelte Zählung mit vectronCents ist nicht
-        // ausgeschlossen, bis TSB-Daten verifiziert sind.
         const { data: chRows, error: chErr } = await supabaseAdmin
           .from("session_channel_amounts")
-          .select("session_id, amount_cents, revenue_channels(is_takeaway, label)")
+          .select("session_id, amount_cents, revenue_channels(kind, label)")
           .eq("organization_id", org)
           .in("session_id", ids)
           .returns<ChannelAmountQueryRow[]>();
@@ -143,12 +140,15 @@ export const getRevenueStats = createServerFn({ method: "GET" })
         channels = (chRows ?? []).map((r) => ({
           sessionId: r.session_id,
           amountCents: r.amount_cents,
-          isTakeaway: r.revenue_channels?.is_takeaway ?? false,
+          kind: r.revenue_channels?.kind ?? "",
         }));
         for (const r of chRows ?? []) {
-          if (r.revenue_channels?.is_takeaway) {
+          // STAT1: Donut-Segmente = Marker + SoUse. `delivery_wolt` steckt
+          // im Marker und ist reine Info (siehe `woltInfoCents`).
+          const kind = r.revenue_channels?.kind;
+          if (kind === "delivery_vectron" || kind === "delivery_souse") {
             takeawayRaw.push({
-              name: r.revenue_channels.label,
+              name: r.revenue_channels?.label ?? kind,
               amountCents: r.amount_cents,
             });
           }

@@ -62,7 +62,15 @@ describe("mapTimeEntryRows", () => {
   it("überspringt Zeilen ohne Pflichtfelder", () => {
     expect(
       mapTimeEntryRows(
-        [{ staff_id: null, business_date: null, started_at: null, ended_at: null, break_minutes: 0 }],
+        [
+          {
+            staff_id: null,
+            business_date: null,
+            started_at: null,
+            ended_at: null,
+            break_minutes: 0,
+          },
+        ],
         true,
       ),
     ).toEqual([]);

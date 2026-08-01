@@ -239,8 +239,7 @@ export function derivedKpis(input: {
   const minutes = input.workMinutes > 0 ? input.workMinutes : 0;
   return {
     revenuePerGuestCents: guests === 0 ? null : Math.round(input.houseCents / guests),
-    revenuePerWorkHourCents:
-      minutes === 0 ? null : Math.round((input.totalCents * 60) / minutes),
+    revenuePerWorkHourCents: minutes === 0 ? null : Math.round((input.totalCents * 60) / minutes),
     workHours: Math.round((minutes / 60) * 100) / 100,
   };
 }

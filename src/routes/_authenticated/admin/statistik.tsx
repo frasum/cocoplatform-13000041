@@ -45,6 +45,7 @@ import {
   takeawayDonutSegments,
 } from "@/lib/statistics/revenue-core";
 import { pctDiff, shareOf, pickTopTwoByTotal } from "@/lib/statistics/comparison-core";
+import { compareKpi } from "@/lib/statistics/kpi-compare";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
@@ -1280,6 +1281,11 @@ type CompareLocation = {
   avgTipPerDayCents: number;
   daysWithData: number;
   tipTotalCents: number;
+  // STAT2b — Rohsummen + fertige Kennzahlen (aus `derivedKpis`).
+  guestTotal: number;
+  workMinutesTotal: number;
+  revenuePerGuestCents: number | null;
+  revenuePerWorkHourCents: number | null;
 };
 
 function LocationCompareSection({
@@ -1309,6 +1315,13 @@ function LocationCompareSection({
       const daysWithData = rev.daily.filter((d) => d.totalCents > 0).length;
       const total = rev.summary.totalCents;
       const tipTotal = tip.totals.totalCents;
+      // STAT2b — keine Neuberechnung in der UI: derivedKpis ist die Quelle.
+      const kpis = derivedKpis({
+        houseCents: rev.summary.houseCents,
+        totalCents: rev.summary.totalCents,
+        guestCount: rev.guestTotal,
+        workMinutes: rev.workMinutesTotal,
+      });
       list.push({
         id: loc.id,
         name: loc.name,
@@ -1320,6 +1333,10 @@ function LocationCompareSection({
         avgTipPerDayCents: daysWithData > 0 ? Math.round(tipTotal / daysWithData) : 0,
         daysWithData,
         tipTotalCents: tipTotal,
+        guestTotal: rev.guestTotal,
+        workMinutesTotal: rev.workMinutesTotal,
+        revenuePerGuestCents: kpis.revenuePerGuestCents,
+        revenuePerWorkHourCents: kpis.revenuePerWorkHourCents,
       });
     });
     return list;

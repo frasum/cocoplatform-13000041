@@ -245,6 +245,21 @@ export function derivedKpis(input: {
   };
 }
 
+// STAT2 — Gäste je Geschäftstag. Mehrere Sessions am selben Tag (z. B. zwei
+// Standorte im Filter „alle") summieren auf; fehlende Zählungen gelten als 0.
+export function sumGuestsByDate(
+  rows: readonly { businessDate: string; guestCount: number | null }[],
+): { byDate: Map<string, number>; total: number } {
+  const byDate = new Map<string, number>();
+  let total = 0;
+  for (const r of rows) {
+    const guests = r.guestCount ?? 0;
+    byDate.set(r.businessDate, (byDate.get(r.businessDate) ?? 0) + guests);
+    total += guests;
+  }
+  return { byDate, total };
+}
+
 // STAT-U2 — Take-Away je Kanal.
 // Summiert `amountCents` je Kanal-Name und sortiert absteigend. Reihenfolge
 // bei Gleichstand: stabil nach Kanal-Name (aufsteigend), damit die UI und

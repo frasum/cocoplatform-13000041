@@ -82,9 +82,10 @@ async function logEffectiveIdentity(page: Page, label: string): Promise<void> {
     `${url}/rest/v1/user_links?select=staff_id,organization_id&user_id=eq.${session.userId}`,
     { headers },
   );
-  const links = (await linkRes.json().catch(() => null)) as
-    | Array<{ staff_id: string; organization_id: string }>
-    | null;
+  const links = (await linkRes.json().catch(() => null)) as Array<{
+    staff_id: string;
+    organization_id: string;
+  }> | null;
   const link = links?.[0] ?? null;
 
   let role: string | null = null;

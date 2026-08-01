@@ -8,6 +8,7 @@ import {
   formatTsd,
   lineChartGeometry,
   monthWindow,
+  stackedBarChartGeometry,
   type ChartArea,
 } from "./statistik-pdf-charts";
 
@@ -122,5 +123,76 @@ describe("formatTsd", () => {
   it("rundet auf T€ mit deutschen Tausenderpunkten", () => {
     expect(formatTsd(1_234_567_00)).toBe("1.235 T€");
     expect(formatTsd(0)).toBe("0 T€");
+  });
+});
+
+// STAT3c — gestapelte Tagesbalken (Standort-Verteilung ohne Zahlen im PDF).
+describe("stackedBarChartGeometry", () => {
+  it("Segmenthöhen eines Tages summieren sich exakt zur Stapelhöhe", () => {
+    const g = stackedBarChartGeometry(
+      [
+        { name: "spicery", values: [3000, 1000] },
+        { name: "YUM", values: [1000, 500] },
+      ],
+      area,
+    );
+    expect(g.max).toBe(4000);
+    const first = g.stacks[0]!;
+    expect(first.height).toBeCloseTo(60, 10);
+    expect(first.segments.reduce((a, s) => a + s.height, 0)).toBeCloseTo(first.height, 10);
+    const second = g.stacks[1]!;
+    expect(second.total).toBe(1500);
+    expect(second.segments.reduce((a, s) => a + s.height, 0)).toBeCloseTo(second.height, 10);
+    // unten beginnend: erste Reihe sitzt auf der Grundlinie
+    expect(first.segments[0]!.y + first.segments[0]!.height).toBeCloseTo(area.y + area.height, 10);
+  });
+
+  it("0 in einer Reihe: das andere Segment füllt den Stapel, kein NaN", () => {
+    const g = stackedBarChartGeometry(
+      [
+        { name: "spicery", values: [0] },
+        { name: "YUM", values: [2000] },
+      ],
+      area,
+    );
+    const stack = g.stacks[0]!;
+    expect(stack.segments[0]!.height).toBe(0);
+    expect(stack.segments[1]!.height).toBeCloseTo(stack.height, 10);
+    expect(Number.isFinite(stack.height)).toBe(true);
+  });
+
+  it("Reihen ungleicher Länge werfen laut", () => {
+    expect(() =>
+      stackedBarChartGeometry(
+        [
+          { name: "spicery", values: [1, 2, 3] },
+          { name: "YUM", values: [1, 2] },
+        ],
+        area,
+      ),
+    ).toThrow(/YUM/);
+  });
+
+  it("Ein-Reihen-Fall ist identisch zu barChartGeometry", () => {
+    const values = [1000, 0, 2500, 700];
+    const flat = barChartGeometry(values, area);
+    const stackedGeo = stackedBarChartGeometry([{ name: "spicery", values }], area);
+    expect(stackedGeo.max).toBe(flat.max);
+    expect(stackedGeo.ticks).toEqual(flat.ticks);
+    stackedGeo.stacks.forEach((s, i) => {
+      const b = flat.bars[i]!;
+      expect(s.x).toBe(b.x);
+      expect(s.width).toBe(b.width);
+      expect(s.y).toBe(b.y);
+      expect(s.height).toBe(b.height);
+      expect(s.segments[0]!.y).toBe(b.y);
+      expect(s.segments[0]!.height).toBe(b.height);
+    });
+  });
+
+  it("leere Reihenliste ergibt keine Stapel", () => {
+    const g = stackedBarChartGeometry([], area);
+    expect(g.stacks).toEqual([]);
+    expect(g.max).toBe(0);
   });
 });

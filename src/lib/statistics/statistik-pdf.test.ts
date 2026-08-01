@@ -43,6 +43,9 @@ vi.mock("jspdf", () => {
     rect() {}
     line() {}
     circle() {}
+    getTextWidth(t: string) {
+      return t.length * 3;
+    }
     text(value: string | string[]) {
       if (Array.isArray(value)) texts.push(...value);
       else texts.push(value);
@@ -367,7 +370,7 @@ describe("statistik-pdf — deutsche Zahlformate", () => {
 
   it("Deltas mit Vorzeichen", () => {
     expect(fmtDeltaPctDe(12.05)).toBe("+12,1 %");
-    expect(fmtDeltaPctDe(-12.05)).toBe("−12,1 %");
+    expect(fmtDeltaPctDe(-12.05)).toBe("-12,1 %");
     expect(fmtDeltaPctDe(0)).toBe("±0,0 %");
     expect(fmtDeltaPctDe(null)).toBe("—");
   });

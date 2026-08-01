@@ -32,6 +32,9 @@ vi.mock("jspdf", () => {
     rect() {}
     line() {}
     circle() {}
+    getTextWidth(t: string) {
+      return t.length * 3;
+    }
     text(value: string | string[]) {
       if (Array.isArray(value)) texts.push(...value);
       else texts.push(value);

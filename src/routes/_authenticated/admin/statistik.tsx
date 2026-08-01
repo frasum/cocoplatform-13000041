@@ -1294,6 +1294,20 @@ type CompareLocation = {
   workMinutesTotal: number;
   revenuePerGuestCents: number | null;
   revenuePerWorkHourCents: number | null;
+  // STAT2c — Vormonatswerte je Standort (Fenster inkl. U5a-Klemmung kommt
+  // fertig aus den Server-Fns; hier wird nichts neu berechnet).
+  previousRange: { startDate: string; endDate: string } | null;
+  previousPartial: boolean;
+  prevTotalCents: number | null;
+  prevAvgDailyCents: number | null;
+  prevTakeawayCents: number | null;
+  prevKitchenTipCents: number | null;
+  prevServiceTipCents: number | null;
+  prevAvgTipPerDayCents: number | null;
+  prevGuestTotal: number | null;
+  prevWorkMinutesTotal: number | null;
+  prevRevenuePerGuestCents: number | null;
+  prevRevenuePerWorkHourCents: number | null;
 };
 
 function LocationCompareSection({

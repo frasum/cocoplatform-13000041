@@ -22,8 +22,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMonthlyRevenueMatrix } from "@/lib/statistics/monthly-revenue.functions";
 import { generateMonatsberichtPdf, MONTH_LABELS } from "@/lib/statistics/monatsbericht-pdf";
-import type { MonthlyCell } from "@/lib/statistics/monthly-core";
 import { displayEuros, displayTsd } from "@/lib/statistics/monthly-core";
+import type { MonthlyViewMode } from "@/lib/statistics/monthly-view";
+import { viewHeadline, viewMaxCents, viewYearRows } from "@/lib/statistics/monthly-view";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -68,9 +69,9 @@ function monthLabelFromKey(key: string): string {
 }
 
 /** Zellfarbe relativ zum Standort-Maximum — dezente Intensitätsstufen. */
-function heatClass(cell: MonthlyCell | null, maxCents: number): string {
-  if (cell === null || maxCents <= 0) return "bg-muted/30 text-muted-foreground";
-  const ratio = cell.totalCents / maxCents;
+function heatClass(value: number | null, maxCents: number): string {
+  if (value === null || maxCents <= 0) return "bg-muted/30 text-muted-foreground";
+  const ratio = value / maxCents;
   if (ratio >= 0.85) return "bg-primary/80 text-primary-foreground";
   if (ratio >= 0.7) return "bg-primary/60 text-primary-foreground";
   if (ratio >= 0.55) return "bg-primary/40 text-foreground";
@@ -95,6 +96,9 @@ export function MonatsentwicklungTab() {
   });
   const [scope, setScope] = useState<string>("all");
   const [yearsN, setYearsN] = useState<"3" | "5" | "all">("5");
+  // MB2 — Takeaway ist Teilmenge des Gesamtumsatzes (N14): Umschalter statt
+  // Zusatzspalte, sonst verleitet die Nebeneinander-Darstellung zur Addition.
+  const [mode, setMode] = useState<MonthlyViewMode>("total");
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const series: Series | null = useMemo(() => {
@@ -102,30 +106,27 @@ export function MonatsentwicklungTab() {
     return q.data.series.find((s) => s.locationId === scope) ?? q.data.series.at(-1) ?? null;
   }, [q.data, scope]);
 
-  const maxCents = useMemo(
-    () => (series ? series.cells.reduce((m, c) => Math.max(m, c.totalCents), 0) : 0),
-    [series],
-  );
+  const viewRows = useMemo(() => (series ? viewYearRows(series.years, mode) : []), [series, mode]);
+
+  const maxCents = useMemo(() => viewMaxCents(viewRows), [viewRows]);
 
   const chartYears = useMemo(() => {
-    if (!series) return [];
-    const all = series.years.map((y) => y.year);
+    const all = viewRows.map((r) => r.year);
     if (yearsN === "all") return all;
     return all.slice(-Number(yearsN));
-  }, [series, yearsN]);
+  }, [viewRows, yearsN]);
 
   const chartData = useMemo(() => {
-    if (!series) return [];
     return MONTH_LABELS.map((label, idx) => {
       const row: Record<string, number | string | null> = { month: label };
-      for (const y of series.years) {
+      for (const y of viewRows) {
         if (!chartYears.includes(y.year)) continue;
-        const cell = y.months[idx];
-        row[String(y.year)] = cell ? displayEuros(cell.totalCents) : null;
+        const value = y.values[idx];
+        row[String(y.year)] = value === null || value === undefined ? null : displayEuros(value);
       }
       return row;
     });
-  }, [series, chartYears]);
+  }, [viewRows, chartYears]);
 
   async function handlePdf() {
     if (!series || !q.data) return;
@@ -165,8 +166,20 @@ export function MonatsentwicklungTab() {
   }
   if (!q.data || !series) return null;
 
-  const h = series.headline;
+  // Gesamt-Modus nutzt weiter unverändert die Kennzahlen der Server-Function
+  // (Nullmessung); nur der Takeaway-Modus rechnet den Kopf aus den Zellen.
+  const h =
+    mode === "total"
+      ? series.headline
+      : viewHeadline(
+          series.cells,
+          Number(q.data.focusMonth.slice(0, 4)),
+          Number(q.data.focusMonth.slice(5, 7)),
+          mode,
+        );
   const currentYear = Number(q.data.focusMonth.slice(0, 4));
+  const takeaway = mode === "takeaway";
+  const modeSuffix = takeaway ? " — Takeaway" : "";
 
   return (
     <div className="space-y-4">
@@ -192,6 +205,24 @@ export function MonatsentwicklungTab() {
           </div>
           <div className="space-y-1">
             <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Ansicht
+            </Label>
+            <div className="inline-flex h-10 items-center rounded-md border border-input p-0.5">
+              {(["total", "takeaway"] as const).map((m) => (
+                <Button
+                  key={m}
+                  type="button"
+                  size="sm"
+                  variant={mode === m ? "default" : "ghost"}
+                  onClick={() => setMode(m)}
+                >
+                  {m === "total" ? "Gesamt" : "Takeaway"}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Jahre im Verlauf
             </Label>
             <div className="inline-flex h-10 items-center rounded-md border border-input p-0.5">
@@ -208,16 +239,23 @@ export function MonatsentwicklungTab() {
               ))}
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="ml-auto h-10"
-            onClick={handlePdf}
-            disabled={pdfBusy}
-          >
-            <Download className="h-4 w-4" />
-            Monatsbericht
-          </Button>
+          <div className="ml-auto flex flex-col items-end gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10"
+              onClick={handlePdf}
+              disabled={pdfBusy}
+            >
+              <Download className="h-4 w-4" />
+              Monatsbericht
+            </Button>
+            {takeaway ? (
+              <span className="text-[11px] text-muted-foreground">
+                Bericht enthält Gesamtumsätze
+              </span>
+            ) : null}
+          </div>
         </div>
       </Card>
 
@@ -226,6 +264,7 @@ export function MonatsentwicklungTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {monthLabelFromKey(h.monthKey)}
+              {modeSuffix}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -242,6 +281,7 @@ export function MonatsentwicklungTab() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Jahressumme bis {MONTH_LABELS[Number(h.monthKey.slice(5, 7)) - 1]}
+              {modeSuffix}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -254,7 +294,7 @@ export function MonatsentwicklungTab() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Bestes Jahr für diesen Monat
+              Bestes Jahr für diesen Monat{modeSuffix}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -270,7 +310,9 @@ export function MonatsentwicklungTab() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Monatsumsätze in T€</CardTitle>
+          <CardTitle className="text-base">
+            {takeaway ? "Takeaway-Umsätze in T€" : "Monatsumsätze in T€"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-separate border-spacing-0.5 text-xs">
@@ -286,18 +328,18 @@ export function MonatsentwicklungTab() {
               </tr>
             </thead>
             <tbody>
-              {[...series.years].reverse().map((y) => (
+              {[...viewRows].reverse().map((y) => (
                 <tr key={y.year}>
                   <td className="px-2 py-1 font-medium tabular-nums">{y.year}</td>
-                  {y.months.map((cell, idx) => (
+                  {y.cells.map((cell, idx) => (
                     <td
                       key={idx}
                       className={cn(
                         "rounded px-2 py-1 text-right tabular-nums",
-                        heatClass(cell, maxCents),
+                        heatClass(y.values[idx] ?? null, maxCents),
                       )}
                       title={
-                        cell
+                        cell && y.values[idx] !== null && y.values[idx] !== undefined
                           ? `${MONTH_NAMES_LONG[idx]} ${y.year}: ${fmtEuro(cell.totalCents)}` +
                             (cell.takeawayCents !== null
                               ? ` · davon Takeaway ${fmtEuro(cell.takeawayCents)}`
@@ -307,8 +349,10 @@ export function MonatsentwicklungTab() {
                           : `${MONTH_NAMES_LONG[idx]} ${y.year}: keine Daten`
                       }
                     >
-                      {cell ? tsd(cell.totalCents) : ""}
-                      {cell?.partial ? (
+                      {y.values[idx] !== null && y.values[idx] !== undefined
+                        ? tsd(y.values[idx] as number)
+                        : ""}
+                      {cell?.partial && y.values[idx] !== null && y.values[idx] !== undefined ? (
                         <span className="ml-1 text-[10px] opacity-70">läuft</span>
                       ) : null}
                     </td>
@@ -323,13 +367,18 @@ export function MonatsentwicklungTab() {
           <p className="mt-2 text-xs text-muted-foreground">
             Werte in Tausend Euro. Vor {q.data.liveFrom.slice(0, 7)} aus der Excel-Historie, danach
             von COCO aus den Kassenabschlüssen berechnet (Details im Tooltip).
+            {takeaway
+              ? " Takeaway ist Teilmenge des Gesamtumsatzes; leere Zellen bedeuten keine Takeaway-Daten (Historie erst ab 2021)."
+              : ""}
           </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Jahresverlauf</CardTitle>
+          <CardTitle className="text-base">
+            {takeaway ? "Jahresverlauf — Takeaway" : "Jahresverlauf"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="h-[340px]">
           <ResponsiveContainer width="100%" height="100%">

@@ -256,3 +256,45 @@ export function computeChannelPercents(items: readonly TakeawayChannel[]): Takea
   }
   return items.map((i, idx) => ({ ...i, pct: raw[idx].floor + bonus[idx] }));
 }
+
+// STAT1 — Donut-Konsistenzprüfung (rein, ohne UI).
+// Die Donut-Segmente sind per Definition genau die Marker- und SoUse-Zeilen.
+// Läuft die Segmentsumme von `markerSum + souseSum` auseinander, ist der
+// Datenpfad kaputt (z.B. ein Kanal fällt beim Laden raus) — das darf nicht
+// still passieren. Abweichung von `takeawayCents` ist dagegen NUR dann
+// erwartbar, wenn die Deckelung `min(vectron, marker + souse)` greift.
+export type DonutCheck =
+  | { ok: true; capped: boolean; message: string | null }
+  | { ok: false; capped: boolean; message: string };
+
+export function checkDonutSegments(input: {
+  segmentSumCents: number;
+  markerSumCents: number;
+  souseSumCents: number;
+  takeawayCents: number;
+}): DonutCheck {
+  const expected = input.markerSumCents + input.souseSumCents;
+  const capped = expected > input.takeawayCents;
+  if (input.segmentSumCents !== expected) {
+    const diff = input.segmentSumCents - expected;
+    return {
+      ok: false,
+      capped,
+      message:
+        `Donut-Prüfung fehlgeschlagen: Segmentsumme ${input.segmentSumCents} Cent ` +
+        `≠ Marker + SoUse ${expected} Cent (Differenz ${diff > 0 ? "+" : ""}${diff} Cent). ` +
+        `Die angezeigten Kanäle passen nicht zur Take-Away-Zerlegung — Zahlen nicht verwenden.`,
+    };
+  }
+  if (capped) {
+    return {
+      ok: true,
+      capped: true,
+      message:
+        `Hinweis: Marker + SoUse (${expected} Cent) übersteigen den Vectron-Tagesumsatz; ` +
+        `Take-Away ist auf ${input.takeawayCents} Cent gedeckelt (Haus ≥ 0). ` +
+        `Die Segment-Prozente beziehen sich auf die ungedeckelte Summe.`,
+    };
+  }
+  return { ok: true, capped: false, message: null };
+}

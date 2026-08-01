@@ -40,6 +40,7 @@ import { personnelRatioPct } from "@/lib/statistics/personnel-core";
 import {
   checkDonutSegments,
   computeChannelPercents,
+  computeTrend,
   derivedKpis,
   takeawayDonutSegments,
 } from "@/lib/statistics/revenue-core";
@@ -115,7 +116,7 @@ type KpiCardProps = {
   /** EUR-Cents (Default-Unit "eur"). Rückwärtskompatibel zu U1. */
   cents?: number;
   trend?: Trend | null | undefined;
-  unit?: "eur" | "hours" | "pct";
+  unit?: "eur" | "hours" | "pct" | "eurOrDash";
   /** Für unit="hours" (Stunden) oder unit="pct" (Prozent oder null). */
   value?: number | null;
   /** Optionaler Trend-Renderer; überschreibt die Default-`TrendLine`. */
@@ -139,6 +140,9 @@ function KpiCard({
   let display: string;
   if (unit === "eur") {
     display = fmtEuro(cents ?? 0);
+  } else if (unit === "eurOrDash") {
+    // STAT2 — Nenner 0 ⇒ „—" (kein NaN, kein 0-Fake).
+    display = value === null || value === undefined ? "—" : fmtEuro(value);
   } else if (unit === "hours") {
     display = value === null || value === undefined ? "—" : `${value.toFixed(2)} h`;
   } else {
@@ -575,11 +579,11 @@ function StatsView({ data }: { data: RevenueStats }) {
   // Trend nur, wenn BEIDE Fenster einen validen Nenner haben.
   const guestTrend =
     kpis.revenuePerGuestCents !== null && prevKpis?.revenuePerGuestCents != null
-      ? computeTrendClient(kpis.revenuePerGuestCents, prevKpis.revenuePerGuestCents)
+      ? computeTrend(kpis.revenuePerGuestCents, prevKpis.revenuePerGuestCents)
       : null;
   const hourTrend =
     kpis.revenuePerWorkHourCents !== null && prevKpis?.revenuePerWorkHourCents != null
-      ? computeTrendClient(kpis.revenuePerWorkHourCents, prevKpis.revenuePerWorkHourCents)
+      ? computeTrend(kpis.revenuePerWorkHourCents, prevKpis.revenuePerWorkHourCents)
       : null;
   return (
     <div className="space-y-6">

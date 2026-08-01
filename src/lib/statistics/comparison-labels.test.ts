@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPctDe, leadDelta, previousTrendLabel } from "./comparison-labels";
+import { formatPctDe, leadDelta, ppLeadDelta, previousTrendLabel } from "./comparison-labels";
+
+describe("ppLeadDelta (STAT2d — Quoten-Kachel)", () => {
+  it("zeigt die Punktdifferenz statt relativem Wachstum", () => {
+    const d = ppLeadDelta({ aName: "spicery", bName: "YUM", aValue: 8.94, bValue: 8.99 });
+    expect(d.text).toBe("YUM +0,1 pp vs. spicery");
+    expect(d.leader).toBe("b");
+  });
+
+  it("Gleichstand und fehlende Werte", () => {
+    expect(ppLeadDelta({ aName: "A", bName: "B", aValue: 9, bValue: 9 }).text).toBe(
+      "Gleichstand (±0,0 pp)",
+    );
+    expect(ppLeadDelta({ aName: "A", bName: "B", aValue: null, bValue: 9 }).text).toBe("—");
+  });
+});
 
 describe("formatPctDe", () => {
   it("deutsche Nachkommastelle, ohne Vorzeichen", () => {

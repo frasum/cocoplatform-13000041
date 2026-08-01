@@ -50,6 +50,10 @@ import { compareKpi } from "@/lib/statistics/kpi-compare";
 import { leadDelta, previousTrendLabel } from "@/lib/statistics/comparison-labels";
 import { formatComparisonRange } from "@/lib/statistics/comparison-label";
 import { generateStatistikPdf, type StatistikPdfData } from "@/lib/statistics/statistik-pdf";
+import {
+  takeawayMatrix,
+  takeawaySharePctOfTotal,
+} from "@/lib/statistics/takeaway-channels";
 import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";

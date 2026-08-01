@@ -176,6 +176,9 @@ function StatistikPage() {
   const [mode, setMode] = useState<"month" | "range">("month");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  // MB3b — Tab kontrolliert, damit die globale Filterleiste im Monats-Tab
+  // ausgeblendet werden kann (Filter-State bleibt erhalten).
+  const [activeTab, setActiveTab] = useState<string>("umsatz");
 
   function handleModeChange(next: "month" | "range") {
     if (next === "range" && (startDate === "" || endDate === "")) {

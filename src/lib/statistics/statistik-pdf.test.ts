@@ -251,6 +251,7 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       perHourCents: kA.revenuePerWorkHourCents,
       prevYearTotalCents: 200_000,
       prevTotalCents: 250_000,
+      tipRatePct: 2.5,
     },
     {
       locationName: "TSB",
@@ -263,6 +264,7 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       guestTotal: 0,
       perGuestCents: kB.revenuePerGuestCents,
       perHourCents: kB.revenuePerWorkHourCents,
+      tipRatePct: null,
     },
   ];
 
@@ -316,6 +318,7 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       "+30,0 %",
       "+4,0 %",
       eur(5_000),
+      "2,5 %",
       "28,8 %",
       "5.464,48 h",
       eur(2_500),
@@ -325,8 +328,10 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     // Ohne Vergleichsbasis bleiben beide Delta-Spalten Gedankenstriche.
     const rowB = findRow("TSB");
     expect(rowB.slice(2, 4)).toEqual(["—", "—"]);
+    // STAT2d — ohne Haus-Umsatz bleibt die TG-Quote ein Gedankenstrich.
+    expect(rowB[5]).toBe("—");
     // Beide Nenner 0 ⇒ Dichte-Kennzahlen „—".
-    expect(rowB.slice(7)).toEqual(["—", "—"]);
+    expect(rowB.slice(8)).toEqual(["—", "—"]);
 
     // Summenzeile aus den fertigen Gesamtwerten.
     const total = findRow("Gesamt");

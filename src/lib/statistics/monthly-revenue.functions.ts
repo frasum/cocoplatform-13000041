@@ -50,9 +50,7 @@ type ChannelQueryRow = {
 export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>
-    z
-      .object({ month: z.string().regex(MONTH_RE).optional() })
-      .parse(input ?? {}),
+    z.object({ month: z.string().regex(MONTH_RE).optional() }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [

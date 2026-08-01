@@ -91,9 +91,7 @@ export async function generateMonatsberichtPdf(
       ["Vorjahresmonat", fmtEurOrDash(data.headline.previousYearCents)],
       [
         "Veränderung ggü. Vorjahresmonat",
-        data.headline.yoyExcludedPartial
-          ? "— (laufender Monat)"
-          : fmtPct(data.headline.yoyPct),
+        data.headline.yoyExcludedPartial ? "— (laufender Monat)" : fmtPct(data.headline.yoyPct),
       ],
       ["Jahressumme bis Monat (YTD)", fmtEur(data.headline.ytdCents)],
       ["Vorjahres-YTD", fmtEurOrDash(data.headline.previousYearYtdCents)],

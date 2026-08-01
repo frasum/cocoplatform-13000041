@@ -229,7 +229,8 @@ export function monthlyHeadline(
     monthKey: monthKey(year, month),
     currentCents,
     previousYearCents: prev ? prev.totalCents : null,
-    yoyPct: partial || currentCents === null ? null : growthPct(currentCents, prev?.totalCents ?? null),
+    yoyPct:
+      partial || currentCents === null ? null : growthPct(currentCents, prev?.totalCents ?? null),
     yoyExcludedPartial: partial,
     ytdCents: ytdCents(cells, year, month),
     previousYearYtdCents: prevYtdRaw,

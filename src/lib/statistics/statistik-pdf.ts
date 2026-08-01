@@ -517,6 +517,7 @@ export async function generateStatistikPdf(
   doc.setFont("helvetica", "italic");
   const notes: string[] = [
     "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.",
+    "Δ je Kanal gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.",
   ];
   if (hasMissingAny || data.personnel.staffWithoutRateNames.length > 0) {
     notes.push(

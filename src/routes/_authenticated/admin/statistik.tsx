@@ -317,6 +317,14 @@ function StatistikPage() {
       const t = tipQueries[i]?.data;
       const p = perQueries[i]?.data;
       if (!r || !t || !p) return;
+      // STAT2b — dieselben Felder wie die Vergleichskarten, keine eigene
+      // Summierung: derivedKpis ist die einzige Kennzahl-Quelle.
+      const k = derivedKpis({
+        houseCents: r.summary.houseCents,
+        totalCents: r.summary.totalCents,
+        guestCount: r.guestTotal,
+        workMinutes: r.workMinutesTotal,
+      });
       comparison.push({
         locationName: loc.name,
         totalCents: r.summary.totalCents,
@@ -325,6 +333,10 @@ function StatistikPage() {
         netHours: p.totals.netHours,
         laborCostCents: p.totals.laborCostCents,
         hasMissingRate: p.staffWithoutRate.length > 0,
+        guestTotal: r.guestTotal,
+        workHours: k.workHours,
+        perGuestCents: k.revenuePerGuestCents,
+        perHourCents: k.revenuePerWorkHourCents,
       });
     });
 

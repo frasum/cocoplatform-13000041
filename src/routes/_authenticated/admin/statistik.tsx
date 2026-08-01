@@ -565,6 +565,7 @@ function StatsView({ data }: { data: RevenueStats }) {
               channels={data.takeawayByChannel}
               totalCents={data.summary.takeawayCents}
               woltInfoCents={data.summary.woltInfoCents}
+              components={data.takeawayComponents}
             />
           ) : (
             <div className="flex h-[220px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
@@ -692,12 +693,22 @@ function TakeawayChannelsDonut({
   channels,
   totalCents,
   woltInfoCents,
+  components,
 }: {
   channels: RevenueStats["takeawayByChannel"];
   totalCents: number;
   woltInfoCents: number;
+  components: RevenueStats["takeawayComponents"];
 }) {
   const withPct = computeChannelPercents(channels);
+  // STAT1 — Segmentsumme automatisch gegen Marker + SoUse prüfen.
+  const segmentSumCents = channels.reduce((s, c) => s + c.amountCents, 0);
+  const check = checkDonutSegments({
+    segmentSumCents,
+    markerSumCents: components.markerSumCents,
+    souseSumCents: components.souseSumCents,
+    takeawayCents: totalCents,
+  });
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center">
       <div className="h-[240px] w-full md:w-1/2">

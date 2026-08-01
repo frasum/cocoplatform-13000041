@@ -155,7 +155,7 @@ const SERIES_PALETTE: Array<[number, number, number]> = [
 
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
-  return cents === null || cents === undefined ? "—" : fmtEur(cents);
+  return cents === null || cents === undefined ? "—" : fmtEurRounded(cents);
 }
 
 /** STAT3 — deutsches Zahlformat: „5.464,48 h" (nie Punkt-Dezimalen). */
@@ -231,7 +231,7 @@ export async function generateStatistikPdf(
   const kpis: Kpi[] = [
     {
       title: "Gesamtumsatz",
-      value: fmtEur(data.revenue.totalCents),
+      value: fmtEurRounded(data.revenue.totalCents),
       lead: deltaLabel(data.revenue.totalCents, data.previousYearTotalCents, cmp),
       leadLabel: "vs. Vorjahresmonat",
       foot: `Vormonat: ${deltaLabel(data.revenue.totalCents, data.previousPeriodTotalCents, cmp)}`,
@@ -246,7 +246,7 @@ export async function generateStatistikPdf(
     {
       title: "Personalquote",
       value: fmtPctDe(data.personnel.ratioPct),
-      lead: fmtEur(data.personnel.laborCostCents),
+      lead: fmtEurRounded(data.personnel.laborCostCents),
       leadLabel: "Basis-Lohnkosten",
       // STAT3b: kein Umsatzwert in der Lohnkosten-Kachel (missverständlich).
       // Der Takeaway-Gesamtwert steht in der Kopfzeile des Takeaway-Blocks.
@@ -255,9 +255,9 @@ export async function generateStatistikPdf(
     {
       title: "Umsatz je Arbeitsstunde",
       value: fmtEurOrDash(gh?.revenuePerWorkHourCents ?? null),
-      lead: fmtHoursDe(data.personnel.netHours),
+      lead: fmtHoursRoundedDe(data.personnel.netHours),
       leadLabel: "Netto-Stunden",
-      foot: `Erfasst: ${fmtHoursDe(gh?.workHours)}`,
+      foot: `Erfasst: ${fmtHoursRoundedDe(gh?.workHours)}`,
     },
   ];
 
@@ -299,26 +299,26 @@ export async function generateStatistikPdf(
   } else {
     const body = data.comparison.map((c) => [
       c.locationName,
-      fmtEur(c.totalCents),
+      fmtEurRounded(c.totalCents),
       deltaLabel(c.totalCents, c.prevYearTotalCents, cmp),
       deltaLabel(c.totalCents, c.prevTotalCents, cmp),
-      fmtEur(c.tipTotalCents),
+      fmtEurRounded(c.tipTotalCents),
       fmtPctDe(c.tipRatePct ?? null),
       `${fmtPctDe(c.ratioPct)}${c.hasMissingRate ? " *" : ""}`,
-      fmtHoursDe(c.netHours),
+      fmtHoursRoundedDe(c.netHours),
       fmtEurOrDash(c.perGuestCents ?? null),
       fmtEurOrDash(c.perHourCents ?? null),
     ]);
     // Summenzeile: fertige Gesamtwerte, keine Neuberechnung im PDF.
     body.push([
       "Gesamt",
-      fmtEur(data.revenue.totalCents),
+      fmtEurRounded(data.revenue.totalCents),
       deltaLabel(data.revenue.totalCents, data.previousYearTotalCents, cmp),
       deltaLabel(data.revenue.totalCents, data.previousPeriodTotalCents, cmp),
-      fmtEur(data.tips.totalCents),
+      fmtEurRounded(data.tips.totalCents),
       fmtPctDe(tipRatePct(data.tips.totalCents, data.revenue.houseCents)),
       `${fmtPctDe(data.personnel.ratioPct)}${hasMissingAny ? " *" : ""}`,
-      fmtHoursDe(data.personnel.netHours),
+      fmtHoursRoundedDe(data.personnel.netHours),
       fmtEurOrDash(gh?.revenuePerGuestCents ?? null),
       fmtEurOrDash(gh?.revenuePerWorkHourCents ?? null),
     ]);
@@ -386,9 +386,9 @@ export async function generateStatistikPdf(
     columnStyles: { 0: { cellWidth: 88, halign: "left", fontStyle: "bold" } },
     head: [["Bereich", ...tipCols.map((t) => t.locationName), "Gesamt"]],
     body: [
-      ["Service", ...tipCols.map((t) => fmtEur(t.serviceCents)), fmtEur(data.tips.serviceCents)],
-      ["Küche", ...tipCols.map((t) => fmtEur(t.kitchenCents)), fmtEur(data.tips.kitchenCents)],
-      ["Gesamt", ...tipCols.map((t) => fmtEur(t.totalCents)), fmtEur(data.tips.totalCents)],
+      ["Service", ...tipCols.map((t) => fmtEurRounded(t.serviceCents)), fmtEurRounded(data.tips.serviceCents)],
+      ["Küche", ...tipCols.map((t) => fmtEurRounded(t.kitchenCents)), fmtEurRounded(data.tips.kitchenCents)],
+      ["Gesamt", ...tipCols.map((t) => fmtEurRounded(t.totalCents)), fmtEurRounded(data.tips.totalCents)],
     ],
     theme: "grid",
   });
@@ -401,7 +401,7 @@ export async function generateStatistikPdf(
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   const headLine = doc.splitTextToSize(
-    `Haus ${fmtEur(data.revenue.houseCents)} · Takeaway ${fmtEur(
+    `Haus ${fmtEurRounded(data.revenue.houseCents)} · Takeaway ${fmtEurRounded(
       data.revenue.takeawayCents,
     )} (Anteil ${fmtPctDe(data.takeawaySharePct)})`,
     usable - 90,
@@ -410,8 +410,8 @@ export async function generateStatistikPdf(
   const tw = data.takeaway;
   const twRow = (r: (typeof tw)["rows"][number]): string[] => [
     r.name,
-    ...r.perLocationCents.map((c) => fmtEur(c)),
-    fmtEur(r.totalCents),
+    ...r.perLocationCents.map((c) => fmtEurRounded(c)),
+    fmtEurRounded(r.totalCents),
     fmtPctDe(r.sharePct),
     fmtDeltaPctDe(r.deltaPct),
   ];

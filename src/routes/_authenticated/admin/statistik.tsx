@@ -505,23 +505,29 @@ function StatistikPage() {
                 </div>
               </>
             )}
-            <div className="space-y-1">
-              <Label
-                htmlFor="stat-loc"
-                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              >
-                Standort
-              </Label>
-              <div id="stat-loc" className="flex h-10 items-center">
-                <LocationPills
-                  locations={locations}
-                  value={locationFilter}
-                  onChange={setLocationFilter}
-                  includeAll
-                  allValue="all"
-                />
+            {/* MB3b — im Tab „Standortvergleich" fehlt die Standort-Auswahl
+                bewusst: die Compare-Queries laden immer alle Standorte und
+                ignorieren den Pill-Filter, eine Auswahl hier wäre irreführend.
+                Der State bleibt erhalten und gilt in den übrigen Tabs weiter. */}
+            {activeTab === "vergleich" ? null : (
+              <div className="space-y-1">
+                <Label
+                  htmlFor="stat-loc"
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Standort
+                </Label>
+                <div id="stat-loc" className="flex h-10 items-center">
+                  <LocationPills
+                    locations={locations}
+                    value={locationFilter}
+                    onChange={setLocationFilter}
+                    includeAll
+                    allValue="all"
+                  />
+                </div>
               </div>
-            </div>
+            )}
             <Button
               type="button"
               variant="outline"

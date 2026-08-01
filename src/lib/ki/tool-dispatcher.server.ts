@@ -405,26 +405,29 @@ async function umsatzZeitraum(ctx: ToolContext, input: Record<string, unknown>) 
     const ids = sessions.map((s) => s.id);
     const { data: ch, error: chErr } = await ctx.admin
       .from("session_channel_amounts")
-      .select("session_id, amount_cents, revenue_channels(is_takeaway, label)")
+      .select("session_id, amount_cents, revenue_channels(kind, label)")
       .eq("organization_id", ctx.organizationId)
       .in("session_id", ids)
       .returns<
         {
           session_id: string;
           amount_cents: number;
-          revenue_channels: { is_takeaway: boolean; label: string } | null;
+          revenue_channels: { kind: string; label: string } | null;
         }[]
       >();
     if (chErr) throw new Error(chErr.message);
     channels = (ch ?? []).map((r) => ({
       sessionId: r.session_id,
       amountCents: r.amount_cents,
-      isTakeaway: r.revenue_channels?.is_takeaway ?? false,
+      kind: r.revenue_channels?.kind ?? "",
     }));
     for (const r of ch ?? []) {
-      if (r.revenue_channels?.is_takeaway) {
+      // STAT1: Take-Away-Segmente = Marker + SoUse; `delivery_wolt` steckt
+      // bereits im Marker und ist reine Info, nie Summand.
+      const kind = r.revenue_channels?.kind;
+      if (kind === "delivery_vectron" || kind === "delivery_souse") {
         takeawayRaw.push({
-          name: r.revenue_channels.label,
+          name: r.revenue_channels?.label ?? kind,
           amountCents: r.amount_cents,
         });
       }

@@ -384,7 +384,6 @@ export async function generateStatistikPdf(
       headStyles: { fillColor: [230, 230, 230], textColor: 20 },
       columnStyles: {
         1: { halign: "right" },
-        2: { halign: "right" },
         3: { halign: "right" },
         4: { halign: "right" },
         5: { halign: "right" },
@@ -392,6 +391,7 @@ export async function generateStatistikPdf(
         7: { halign: "right" },
         8: { halign: "right" },
         9: { halign: "right" },
+        10: { halign: "right" },
       },
       head: [
         [

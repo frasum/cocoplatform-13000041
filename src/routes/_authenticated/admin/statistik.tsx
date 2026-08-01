@@ -340,6 +340,9 @@ function StatistikPage() {
         workHours: k.workHours,
         perGuestCents: k.revenuePerGuestCents,
         perHourCents: k.revenuePerWorkHourCents,
+        previousRange: r.previousRange,
+        previousPartial: r.coverage.isPartial,
+        prevTotalCents: r.previous?.totalCents ?? null,
       });
     });
 

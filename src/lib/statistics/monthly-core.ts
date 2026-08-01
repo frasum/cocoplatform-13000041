@@ -238,3 +238,21 @@ export function monthlyHeadline(
     bestForMonth: best ? { year: best.year, totalCents: best.totalCents } : null,
   };
 }
+
+// MB1-N1 — Anzeige-Formatierung (nur Darstellung; die Cent-Werte bleiben für
+// YoY/YTD unverändert). Kaufmännisch auf ganze Euro gerundet.
+
+/** Cents → ganze Euro, kaufmännisch gerundet. */
+export function displayEuros(cents: number): number {
+  return Math.round(cents / 100);
+}
+
+/** Cents → Euro-Anzeige mit deutschen Tausenderpunkten, z. B. „160.193". */
+export function formatDisplayEuros(cents: number): string {
+  return displayEuros(cents).toLocaleString("de-DE");
+}
+
+/** Cents → T€-Wert (auf Tausend Euro gerundet). */
+export function displayTsd(cents: number): number {
+  return Math.round(cents / 100_000);
+}

@@ -304,6 +304,12 @@ function StatistikPage() {
     const staffWithoutRateNames = per.staffWithoutRate.map(
       (id) => per.perStaff.find((p) => p.staffId === id)?.name ?? id,
     );
+    const pdfKpis = derivedKpis({
+      houseCents: rev.summary.houseCents,
+      totalCents: rev.summary.totalCents,
+      guestCount: rev.guestTotal,
+      workMinutes: rev.workMinutesTotal,
+    });
 
     const comparison: StatistikPdfData["comparison"] = [];
     locations.forEach((loc, i) => {
@@ -355,6 +361,28 @@ function StatistikPage() {
         takeawayCents: d.takeawayCents,
         totalCents: d.totalCents,
       })),
+      // STAT2 — gleiche Quelle wie die Kacheln/das Panel; keine eigene Summierung.
+      guestHours: {
+        guestTotal: rev.guestTotal,
+        workHours: pdfKpis.workHours,
+        revenuePerGuestCents: pdfKpis.revenuePerGuestCents,
+        revenuePerWorkHourCents: pdfKpis.revenuePerWorkHourCents,
+        daily: rev.daily.map((d) => {
+          const k = derivedKpis({
+            houseCents: d.houseCents,
+            totalCents: d.totalCents,
+            guestCount: d.guestCount,
+            workMinutes: d.workMinutes,
+          });
+          return {
+            businessDate: d.businessDate,
+            guestCount: d.guestCount,
+            workHours: k.workHours,
+            perGuestCents: k.revenuePerGuestCents,
+            perHourCents: k.revenuePerWorkHourCents,
+          };
+        }),
+      },
       comparison,
     };
 

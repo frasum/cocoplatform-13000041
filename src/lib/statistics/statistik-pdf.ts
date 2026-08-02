@@ -724,15 +724,8 @@ export async function generateStatistikPdf(
       }
       doc.setLineWidth(0.5);
     });
-    // Legende rechtsbündig in der Titelzeile (siehe drawLegend).
-    drawLegend(
-      geo.series.map((s) => s.name),
-      chartB.y - 9,
-      (x, y, color) => {
-        doc.setFillColor(color[0], color[1], color[2]);
-        doc.circle(x + 2, y + 2, 1.8, "F");
-      },
-    );
+    // STAT3i — keine zweite Legende: die Farbzuordnung steht EINMAL am
+    // Tagesumsatz und gilt (gleicher Standort ⇒ gleiche Farbe) für alle Grafiken.
     doc.setDrawColor(200);
     doc.setFontSize(5.5);
     doc.setTextColor(90);
@@ -767,14 +760,7 @@ export async function generateStatistikPdf(
       );
       cursorY += 8 + BLOCK_GAP;
     } else {
-      drawLegend(
-        ytd.series.map((s) => s.name),
-        cursorY - 5,
-        (x, y, c) => {
-          doc.setFillColor(c[0], c[1], c[2]);
-          doc.rect(x, y, 4, 4, "F");
-        },
-      );
+      // STAT3i — Legende nur am Tagesumsatz (siehe Grafik A).
       cursorY += 6;
       const chartC: ChartArea = {
         x: marginX + axisW,
@@ -788,7 +774,9 @@ export async function generateStatistikPdf(
           values: ytd.series.map((s) => s.values[i] ?? null),
         })),
         chartC,
-        { gapRatio: 0.3, tickCount: 4, seriesNames: ytd.series.map((s) => s.name) },
+        // STAT3i — dichteres Tick-Ziel: der oberste Rasterwert liegt damit
+        // näher über dem Datenmaximum (weniger Luft über den Balken).
+        { gapRatio: 0.3, tickCount: 5, seriesNames: ytd.series.map((s) => s.name) },
       );
       doc.setFontSize(6.5);
       doc.setFont("helvetica", "normal");

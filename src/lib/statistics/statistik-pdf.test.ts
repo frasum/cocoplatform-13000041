@@ -220,8 +220,8 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
         ],
       }),
     );
-    // Genau drei Tabellen: Standort-Vergleich, Trinkgeld-Matrix, Kanal-Matrix.
-    expect(captured).toHaveLength(3);
+    // STAT3f — genau zwei Tabellen: Standort-Vergleich und Kanal-Matrix.
+    expect(captured).toHaveLength(2);
     const bodies = captured.flatMap((t) => t.body.map((r) => r.map(cell)));
     expect(bodies.some((r) => r[0] === "2026-07-18")).toBe(false);
   });
@@ -290,15 +290,6 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
           serviceCents: 4_000,
           kitchenCents: 1_000,
           totalCents: 5_000,
-          perLocation: [
-            {
-              locationName: "Spicery",
-              serviceCents: 4_000,
-              kitchenCents: 1_000,
-              totalCents: 5_000,
-            },
-            { locationName: "TSB", serviceCents: 0, kitchenCents: 0, totalCents: 0 },
-          ],
         },
         personnel: {
           netHours: 5_464.475,
@@ -344,9 +335,9 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     expect(total[2]).toBe("+20,0 %");
     expect(total[3]).toBe("+2,9 %");
 
-    // Trinkgeld-Matrix: 3 Zeilen × (Bereich + Standorte + Gesamt).
-    expect(findRow("Service")).toEqual(["Service", eur(4_000), eur(0), eur(4_000)]);
-    expect(findRow("Küche")).toEqual(["Küche", eur(1_000), eur(0), eur(1_000)]);
+    // STAT3f — die Trinkgeld-Matrix ist entfallen (kumulierter Jahresvergleich).
+    const allRows = captured.flatMap((t) => t.body.map((r) => r.map(cell)));
+    expect(allRows.some((r) => r[0] === "Service")).toBe(false);
   });
 
   it("freier Zeitraum: Δ-Spalten neutral, kein Monatsverlauf", async () => {

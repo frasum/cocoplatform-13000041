@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§127: EV1 Event-Hinweise komplett — Tabelle, Import, Kassen-Hinweis)
+Stand: 02.08.2026 (§128: STAT3l Ergebnis-Marge; EV1-Export; WX1 Wetterdaten — zweiter PG0-Baustein vorgezogen)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -4832,3 +4832,17 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 **EV1-R2 (`80bfade5`):** `eventNotices` als reine Funktion (Kalendertag injiziert, kein `new Date()` im Kern; Starttag ⇒ **NUR** „running Tag 1/y“, kein Doppel-Hinweis; Sortierung Impact absteigend). Server-Function nutzt `businessDateOf` (Kassen-Datumskonvention — eine Wahrheit) und liefert für Rollen unterhalb manager/admin **LEER**; die UI schaltet die Query für staff zusätzlich ab (doppelte Verteidigung, F4). Einbau in `kasse.tsx` hinter `ovQ.data?.session` — sichtbar exakt nach Session-Start; permanent, nicht wegklickbar (F8); kompakt Name + Impact-Badge + ggf. „(Termin vorläufig)“ (F7). Dienstplan ausdrücklich unberührt.
 
 **Offene Merkposten:** wie §126, MINUS „EV1 bauen“ (komplett), MINUS „EV1-Einmal-Import“ (s. Vollzugsvermerk oben), PLUS: EV1-Sichtprüfung durch den Bauherrn (Testevent `date_from` = morgen: als admin sichtbar, als staff **NICHT** sichtbar; erster echter Hinweis fällt auf den 14.08. — Seiler-und-Speer-Vortag) · F7-Nachtrag-Kandidat (Empfehlungs-Spalte im Kassen-Hinweis) bleibt Praxisbeobachtung.
+
+## §128 — Ergebnis-Marge, Events-Export, WX1 Wetterdaten (02.08., mittags)
+
+**Abnahme-Anker:** HEAD `5d5f118c` — vier Gates grün (`tsc` 0 · `eslint` 0 · `prettier` clean · `vitest` 2319, 0 Skips; 2300 + 19).
+
+**STAT3l (`a8614426`):** Fazit-Banner um Marge ergänzt — `preTaxMarginPct(result, grossRevenue)` neben `estimatedPreTaxResultCents` im BWA-Modul (eine Formelfamilie), Anzeige „(7,0 % vom Bruttoumsatz)“ in `deltaTone`-Färbung des Betrags. Bauherren-Entscheid: Bezug bewusst **BRUTTO** (kassennah/konservativ; banküblich wäre netto ≈ 7,7 % — das Label macht den Bezug eindeutig). Damit ist der PDF-Feinschliff endgültig geschlossen.
+
+**Bauherren-Direktrunden:** Einstellungen-Label „Messen & Veranstaltungen“ (`25ac5e99`); EV1-Export-Button (`af16af5b`) — CSV/XLSX-Export der Veranstaltungsliste, pure `buildEventsCsv`, `exceljs` dynamisch, alle Spalten inkl. „Vorläufig“. Vom Prüfer nachträglich gesichtet, unbedenklich.
+
+**WX1 (`5d5f118c`) — Wetterdaten, zweiter vorgezogener PG0-Baustein** (Bauherren-Entscheid: Sammeln beginnt sofort, damit Forecast-vs-Ist-Historie für die späteren PG2-Spannen wächst): Tabelle `weather_days` (EIN Datensatz je Tag+Org — beide Häuser teilen das München-Wetter; `numeric` ausdrücklich als Messwert begründet; UNIQUE org+business_date). Schreibrechte **NUR** Service-Role — `authenticated` hat ausschließlich SELECT, die Tabelle ist client-dicht; Admin-Check lebt in den Server-Functions (`syncWeather`: Forecast heute..+16 + Archive letzte 10 Tage; `backfillWeather` from/to parametrisiert für spätere N2-Erweiterung; `getWeatherStatus`). Quelle Open-Meteo (DWD/ICON, kein Key, reines `fetch` — Worker-tauglich, `timezone=Europe/Berlin` gegen UTC-Tagesversatz). Kernregel `mayOverwrite`: `archive` überschreibt alles, `forecast` nur `forecast` — Messung schlägt Prognose, nie umgekehrt; `null` bleibt `null` (0 mm ist eine Aussage, `null` keine). Verwaltungskarte unter Einstellungen (Status, Sync-Knopf, Backfill-Dialog). Täglicher Cron-Sync = Merkposten. `WEATHER_COORDS` als Konstante mit SaaS-Erweiterungsvermerk (analog `holiday_region`).
+
+**Produktions-Vollzug WX1:** Migration ausgeführt und belegt (Kontroll-CSV `pg_get_constraintdef`); Backfill 16.02.–gestern **ausstehend**; erster Sync **ausstehend** — unbestätigte Schritte bleiben ausdrücklich als „ausstehend“ stehen.
+
+**Offene Merkposten:** wie §127, PLUS: WX-Cron (täglicher automatischer Sync via Cloudflare Cron — bis dahin trägt der Knopf) · WX1-Vollzug bestätigen (Backfill + erster Sync, s. o.). **PG0-Zwischenstand:** Events ✓ (EV1), Wetter ✓ (WX1) — es fehlen Ferienkalender-Anbindung an die Prognose-Achse, OpenLigaDB-Prüfung und der Tageshistorien-Prüfblock (TA-Archiv/Vectron, N1/N2).

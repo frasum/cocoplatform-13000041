@@ -61,10 +61,19 @@ import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
 import { ytdByYear } from "@/lib/statistics/ytd-compare";
+import { listBwaMonths } from "@/lib/bwa/bwa.functions";
+import {
+  aggregateGroup,
+  computeBreakEven,
+  estimatedPreTaxResultCents,
+} from "@/lib/bwa/bwa-analytics";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
 import { fillDailyGaps } from "@/lib/statistics/chart-fill";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+/** STAT3h — eindeutige Entität für die Break-even-Modellzeile (vgl. BWA-Modul). */
+const PRETAX_ENTITY = "YUM Gastronomie GmbH";
 
 export const Route = createFileRoute("/_authenticated/admin/statistik")({
   head: () => ({ meta: [{ title: "Statistik" }] }),
@@ -248,6 +257,15 @@ function StatistikPage() {
   const matrixQ = useQuery({
     queryKey: ["monthlyRevenueMatrix"],
     queryFn: () => getMonthlyRevenueMatrix({ data: {} }),
+  });
+
+  // STAT3h — Break-even-Grundlage für die Modellzeile im PDF. Nur relevant im
+  // Scope „Alle Standorte" (eindeutige Entität) und bei abgeschlossenem Monat.
+  const preTaxEligible = mode === "month" && locationFilter === "all" && month < currentMonth();
+  const bwaQ = useQuery({
+    queryKey: ["bwa", "months"],
+    queryFn: () => listBwaMonths(),
+    enabled: preTaxEligible,
   });
 
   // Compare-Queries (alle Standorte, ignorieren den Pill-Filter) — genau einmal
@@ -468,6 +486,29 @@ function StatistikPage() {
           )
         : undefined;
 
+    // STAT3h — Modell-Ergebnis vor Steuern: rollierender Break-even der
+    // eindeutigen Entität (alle Kostenstellen zur „Gruppe" verdichtet) auf den
+    // Kassen-Bruttoumsatz des Monats angewandt. Fehlt die BWA oder ist der
+    // Deckungsbeitrag unbrauchbar, entfällt die Zeile ersatzlos.
+    const bwaRows = preTaxEligible ? (bwaQ.data ?? null) : null;
+    const be = bwaRows
+      ? computeBreakEven(
+          aggregateGroup(bwaRows.filter((r) => r.entity === PRETAX_ENTITY)).filter(
+            (r) => r.month <= `${month}-01`,
+          ),
+        )
+      : null;
+    const resultCents = estimatedPreTaxResultCents(rev.summary.totalCents, be);
+    const preTaxModel =
+      be && resultCents !== null
+        ? {
+            resultCents,
+            netRevenueCents: Math.round(rev.summary.totalCents / be.factor),
+            breakEvenMonthCents: be.netMonthCents,
+            dbPct: be.db * 100,
+          }
+        : undefined;
+
     const data: StatistikPdfData = {
       monthLabel,
       scopeLabel,
@@ -518,6 +559,7 @@ function StatistikPage() {
       },
       ...(monthly ? { monthly } : {}),
       ...(ytdCompare ? { ytdCompare } : {}),
+      ...(preTaxModel ? { preTaxModel } : {}),
       comparison,
     };
 

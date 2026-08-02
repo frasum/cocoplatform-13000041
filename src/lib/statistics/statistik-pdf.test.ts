@@ -382,6 +382,31 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     expect(line).toContain(`Gesamt ${eur(4_000)} (4,0 %)`);
   });
 
+  it("STAT3h: Modellzeile + Fußnote nur bei gesetztem preTaxModel", async () => {
+    captured.length = 0;
+    texts.length = 0;
+    await generateStatistikPdf(baseData({}));
+    expect(texts.some((t) => t.includes("Ergebnis vor Steuern (Modell)"))).toBe(false);
+    expect(texts.some((t) => t.includes("Modellrechnung"))).toBe(false);
+
+    captured.length = 0;
+    texts.length = 0;
+    await generateStatistikPdf(
+      baseData({
+        preTaxModel: {
+          resultCents: 1_093_210,
+          netRevenueCents: 29_645_229,
+          breakEvenMonthCents: 28_083_500,
+          dbPct: 70,
+        },
+      }),
+    );
+    expect(texts.some((t) => t.includes("Ergebnis vor Steuern (Modell)"))).toBe(true);
+    expect(texts.some((t) => t === fmtEurRounded(1_093_210))).toBe(true);
+    expect(texts.some((t) => t.includes("davon 70,0 % Deckungsbeitrag"))).toBe(true);
+    expect(texts.some((t) => t.includes("Modellrechnung"))).toBe(true);
+  });
+
   it("freier Zeitraum: Δ-Spalten neutral, kein Monatsverlauf", async () => {
     captured.length = 0;
     texts.length = 0;

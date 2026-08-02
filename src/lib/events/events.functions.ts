@@ -88,10 +88,7 @@ function rowFromDb(r: DbRow): EventRow {
 
 type EventInsert = Database["public"]["Tables"]["events"]["Insert"];
 
-function payload(
-  organizationId: string,
-  v: z.infer<typeof eventFields>,
-): Omit<EventInsert, "id"> {
+function payload(organizationId: string, v: z.infer<typeof eventFields>): Omit<EventInsert, "id"> {
   return {
     organization_id: organizationId,
     name: v.name,

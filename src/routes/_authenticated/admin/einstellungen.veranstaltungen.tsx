@@ -27,7 +27,11 @@ import {
   type EventImpact,
   type EventRow,
 } from "@/lib/events/events-core";
-import { parseEventsSheet, type ParsedEventRow, type SheetRow } from "@/lib/events/parse-events-xlsx";
+import {
+  parseEventsSheet,
+  type ParsedEventRow,
+  type SheetRow,
+} from "@/lib/events/parse-events-xlsx";
 import { ImpactBadge } from "@/components/events/ImpactBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -320,7 +324,9 @@ function VeranstaltungenPage() {
       <Dialog open={form !== null} onOpenChange={(o) => !o && setForm(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{form?.id ? "Veranstaltung bearbeiten" : "Neue Veranstaltung"}</DialogTitle>
+            <DialogTitle>
+              {form?.id ? "Veranstaltung bearbeiten" : "Neue Veranstaltung"}
+            </DialogTitle>
             <DialogDescription>
               Events gelten betriebsweit — es gibt bewusst keine Standort-Zuordnung.
             </DialogDescription>

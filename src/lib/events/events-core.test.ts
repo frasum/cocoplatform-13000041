@@ -52,6 +52,8 @@ describe("detectTermChanges", () => {
   });
 
   it("meldet neue Events ohne Namensgleichheit nicht", () => {
-    expect(detectTermChanges([{ name: "Konzert B", dateFrom: "2026-06-11" }], existing)).toEqual([]);
+    expect(detectTermChanges([{ name: "Konzert B", dateFrom: "2026-06-11" }], existing)).toEqual(
+      [],
+    );
   });
 });

@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§125: Statistik-PDF-Serie STAT2d/3d–3i komplett; BWA-V1 USt-Fix 7 % Haus-Speisen; Modell-Ergebnis vor Steuern)
+Stand: 02.08.2026 (§126: PDF-Feinschliff abgeschlossen (STAT3j/3k); EV1 Event-Hinweise beschlossen, PG-F8 revidiert)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -4798,3 +4798,21 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 **Erkenntnis aus dem BWA-Beleg:** Der PDF-Import erkennt Kostenstellen bereits (Parser-Varianten A/B, `bwa_monthly.cost_center`) — YUM- und Spicery-Blätter liegen als getrennte Zeilen in der DB; der Gesamt-BE läuft über `aggregateGroup`.
 
 **Offene Merkposten:** wie §124, PLUS: **BWA-V2** — Break-even + Modell-Ergebnis je Kostenstelle (Filterwechsel statt Import-Umbau; Motivation: Spicery kumuliert +36 T€ vs. YUM +5 T€ vor Steuern, Mai-BWA — das Konsolidierte mittelt zwei verschiedene Betriebe) · Kanal-Vorjahresvergleich ab Feb 2027 umstellbar (COCO sammelt die Kanal-Zerlegung seit 02/2026; nach zwölf Monaten kann die Kanaltabellen-Spalte von Vorperiode auf Vorjahr wechseln, Fußnote entfällt) · Bauherren-Sichtprüfung des BWA-V1-Effekts am Bildschirm (Mix ~9,8 %, BE brutto niedriger, Ergebnis-Zeile ~verdoppelt).
+
+---
+
+## §126 — PDF-Feinschliff abgeschlossen; EV1 Event-Hinweise gegrillt (02.08., mittags)
+
+**Abnahme-Anker:** HEAD `a9e850a5` — vier Gates grün (`tsc` 0 · `eslint` 0 · `prettier` clean · `vitest` 2267 Tests, 0 Skips; 2253 + 14).
+
+**STAT3j — Fußnoten-Marker + Fazit-Banner + Tick-Feinraster:** Hochgestellte ¹ ² ³ (Latin-1) an Basis-Lohnkosten/Pers.-Quote, Kanal-Vorperiode und TG-Quote; Konvention im Code dokumentiert: **Ziffern für PERMANENTE stellengebundene Fußnoten** (maximal drei — ⁴ wäre U+2074, außerhalb WinAnsi, die Sperrsatz-Falle), `*` für konditionale. Ergebnis-Zeile ist jetzt Fazit-**BANNER**: mittig, neutraler Kasten, Betrag groß in `deltaTone`-Färbung (Kasten bewusst nie eingefärbt — die Bewertung trägt der Betrag). Lovable-Tick-Diagnose: 250er-Raster war im 1/2/5-Mantissen-Satz prinzipiell unerreichbar — `FINE_MANTISSAS` [1, 2, 2.5, 5, 10] als Opt-in **NUR** für die gruppierten Balken (1.171 ⇒ Top 1.250); übrige Geometrien bit-stabil.
+
+**STAT3k/3k-b — Wochenend- und Feiertagsbänder im Tagesumsatz:** `dayBands` als reine Geometrie (zusammenhängende Tage zu **EINEM** Band gemergt), `markedCalendarDays` konsumiert `bavarianHolidayMap` aus `shift-hours` (die SFN-erprobte eine Feiertagswahrheit — keine zweite Liste im PDF). Füllgrau nach Bauherren-Sichtprüfung von ~247 auf **236** nachgeschärft. Fußnote ohne Ziffern-Marker (Konvention: die drei sind voll).
+
+**PDF-Feinschliff für ABGESCHLOSSEN erklärt** (13 abgenommene Runden STAT2d/3d–3k-b über zwei Tage). Weitere Ideen werden im Praxisbetrieb gesammelt; nächster natürlicher Prüfstand ist der August-Bericht Anfang September. Bekannter offener Kandidat: Empfehlungs-Spalte im Kassen-Hinweis (s. EV1-F7-Vermerk).
+
+**EV1 — Event-Hinweise in der Tagesabrechnung:** Grilling abgeschlossen (Beschlussprotokoll beim Bauherrn; Kernpunkte): München-Eventkalender (42 Events bis 2027, Perplexity-kuratiert, XLSX) wird als `events`-Tabelle importiert = **VORGEZOGENE PG0-Events-Tabelle** (eine Tabelle, zwei Verbraucher: Kassen-Hinweis jetzt, Prognosefaktor später). Hinweis am **Vortag UND Event-Tag**; Mehrtages-Events mit Dauerhinweis („Wiesn läuft, Tag 5/16“); Sichtbarkeit **NUR manager+admin** (Führungs-Info); alle Impact-Stufen, farblich; kompakter Inhalt (Name + Datum + Impact-Badge — Empfehlungs-Spalte wird importiert, erscheint aber nur in der Verwaltungs-UI, F7-Vermerk); permanent, nicht wegklickbar; volle Admin-UI mit **idempotentem** XLSX-Import (Schlüssel Name + Von-Datum, Cash-Import-Disziplin); 2027-Platzhalter mit „vorläufig“-Kennzeichen. **KEIN** Hinweis im Dienstplan (ausdrücklich).
+
+**PG-Protokoll-Revision N3** (Bauherren-Entscheid): ① Konzerte wieder in Events-Tabelle **UND** Prognose — das Streich-Argument (manueller Pflegeaufwand) ist durch KI-kuratierte Quartals-Re-Importe entkräftet; OpenLigaDB-Prüfung für Sport bleibt. ② **Kein** Je-Standort-Flag — Events gelten global; bei Bedarf additiv nachrüstbar.
+
+**Offene Merkposten:** wie §125, PLUS: **EV1 bauen** (zwei Runden: ① Migration + Import + Verwaltungs-UI, ② Kassen-Hinweis; Zieltermin komfortabel vor Wiesn-Vortag 18.09.) · EV1-Einmal-Import der Bauherren-XLSX nach Runde 1.

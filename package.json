@@ -88,7 +88,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
-    "@lovable.dev/vite-tanstack-config": "2.7.7",
+    "@lovable.dev/vite-tanstack-config": "2.8.5",
     "@playwright/test": "^1.61.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@types/node": "^22.16.5",

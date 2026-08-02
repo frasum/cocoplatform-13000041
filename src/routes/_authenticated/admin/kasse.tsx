@@ -96,7 +96,7 @@ import { EventNoticesBlock } from "@/components/cash/EventNoticesBlock";
 import { WeatherWidget } from "@/components/cash/WeatherWidget";
 import { listWeatherRange } from "@/lib/weather/weather.functions";
 import { shiftIsoDate } from "@/lib/weather/weather-core";
-import { listEventNoticesForToday } from "@/lib/events/events.functions";
+import { listEventNotices } from "@/lib/events/events.functions";
 import { TipPoolCard } from "@/components/cash/TipPoolCard";
 import { activeSettlements, computeTipTotalCents } from "@/lib/cash/tip-pool";
 import { fmtCents } from "@/lib/format";
@@ -205,12 +205,13 @@ function KassePage() {
   // EV1-R2/R3: Event-Hinweise (heute/morgen) und Wetter. Die Server-Functions
   // liefern für staff/payroll ohnehin leer; die UI rendert zusätzlich nur für
   // admin, manager und planer.
-  const fetchEventNotices = useServerFn(listEventNoticesForToday);
+  const fetchEventNotices = useServerFn(listEventNotices);
   const headerCardsEnabled =
     identity.role === "admin" || identity.role === "manager" || identity.role === "planer";
   const eventNoticesQ = useQuery({
-    queryKey: ["events", "notices-today"],
-    queryFn: () => fetchEventNotices(),
+    // EV1-R4: Hinweise folgen dem GEWÄHLTEN Geschäftstag (wie das Wetter-Widget).
+    queryKey: ["events", "notices", businessDate],
+    queryFn: () => fetchEventNotices({ data: { businessDate } }),
     enabled: headerCardsEnabled,
   });
   const fetchWeatherRange = useServerFn(listWeatherRange);
@@ -622,7 +623,11 @@ function KassePage() {
                 notices={eventNoticesQ.data?.events ?? []}
                 schoolHolidays={eventNoticesQ.data?.schoolHolidays ?? []}
               />
-              <WeatherWidget today={businessDate} rows={weatherQ.data ?? []} />
+              <WeatherWidget
+                today={businessDate}
+                actualToday={defaultCashBusinessDate(new Date())}
+                rows={weatherQ.data ?? []}
+              />
             </div>
           )}
 

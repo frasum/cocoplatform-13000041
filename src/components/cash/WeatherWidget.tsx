@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { weatherSymbol, type LucideIconName } from "@/lib/weather/weather-symbol";
 import { shiftIsoDate } from "@/lib/weather/weather-core";
+import { firstColumnLabel, weekdayShort } from "@/lib/weather/weather-labels";
 import type { WeatherRangeRow } from "@/lib/weather/weather.functions";
 
 const ICONS: Record<LucideIconName, LucideIcon> = {
@@ -34,14 +35,6 @@ const ICONS: Record<LucideIconName, LucideIcon> = {
   HelpCircle,
 };
 
-const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
-
-function weekdayShort(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const idx = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1, 12, 0, 0)).getUTCDay();
-  return WEEKDAYS[idx] ?? "—";
-}
-
 function temps(row: WeatherRangeRow): string {
   if (row.tempMaxC === null && row.tempMinC === null) return "—";
   const fmt = (v: number | null) => (v === null ? "—" : `${Math.round(v)}°`);
@@ -55,9 +48,11 @@ function rain(row: WeatherRangeRow): string | null {
 
 export function WeatherWidget({
   today,
+  actualToday,
   rows,
 }: {
   today: string;
+  actualToday: string;
   rows: readonly WeatherRangeRow[];
 }) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((offset) => shiftIsoDate(today, offset));
@@ -86,7 +81,7 @@ export function WeatherWidget({
               title={row ? sym.label : "kein Sync-Datenstand"}
             >
               <span className="text-[9px] font-medium leading-tight text-amber-900/70 dark:text-amber-100/70">
-                {i === 0 ? "Heute" : weekdayShort(iso)}
+                {i === 0 ? firstColumnLabel(iso, actualToday) : weekdayShort(iso)}
               </span>
               <Icon
                 className="h-3.5 w-3.5 text-amber-900 dark:text-amber-100"

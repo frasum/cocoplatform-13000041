@@ -278,20 +278,31 @@ export const importEvents = createServerFn({ method: "POST" })
   });
 
 /**
- * EV1-R2 — Hinweise für die Tagesabrechnung (heute/morgen).
+ * EV1-R2/R4 — Hinweise für die Tagesabrechnung (gewählter Tag/Folgetag).
  *
  * FK1: Zusätzlich zu den Event-Zeilen liefert dieselbe Antwort die
  * bayerischen SCHULFERIEN-Hinweise (Code-Wahrheit, keine Tabelle) — ein
  * Roundtrip, dieselbe Rollenlogik, derselbe Geschäftstag.
+ *
+ * EV1-R4: Der Bezugstag ist der GEWÄHLTE Geschäftstag der Seite (Parameter
+ * businessDate); ohne Angabe der aktuelle Geschäftstag (3-Uhr-Cut). Vorher
+ * rechnete die Function fest mit „heute" und widersprach damit der
+ * Datumswahl der Tagesabrechnung.
  *
  * Rollenprüfung (F4, Bauherren-Revision 02.08.): admin, manager UND planer
  * erhalten Inhalte — der Planer ist Adressat der Besetzungs-Info; staff (und
  * payroll) bekommen eine leere Liste statt eines Fehlers. Der Kalendertag ist
  * der Geschäftstag der Kasse (Europe/Berlin, 3-Uhr-Cutoff).
  */
-export const listEventNoticesForToday = createServerFn({ method: "GET" })
+export const listEventNotices = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<TodayNotices> => {
+  .inputValidator((input: unknown) =>
+    z
+      .object({ businessDate: isoDate.optional() })
+      .optional()
+      .parse(input ?? undefined),
+  )
+  .handler(async ({ data, context }): Promise<TodayNotices> => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
       "admin",
       "manager",
@@ -303,12 +314,12 @@ export const listEventNoticesForToday = createServerFn({ method: "GET" })
       return { events: [], schoolHolidays: [] };
     }
 
-    const today = businessDateOf(new Date());
+    const today = data?.businessDate ?? businessDateOf(new Date());
     const windowFrom = shiftIsoDay(today, -1);
     const windowTo = shiftIsoDay(today, 1);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const { data: eventRows, error } = await supabaseAdmin
       .from("events")
       .select(SELECT_COLS)
       .eq("organization_id", caller.organizationId)
@@ -316,7 +327,7 @@ export const listEventNoticesForToday = createServerFn({ method: "GET" })
       .lte("date_from", windowTo);
     if (error) throw error;
 
-    const rows = (data ?? []).map((r) => rowFromDb(r as unknown as DbRow));
+    const rows = (eventRows ?? []).map((r) => rowFromDb(r as unknown as DbRow));
     return {
       events: eventNotices(rows, today),
       schoolHolidays: schoolHolidayNotices(today),

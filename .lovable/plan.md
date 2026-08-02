@@ -1,39 +1,28 @@
-## FK1 — Schulferien Bayern: Code-Kalender + Hinweis in der Tagesabrechnung
+## EV1-R4 — Notices folgen dem gewählten Geschäftstag
 
-### Bestandsmeldung (verifiziert)
-- `listEventNoticesForToday` (src/lib/events/events.functions.ts, Z. 287–313) berechnet `today = businessDateOf(new Date())`, filtert `events` im ±1-Tag-Fenster und gibt `eventNotices(rows, today)` zurück; Rollen-Gate: nur `admin`/`manager`/`planer`.
-- `kasse.tsx` konsumiert genau eine Query (`["events","notices-today"]`) und rendert `<EventNoticesBlock notices={…} />`.
-- `EventNoticesBlock` rendert `null` bei leerer Liste und nutzt `ImpactBadge` je Zeile.
-- Amtliche Quelle geprüft: km.bayern.de / BayMBl. 2022 Nr. 747 (Ferienordnung 2024/2025–2029/2030) — alle Zeiträume bis 2029/2030 sind veröffentlicht.
+### Befund (belegt)
+- `listEventNoticesForToday` (src/lib/events/events.functions.ts:292 ff.) berechnet `const today = businessDateOf(new Date())` und nimmt keinen Parameter — die Karte zeigt also immer die Heute-Sicht.
+- `kasse.tsx` ruft sie ohne Argument, Query-Key `["events","notices-today"]` ohne Datum (Zeile 211-215), während `weatherQ` (Zeile 217-222) das Seiten-`businessDate` nutzt. Genau die gemeldete Diskrepanz.
+- `WeatherWidget` labelt Spalte 0 hart mit „Heute" (Zeile 89).
 
-Den Liefer-SHA melde ich vor dem ersten Edit.
+### Änderungen
 
-### Schritt 1 — `src/lib/time/school-holidays.ts` (neu, reines Modul)
-- Typen und Signaturen exakt wie beauftragt (`SchoolHolidayPeriod`, `schoolHolidays(year, region?)`, `schoolHolidayOn(dateISO, region?)`), Region heute nur `"BY"`, andere Werte ⇒ leer/`null`.
-- Datenbasis: schuljahrweise Konstanten, Quellvermerk je Schuljahr (BayMBl. 2022 Nr. 747, veröffentlicht 21.12.2022), erfasst 2024/2025 bis 2029/2030 mit Sommer-, Allerheiligen-, Weihnachts-, Frühjahrs-, Oster- und Pfingstferien (Grenzen inklusive, exakt die amtlichen Tabellenwerte).
-- `schoolHolidays(year)` liefert alle Zeiträume, die das Kalenderjahr `year` berühren (Weihnachtsferien laufen über den Jahreswechsel). Keine Extrapolation: ab 2030 fehlen Daten, `schoolHolidayOn` ⇒ `null`.
-- Buß- und Bettag (Mittwoch vor dem 23. November) wird als eigener, einTägiger Zeitraum „Buß- und Bettag (unterrichtsfrei)" geführt, weil das KM ihn in Bayern als unterrichtsfreien Tag ausweist; er steht in der Ferienordnung nicht in der Tabelle, deshalb kommentiere ich Herleitung und Quelle offen an der Konstante. Wenn du diesen Tag nicht möchtest, sag es — dann bleibt er raus.
-- `bavarianHolidayMap` und alle SFN-/Lohnpfade werden nicht angefasst; keine Kreuzimporte.
+**1. Server — `src/lib/events/events.functions.ts`**
+- Umbenennen auf `listEventNotices` (alter Name lügt), Methode bleibt GET, Rollen-Gate (`admin/manager/staff/payroll/planer` laden, Inhalte nur admin/manager/planer) unverändert.
+- Neuer `inputValidator`: `z.object({ businessDate: isoDate.optional() }).optional()` → `const today = data?.businessDate ?? businessDateOf(new Date())`. Fenster (`shiftIsoDay(today, ±1)`), `eventNotices(rows, today)` und `schoolHolidayNotices(today)` rechnen mit diesem Tag.
+- Kernlogik in `event-notices.ts` / `school-holiday-notices.ts` bleibt unangetastet.
 
-Tests (`school-holidays.test.ts`): erster Sommerferientag und letzter Weihnachtsferientag je erfasstem Schuljahr, Mitte der Sommerferien, Tag nach Ferienende, Grenztage (from/to) inklusive, nicht erfasstes Jahr ⇒ `null`, unbekannte Region ⇒ `null`.
+**2. `src/routes/_authenticated/admin/kasse.tsx`**
+- Import/`useServerFn` auf `listEventNotices`; Aufruf `fetchEventNotices({ data: { businessDate } })`; Query-Key `["events", "notices", businessDate]`.
+- Kein weiterer Aufrufer vorhanden (wird vor dem Commit per Suche bestätigt).
 
-### Schritt 2 — Ferien-Notices (reine Logik)
-Neues Schwestermodul `src/lib/events/school-holiday-notices.ts` (hält `event-notices.ts` frei von der Feiertags-/Ferien-Domäne, nutzt aber dessen `shiftIsoDay`):
-- `schoolHolidayNotices(todayISO, region?)` ⇒ `{ kind: "holiday_running"; name; dayIndex; dayCount }` bzw. `{ kind: "holiday_tomorrow"; name }`.
-- Regeln wie EV1-R2: läuft der Zeitraum heute ⇒ nur `running` mit Tag x/y (auch am ersten Tag); sonst Beginn morgen ⇒ `tomorrow`. Kalendertag wird injiziert, kein `new Date()` im Kern.
+**3. `WeatherWidget` — Label Spalte 1**
+- Kleine pure Helferfunktion (in `src/lib/weather/weather-core.ts` oder neben dem Widget): `firstColumnLabel(selectedIso, actualTodayIso)` → `"Heute"` nur bei Gleichheit, sonst Wochentagskürzel.
+- Widget erhält den echten aktuellen Geschäftstag (`defaultCashBusinessDate(new Date())`) als Prop `actualToday` von `kasse.tsx`; Datenpfad und Layout unverändert.
 
-Tests: Vortag, Tag 1 (nur running), Mitte, letzter Tag, Tag danach, Jahr ohne Daten.
+**4. Tests**
+- Notices-Durchreichung (Unit auf der Kombination, ohne DB): gewählter Tag `2026-08-01` ⇒ keine Ferien-Zeile; `2026-08-02` ⇒ `holiday_tomorrow` (Sommerferien ab 2026-08-03); `2026-08-03` ⇒ `holiday_running` 1/43.
+- Neue Label-Helferlogik: gewählt = heute ⇒ „Heute"; gewählt = Vortag (2026-08-01, Samstag) ⇒ „Sa".
 
-### Schritt 3 — Anzeige und Server
-- `listEventNoticesForToday` gibt künftig ein Objekt `{ events: EventNotice[]; schoolHolidays: SchoolHolidayNotice[] }` zurück (ein Roundtrip, gleiche Rollenlogik, gleicher `businessDateOf`-Tag).
-- `EventNoticesBlock` bekommt zusätzlich `schoolHolidays` und rendert deren Zeilen NACH den Event-Zeilen: Text „Sommerferien — Tag 12/44" bzw. „Morgen beginnen die Sommerferien", dazu ein eigener dezenter `FERIEN`-Badge (Slate-Ton über Design-Tokens, keine Impact-Farbe).
-- `null` nur noch, wenn beide Listen leer sind — die blaue Karte erscheint also auch bei ausschließlich Ferien-Hinweisen.
-- `kasse.tsx`: gleiche Query, neue Props durchgereicht.
-
-### Nicht angefasst
-`bavarianHolidayMap`/SFN/Lohn, Statistik-PDF-`dayBands`, `events`-Tabelle und -Import, Wetter-Widget, Dienstplan, `pap-2026/**`.
-
-### Erfolgs-Gate
-`tsc --noEmit`, `eslint . --max-warnings=0`, `prettier --check .` (nach `--write`), `vitest run` — alle grün, eine Runde = ein Commit.
-
-Hinweis zur Sichtprüfung: Heute ist der 02.08.2026, die Sommerferien 2026 beginnen amtlich am 03.08.2026. Die Kasse zeigt nach der Lieferung deshalb korrekt „Morgen beginnen die Sommerferien"; „Sommerferien — Tag 1/43" erscheint ab morgen.
+### Gates
+tsc, eslint, prettier --write, vitest — eine Runde, ein Commit. `pap-2026/**`, `noticesTone`, Wetter-Datenpfad und Rollen-Gates bleiben unberührt.

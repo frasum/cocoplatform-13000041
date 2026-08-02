@@ -365,7 +365,7 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
 
     const at = (part: string) => texts.findIndex((t) => t.includes(part));
     const order = [
-      at("Standorte im Vergleich"),
+      at("Standort-Vergleich"),
       at("Trinkgeld"),
       at("Take-Away-Kanäle"),
       at("Tagesumsatz"),

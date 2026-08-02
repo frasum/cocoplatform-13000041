@@ -470,28 +470,6 @@ function StatistikPage() {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,
         totalCents: tip.totals.totalCents,
-        // STAT3 — 3×n-Matrix statt Klarnamen-Liste (Bank-/Gesellschafter-PDF).
-        perLocation: locations
-          .map((loc, i) => {
-            const t = tipQueries[i]?.data;
-            if (!t) return null;
-            return {
-              locationName: loc.name,
-              serviceCents: t.totals.serviceCents,
-              kitchenCents: t.totals.kitchenCents,
-              totalCents: t.totals.totalCents,
-            };
-          })
-          .filter(
-            (
-              t,
-            ): t is {
-              locationName: string;
-              serviceCents: number;
-              kitchenCents: number;
-              totalCents: number;
-            } => t !== null,
-          ),
       },
       personnel: {
         netHours: per.totals.netHours,
@@ -522,6 +500,7 @@ function StatistikPage() {
         revenuePerWorkHourCents: pdfKpis.revenuePerWorkHourCents,
       },
       ...(monthly ? { monthly } : {}),
+      ...(ytdCompare ? { ytdCompare } : {}),
       comparison,
     };
 

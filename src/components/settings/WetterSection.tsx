@@ -9,9 +9,19 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { backfillWeather, getWeatherStatus, syncWeather } from "@/lib/weather/weather.functions";
-import { shiftIsoDate } from "@/lib/weather/weather-core";
+import {
+  WEATHER_BACKFILL_MIN,
+  friendlyWeatherError,
+  shiftIsoDate,
+} from "@/lib/weather/weather-core";
 
 const BACKFILL_START = "2026-02-16";
+
+type Feedback = { kind: "ok" | "error"; text: string };
+
+function toFeedbackText(e: unknown, fallback: string): string {
+  return friendlyWeatherError(e instanceof Error ? e.message : fallback);
+}
 
 export function WetterSection() {
   const queryClient = useQueryClient();
@@ -26,8 +36,9 @@ export function WetterSection() {
   const yesterday = shiftIsoDate(statusQ.data?.today ?? "2026-01-01", -1);
   const [from, setFrom] = useState(BACKFILL_START);
   const [to, setTo] = useState("");
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  // Fehler und Erfolg teilen EINEN Zustand — sonst bleibt eine alte
+  // Fehlermeldung nach einem geglückten Lauf stehen.
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   const refresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ["admin", "weather-status"] });
@@ -36,32 +47,46 @@ export function WetterSection() {
   const syncM = useMutation({
     mutationFn: () => callSync(),
     onSuccess: async (r) => {
-      setErr(null);
-      setMsg(
-        `Synchronisiert: ${r.forecastWritten} Vorhersage-Tage, ${r.archiveWritten} Archiv-Tage geschrieben, ${r.skipped} übersprungen.`,
-      );
+      setFeedback({
+        kind: "ok",
+        text: `Synchronisiert: ${r.forecastWritten} Vorhersage-Tage, ${r.archiveWritten} Archiv-Tage geschrieben, ${r.skipped} übersprungen.`,
+      });
       await refresh();
     },
     onError: (e: unknown) => {
-      setMsg(null);
-      setErr(e instanceof Error ? e.message : "Synchronisierung fehlgeschlagen.");
+      setFeedback({ kind: "error", text: toFeedbackText(e, "Synchronisierung fehlgeschlagen.") });
     },
   });
 
   const backfillM = useMutation({
     mutationFn: () => callBackfill({ data: { from, to: to || yesterday } }),
     onSuccess: async (r) => {
-      setErr(null);
-      setMsg(
-        `Backfill: ${r.written} von ${r.days} gelieferten Tagen geschrieben, ${r.skipped} übersprungen.`,
-      );
+      setFeedback({
+        kind: "ok",
+        text: `Backfill: ${r.written} von ${r.days} gelieferten Tagen geschrieben, ${r.skipped} übersprungen.`,
+      });
       await refresh();
     },
     onError: (e: unknown) => {
-      setMsg(null);
-      setErr(e instanceof Error ? e.message : "Backfill fehlgeschlagen.");
+      setFeedback({ kind: "error", text: toFeedbackText(e, "Backfill fehlgeschlagen.") });
     },
   });
+
+  const startBackfill = () => {
+    const effectiveTo = to || yesterday;
+    if (from < WEATHER_BACKFILL_MIN || from > yesterday) {
+      setFeedback({
+        kind: "error",
+        text: "Von-Datum muss zwischen 01.01.2000 und heute liegen.",
+      });
+      return;
+    }
+    if (from > effectiveTo) {
+      setFeedback({ kind: "error", text: "Von-Datum darf nicht nach dem Bis-Datum liegen." });
+      return;
+    }
+    backfillM.mutate();
+  };
 
   const busy = syncM.isPending || backfillM.isPending;
   const status = statusQ.data;
@@ -112,6 +137,7 @@ export function WetterSection() {
             <input
               type="date"
               value={from}
+              min={WEATHER_BACKFILL_MIN}
               max={yesterday}
               onChange={(e) => setFrom(e.target.value)}
               className="rounded-md border border-border bg-background px-2 py-1 text-sm"
@@ -122,6 +148,7 @@ export function WetterSection() {
             <input
               type="date"
               value={to || yesterday}
+              min={WEATHER_BACKFILL_MIN}
               max={yesterday}
               onChange={(e) => setTo(e.target.value)}
               className="rounded-md border border-border bg-background px-2 py-1 text-sm"
@@ -129,7 +156,7 @@ export function WetterSection() {
           </label>
           <button
             type="button"
-            onClick={() => backfillM.mutate()}
+            onClick={startBackfill}
             disabled={busy}
             className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-50"
           >
@@ -142,8 +169,15 @@ export function WetterSection() {
         </p>
       </div>
 
-      {msg && <p className="text-xs text-foreground">{msg}</p>}
-      {err && <p className="text-xs text-destructive">{err}</p>}
+      {feedback && (
+        <p
+          className={
+            feedback.kind === "ok" ? "text-xs text-foreground" : "text-xs text-destructive"
+          }
+        >
+          {feedback.text}
+        </p>
+      )}
     </section>
   );
 }

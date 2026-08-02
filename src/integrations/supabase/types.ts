@@ -5733,6 +5733,7 @@ export type Database = {
           sunshine_hours: number | null
           temp_max_c: number | null
           temp_min_c: number | null
+          weather_code: number | null
         }
         Insert: {
           business_date: string
@@ -5744,6 +5745,7 @@ export type Database = {
           sunshine_hours?: number | null
           temp_max_c?: number | null
           temp_min_c?: number | null
+          weather_code?: number | null
         }
         Update: {
           business_date?: string
@@ -5755,6 +5757,7 @@ export type Database = {
           sunshine_hours?: number | null
           temp_max_c?: number | null
           temp_min_c?: number | null
+          weather_code?: number | null
         }
         Relationships: [
           {

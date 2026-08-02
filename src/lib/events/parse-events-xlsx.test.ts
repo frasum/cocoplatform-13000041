@@ -29,7 +29,7 @@ describe("parseSheetDate", () => {
 
   it("liest Excel-Seriennummern (1900-System)", () => {
     expect(parseSheetDate(25569)).toBe("1970-01-01");
-    expect(parseSheetDate(46280)).toBe("2026-09-19");
+    expect(parseSheetDate(46284)).toBe("2026-09-19");
   });
 
   it("liest Date-Objekte", () => {

@@ -6,14 +6,27 @@ import { Card } from "@/components/ui/card";
 import { CalendarClock } from "lucide-react";
 import { ImpactBadge } from "@/components/events/ImpactBadge";
 import type { EventNotice } from "@/lib/events/event-notices";
+import type { SchoolHolidayNotice } from "@/lib/events/school-holiday-notices";
 
 function noticeText(n: EventNotice): string {
   if (n.kind === "tomorrow") return `Morgen: ${n.name}`;
   return `${n.name} läuft — Tag ${n.dayIndex}/${n.dayCount}`;
 }
 
-export function EventNoticesBlock({ notices }: { notices: readonly EventNotice[] }) {
-  if (notices.length === 0) return null;
+// FK1: Ferien sind Dauerkontext, keine Impact-Stufe — eigener, dezenter Ton.
+function holidayText(n: SchoolHolidayNotice): string {
+  if (n.kind === "holiday_tomorrow") return `Morgen beginnen die ${n.name}`;
+  return `${n.name} — Tag ${n.dayIndex}/${n.dayCount}`;
+}
+
+export function EventNoticesBlock({
+  notices,
+  schoolHolidays = [],
+}: {
+  notices: readonly EventNotice[];
+  schoolHolidays?: readonly SchoolHolidayNotice[];
+}) {
+  if (notices.length === 0 && schoolHolidays.length === 0) return null;
   return (
     <Card className="h-full space-y-1 border-blue-200 bg-blue-50/70 p-2.5 dark:border-blue-900 dark:bg-blue-950/30">
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-blue-900/70 dark:text-blue-100/70">
@@ -30,6 +43,17 @@ export function EventNoticesBlock({ notices }: { notices: readonly EventNotice[]
           {n.provisional && (
             <span className="text-[10px] text-muted-foreground">(Termin vorläufig)</span>
           )}
+        </div>
+      ))}
+      {schoolHolidays.map((n, i) => (
+        <div
+          key={`ferien-${n.name}-${i}`}
+          className="flex flex-wrap items-center gap-1.5 text-xs leading-tight"
+        >
+          <span className="text-foreground">{holidayText(n)}</span>
+          <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Ferien
+          </span>
         </div>
       ))}
     </Card>

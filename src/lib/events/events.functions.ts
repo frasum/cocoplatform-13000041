@@ -14,7 +14,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { makeAuditWriter } from "@/lib/admin/audit";
 import { businessDateOf } from "@/lib/business-date";
-import { eventNotices, shiftIsoDay, type EventNotice } from "./event-notices";
+import { eventNotices, shiftIsoDay } from "./event-notices";
+import { schoolHolidayNotices, type TodayNotices } from "./school-holiday-notices";
 import {
   EVENT_IMPACTS,
   detectTermChanges,
@@ -279,6 +280,10 @@ export const importEvents = createServerFn({ method: "POST" })
 /**
  * EV1-R2 — Hinweise für die Tagesabrechnung (heute/morgen).
  *
+ * FK1: Zusätzlich zu den Event-Zeilen liefert dieselbe Antwort die
+ * bayerischen SCHULFERIEN-Hinweise (Code-Wahrheit, keine Tabelle) — ein
+ * Roundtrip, dieselbe Rollenlogik, derselbe Geschäftstag.
+ *
  * Rollenprüfung (F4, Bauherren-Revision 02.08.): admin, manager UND planer
  * erhalten Inhalte — der Planer ist Adressat der Besetzungs-Info; staff (und
  * payroll) bekommen eine leere Liste statt eines Fehlers. Der Kalendertag ist
@@ -286,7 +291,7 @@ export const importEvents = createServerFn({ method: "POST" })
  */
 export const listEventNoticesForToday = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }): Promise<EventNotice[]> => {
+  .handler(async ({ context }): Promise<TodayNotices> => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
       "admin",
       "manager",
@@ -294,7 +299,9 @@ export const listEventNoticesForToday = createServerFn({ method: "GET" })
       "payroll",
       "planer",
     ]);
-    if (caller.role !== "admin" && caller.role !== "manager" && caller.role !== "planer") return [];
+    if (caller.role !== "admin" && caller.role !== "manager" && caller.role !== "planer") {
+      return { events: [], schoolHolidays: [] };
+    }
 
     const today = businessDateOf(new Date());
     const windowFrom = shiftIsoDay(today, -1);
@@ -310,5 +317,8 @@ export const listEventNoticesForToday = createServerFn({ method: "GET" })
     if (error) throw error;
 
     const rows = (data ?? []).map((r) => rowFromDb(r as unknown as DbRow));
-    return eventNotices(rows, today);
+    return {
+      events: eventNotices(rows, today),
+      schoolHolidays: schoolHolidayNotices(today),
+    };
   });

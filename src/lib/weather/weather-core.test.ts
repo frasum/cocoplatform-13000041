@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   ARCHIVE_LOOKBACK_DAYS,
   FORECAST_DAYS_AHEAD,
+  WEATHER_BACKFILL_MIN,
   archiveUrl,
+  backfillInputSchema,
+  friendlyWeatherError,
   forecastUrl,
   mapOpenMeteoDaily,
   mayOverwrite,
@@ -12,6 +15,46 @@ import {
   sunshineSecondsToHours,
   validateRange,
 } from "./weather-core";
+
+describe("backfillInputSchema (WX1-b)", () => {
+  it("lehnt ein Jahr aus dem nativen Datepicker-Tippfehler ab", () => {
+    const res = backfillInputSchema.safeParse({ from: "0025-01-01", to: "2026-08-01" });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error.issues[0]?.message).toContain(WEATHER_BACKFILL_MIN);
+    }
+  });
+
+  it("akzeptiert die Untergrenze 2000-01-01", () => {
+    expect(backfillInputSchema.safeParse({ from: "2000-01-01", to: "2026-08-01" }).success).toBe(
+      true,
+    );
+  });
+
+  it("lehnt 1999-12-31 ab", () => {
+    expect(backfillInputSchema.safeParse({ from: "1999-12-31", to: "2026-08-01" }).success).toBe(
+      false,
+    );
+  });
+
+  it("lehnt Nicht-ISO-Datumsformate ab", () => {
+    expect(backfillInputSchema.safeParse({ from: "16.02.2026", to: "2026-08-01" }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe("friendlyWeatherError (WX1-b)", () => {
+  it("übersetzt HTTP 400 in einen verständlichen Satz mit Detail", () => {
+    const out = friendlyWeatherError("Open-Meteo antwortete mit HTTP 400. Grund: bad range");
+    expect(out).toContain("Datumsbereich prüfen");
+    expect(out).toContain("HTTP 400");
+  });
+
+  it("lässt Meldungen ohne HTTP-Status unverändert", () => {
+    expect(friendlyWeatherError("fetch failed")).toBe("fetch failed");
+  });
+});
 
 const FORECAST_FIXTURE = {
   daily: {

@@ -567,6 +567,38 @@ export const setStaffParticipatesInPool = createServerFn({ method: "POST" })
     });
   });
 
+// RS1 — Merkmal „im Dienstplan planbar". Aus = die Person erscheint nicht in
+// Planungs-Personenlisten (Wochenplan, Zuweisung, Displays, Tausch-Peers);
+// Zeiterfassung und Lohn bleiben unberührt. Admin-only.
+export const setStaffRosterPlannable = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ staffId: z.string().uuid(), plannable: z.boolean() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin"]);
+    return runAllowed(caller.role, ["admin"], makeAuditWriter(caller), async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      expectVoid(
+        await supabaseAdmin
+          .from("staff")
+          .update({ roster_plannable: data.plannable })
+          .eq("id", data.staffId)
+          .eq("organization_id", caller.organizationId),
+        "setStaffRosterPlannable",
+      );
+      return {
+        result: { ok: true as const },
+        audit: {
+          action: "staff.set_roster_plannable",
+          entity: "staff",
+          entityId: data.staffId,
+          meta: { plannable: data.plannable },
+        },
+      };
+    });
+  });
+
 // Personalnummer manuell setzen/entfernen. Admin- und payroll-only; PII-nah
 // über payroll bereits abgedeckt (Import läuft dort). Uniqueness wird
 // weich pro Organisation geprüft (kein DB-Unique — Historie kann Kollisionen

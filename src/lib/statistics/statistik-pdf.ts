@@ -776,6 +776,10 @@ export async function generateStatistikPdf(
   if (!cmp) {
     notes.push("Freier Zeitraum: Vorjahres-/Vormonatsvergleich und der Monatsverlauf entfallen.");
   }
+  // STAT3f — Lücken-Jahre benennen: ein fehlender Monat ⇒ kein Balken.
+  for (const year of ytdIncomplete) {
+    notes.push(`${year}: Historie unvollständig — im kumulierten Vergleich ohne Balken.`);
+  }
   for (const note of notes) {
     const lines = doc.splitTextToSize(note, usable);
     doc.text(lines, marginX, cursorY);

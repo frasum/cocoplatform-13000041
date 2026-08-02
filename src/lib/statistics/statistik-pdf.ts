@@ -263,6 +263,20 @@ export function preTaxChainText(preTax: NonNullable<StatistikPdfData["preTaxMode
   )} · DB-Quote ${fmtPctDe(preTax.dbPct)}`;
 }
 
+/**
+ * STAT3l — Klammerteil hinter dem Betrag der Banner-Zeile 1: Marge des
+ * Modell-Ergebnisses am BRUTTO-Gesamtumsatz des Berichtsmonats.
+ *
+ * Vorzeichen bewusst als ASCII-Bindestrich (WinAnsi-Falle, siehe
+ * `src/test/win-ansi.ts`). `null` (Bruttoumsatz <= 0) ⇒ leerer String, der
+ * Klammerteil entfällt dann ersatzlos.
+ */
+export function preTaxMarginText(pct: number | null): string {
+  if (pct === null || !Number.isFinite(pct)) return "";
+  const sign = pct < 0 ? "-" : "";
+  return `(${sign}${fmtPctDe(Math.abs(pct))} vom Bruttoumsatz)`;
+}
+
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
   return cents === null || cents === undefined ? "—" : fmtEurRounded(cents);

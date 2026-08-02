@@ -319,7 +319,7 @@ export const listEventNotices = createServerFn({ method: "GET" })
     const windowTo = shiftIsoDay(today, 1);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    const { data: eventRows, error } = await supabaseAdmin
       .from("events")
       .select(SELECT_COLS)
       .eq("organization_id", caller.organizationId)
@@ -327,7 +327,7 @@ export const listEventNotices = createServerFn({ method: "GET" })
       .lte("date_from", windowTo);
     if (error) throw error;
 
-    const rows = (data ?? []).map((r) => rowFromDb(r as unknown as DbRow));
+    const rows = (eventRows ?? []).map((r) => rowFromDb(r as unknown as DbRow));
     return {
       events: eventNotices(rows, today),
       schoolHolidays: schoolHolidayNotices(today),

@@ -328,12 +328,6 @@ export function groupedBarChartGeometry(
   return { groups: out, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3) };
 }
 
-export type LineSeriesGeometryUnused = {
-  name: string;
-  /** null = kein Wert für diesen Monat (Lücke, keine 0-Kerbe). */
-  points: (LinePoint | null)[];
-};
-
 export type LineGeometry = {
   series: LineSeriesGeometry[];
   max: number;

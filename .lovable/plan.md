@@ -1,36 +1,39 @@
-## Bestandsmeldung (Konflikt melden, nicht still lösen)
+## FK1 — Schulferien Bayern: Code-Kalender + Hinweis in der Tagesabrechnung
 
-- Basis: `origin/main`, HEAD `13b92e106` (danach `582771776` = §130-Doku-Vertrag). Anker 55530025 liegt darunter.
-- **Abweichung zu Schritt 1:** Die Spalte `public.staff.roster_plannable` (boolean, NOT NULL, DEFAULT true) **existiert in der Datenbank bereits** und ist in `src/integrations/supabase/types.ts` generiert. Im Anwendungscode wird sie **nirgends** verwendet. Es ist also nur noch der Spalten-Kommentar offen, keine Struktur-Migration. Ich lege daher nur eine kleine, idempotente Migration (`ADD COLUMN IF NOT EXISTS` + `COMMENT ON COLUMN`) an — falls du sie gar nicht ausführen willst, entfällt lediglich der Kommentar.
+### Bestandsmeldung (verifiziert)
+- `listEventNoticesForToday` (src/lib/events/events.functions.ts, Z. 287–313) berechnet `today = businessDateOf(new Date())`, filtert `events` im ±1-Tag-Fenster und gibt `eventNotices(rows, today)` zurück; Rollen-Gate: nur `admin`/`manager`/`planer`.
+- `kasse.tsx` konsumiert genau eine Query (`["events","notices-today"]`) und rendert `<EventNoticesBlock notices={…} />`.
+- `EventNoticesBlock` rendert `null` bei leerer Liste und nutzt `ImpactBadge` je Zeile.
+- Amtliche Quelle geprüft: km.bayern.de / BayMBl. 2022 Nr. 747 (Ferienordnung 2024/2025–2029/2030) — alle Zeiträume bis 2029/2030 sind veröffentlicht.
 
-## Fundliste der Planungs-Personenquellen (geprüft)
+Den Liefer-SHA melde ich vor dem ersten Edit.
 
-Gefiltert wird auf `roster_plannable = true` (bzw. `!== false`) — genau an den Stellen, die heute `is_active` prüfen:
+### Schritt 1 — `src/lib/time/school-holidays.ts` (neu, reines Modul)
+- Typen und Signaturen exakt wie beauftragt (`SchoolHolidayPeriod`, `schoolHolidays(year, region?)`, `schoolHolidayOn(dateISO, region?)`), Region heute nur `"BY"`, andere Werte ⇒ leer/`null`.
+- Datenbasis: schuljahrweise Konstanten, Quellvermerk je Schuljahr (BayMBl. 2022 Nr. 747, veröffentlicht 21.12.2022), erfasst 2024/2025 bis 2029/2030 mit Sommer-, Allerheiligen-, Weihnachts-, Frühjahrs-, Oster- und Pfingstferien (Grenzen inklusive, exakt die amtlichen Tabellenwerte).
+- `schoolHolidays(year)` liefert alle Zeiträume, die das Kalenderjahr `year` berühren (Weihnachtsferien laufen über den Jahreswechsel). Keine Extrapolation: ab 2030 fehlen Daten, `schoolHolidayOn` ⇒ `null`.
+- Buß- und Bettag (Mittwoch vor dem 23. November) wird als eigener, einTägiger Zeitraum „Buß- und Bettag (unterrichtsfrei)" geführt, weil das KM ihn in Bayern als unterrichtsfreien Tag ausweist; er steht in der Ferienordnung nicht in der Tabelle, deshalb kommentiere ich Herleitung und Quelle offen an der Konstante. Wenn du diesen Tag nicht möchtest, sag es — dann bleibt er raus.
+- `bavarianHolidayMap` und alle SFN-/Lohnpfade werden nicht angefasst; keine Kreuzimporte.
 
-1. `src/lib/roster/roster.functions.ts` → `getStaffForRoster` (Zeilen ~508–560): `staff(id, display_name, is_active)` wird zu `staff(id, display_name, is_active, roster_plannable)`; die zwei bestehenden Filterstellen bekommen die Zusatzbedingung. Diese Quelle versorgt Wochenplan (`admin/dienstplan.tsx`), `RosterGrid`, `RosterAreaBlock`, `RosterDayView`, `DayEditSheet` (Personen-Auswahl beim Zuweisen) und `PlanerRosterView` — damit sind alle Planer-/Zuweisungslisten in einem Zug erfasst.
-2. `src/lib/display/display-data.server.ts` (Zeile ~254/270, Zeilenbasis der Displays): gleiche Ergänzung. Wirkt auf Restaurant-Display, TRMNL-Dienstplan und TRMNL-Planungstafel (alle bauen auf `buildDisplayData`).
-3. `src/lib/roster/swap.functions.ts` (Peer-Kandidaten, ~Zeile 196): der `staff`-Query filtert bereits `is_active = true`; dort zusätzlich `roster_plannable = true`, damit eine Feste-Zeiten-Kraft keine neuen Schichten per Tausch erhält. *(Falls du das anders willst — sag es, dann bleibt Tausch unberührt.)*
+Tests (`school-holidays.test.ts`): erster Sommerferientag und letzter Weihnachtsferientag je erfasstem Schuljahr, Mitte der Sommerferien, Tag nach Ferienende, Grenztage (from/to) inklusive, nicht erfasstes Jahr ⇒ `null`, unbekannte Region ⇒ `null`.
 
-**Nicht angetastet** (geprüft, dass sie andere Pfade nutzen): Zeiterfassung (`stempeln`, `zeit-uebersicht`, `schichten`), Lohn/Exporte, Verwaltungs-Personalliste (`staff.index.tsx`, `admin/staff.functions.ts` Listen-Query), Urlaubs-/Abwesenheitsplaner (`vacation-planner.functions.ts` — laut Auftrag ausdrücklich ausgenommen), Frei-Wünsche der Mitarbeiter (Selbstansicht), Dokumente, Statistik, `pap-2026/**`. Bestehende `roster_shifts` bleiben unverändert sichtbar — gefiltert werden nur Personenlisten.
+### Schritt 2 — Ferien-Notices (reine Logik)
+Neues Schwestermodul `src/lib/events/school-holiday-notices.ts` (hält `event-notices.ts` frei von der Feiertags-/Ferien-Domäne, nutzt aber dessen `shiftIsoDay`):
+- `schoolHolidayNotices(todayISO, region?)` ⇒ `{ kind: "holiday_running"; name; dayIndex; dayCount }` bzw. `{ kind: "holiday_tomorrow"; name }`.
+- Regeln wie EV1-R2: läuft der Zeitraum heute ⇒ nur `running` mit Tag x/y (auch am ersten Tag); sonst Beginn morgen ⇒ `tomorrow`. Kalendertag wird injiziert, kein `new Date()` im Kern.
 
-## Verwaltungs-UI
+Tests: Vortag, Tag 1 (nur running), Mitte, letzter Tag, Tag danach, Jahr ohne Daten.
 
-In der Mitarbeiter-Detailseite (`staff.$staffId`, Stammdaten-Block) ein Schalter **„Im Dienstplan planbar"** (Default an), Hilfstext: „Aus: für Kräfte mit festen Arbeitszeiten — erscheinen nicht in der Planung; Zeiterfassung und Lohn laufen normal." Umsetzung exakt nach dem bestehenden Muster von `participates_in_pool`: neues Feld in `getStaffDetail` (Select + Rückgabe `rosterPlannable`), neue Server-Funktion `setStaffRosterPlannable` (admin-only, Audit-Log-Eintrag `staff.set_roster_plannable`), Mutation + Invalidierung in der UI.
+### Schritt 3 — Anzeige und Server
+- `listEventNoticesForToday` gibt künftig ein Objekt `{ events: EventNotice[]; schoolHolidays: SchoolHolidayNotice[] }` zurück (ein Roundtrip, gleiche Rollenlogik, gleicher `businessDateOf`-Tag).
+- `EventNoticesBlock` bekommt zusätzlich `schoolHolidays` und rendert deren Zeilen NACH den Event-Zeilen: Text „Sommerferien — Tag 12/44" bzw. „Morgen beginnen die Sommerferien", dazu ein eigener dezenter `FERIEN`-Badge (Slate-Ton über Design-Tokens, keine Impact-Farbe).
+- `null` nur noch, wenn beide Listen leer sind — die blaue Karte erscheint also auch bei ausschließlich Ferien-Hinweisen.
+- `kasse.tsx`: gleiche Query, neue Props durchgereicht.
 
-## Tests (blockierend)
+### Nicht angefasst
+`bavarianHolidayMap`/SFN/Lohn, Statistik-PDF-`dayBands`, `events`-Tabelle und -Import, Wetter-Widget, Dienstplan, `pap-2026/**`.
 
-Neues pures Modul `src/lib/roster/roster-plannable.ts` mit `filterPlannable(rows)` (Signatur über eine minimale Row-Form `{ isActive, rosterPlannable }`), das die drei Fundstellen gemeinsam nutzen; dazu `roster-plannable.test.ts`:
-- `rosterPlannable: false` ⇒ nicht in der Planungsliste,
-- `true` / `undefined` (Bestand) ⇒ enthalten,
-- inaktive Person bleibt wie bisher ausgeschlossen,
-- allgemeine Staff-Liste (ungefilterter Pfad) enthält die Person weiterhin.
+### Erfolgs-Gate
+`tsc --noEmit`, `eslint . --max-warnings=0`, `prettier --check .` (nach `--write`), `vitest run` — alle grün, eine Runde = ein Commit.
 
-## Technische Details
-
-- Migration (idempotent): `ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS roster_plannable boolean NOT NULL DEFAULT true;` + `COMMENT ON COLUMN ...`. Kein Backfill.
-- Kein RLS-/Grant-Wechsel: die Spalte hängt an der bestehenden `staff`-Tabelle mit unveränderten Policies.
-- Kommentar-Hygiene: jede geänderte Stelle bekommt einen knappen `RS1`-Hinweis, der nur beschreibt, was tatsächlich passiert.
-
-## Erfolgs-Gate
-
-Vier Gates auf dem Liefer-SHA: `tsc --noEmit` 0 · `eslint . --max-warnings=0` 0 · `prettier --check .` clean · `vitest run` grün. `prettier --write` vor dem Commit, eine Runde = ein Commit. Fertigmeldung nennt die vollständige Fundliste und den SHA.
+Hinweis zur Sichtprüfung: Heute ist der 02.08.2026, die Sommerferien 2026 beginnen amtlich am 03.08.2026. Die Kasse zeigt nach der Lieferung deshalb korrekt „Morgen beginnen die Sommerferien"; „Sommerferien — Tag 1/43" erscheint ab morgen.

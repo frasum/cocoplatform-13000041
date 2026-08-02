@@ -647,7 +647,7 @@ export async function generateStatistikPdf(
       });
     }
     doc.setFont("helvetica", "normal");
-    cursorY = chartA.y + chartA.height + 20;
+    cursorY = chartA.y + chartA.height + 4 + BLOCK_GAP;
   }
 
   // ── Grafik B — 13-Monats-Verlauf ────────────────────────────────────────
@@ -709,7 +709,85 @@ export async function generateStatistikPdf(
       doc.text(label, x, chartB.y + chartB.height + 8, { align: "center" });
     });
     doc.setTextColor(20);
-    cursorY = chartB.y + chartB.height + 18;
+    cursorY = chartB.y + chartB.height + 4 + BLOCK_GAP;
+  }
+
+  // ── STAT3f — Jan–M kumuliert im 5-Jahres-Vergleich (längster Zeithorizont) ─
+  // STAT3g: steht am Ende der Grafik-Sequenz (Monat → Jahr → Langfrist).
+  const ytd = data.ytdCompare;
+  const ytdIncomplete: number[] = ytd?.incompleteYears ?? [];
+  if (ytd) {
+    const heading =
+      ytd.throughMonth > 0
+        ? `Jan–${MONTH_NAMES_LONG[ytd.throughMonth - 1]} kumuliert im ${ytd.years.length}-Jahres-Vergleich`
+        : "Kumulierter Jahresvergleich";
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(heading, marginX, cursorY);
+    if (ytd.throughMonth === 0 || ytd.series.length === 0) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "italic");
+      doc.text(
+        "Entfällt: im laufenden Januar liegt noch kein abgeschlossener Monat vor.",
+        marginX,
+        cursorY + 13,
+      );
+      cursorY += 8 + BLOCK_GAP;
+    } else {
+      drawLegend(
+        ytd.series.map((s) => s.name),
+        cursorY - 5,
+        (x, y, c) => {
+          doc.setFillColor(c[0], c[1], c[2]);
+          doc.rect(x, y, 4, 4, "F");
+        },
+      );
+      cursorY += 6;
+      const chartC: ChartArea = {
+        x: marginX + axisW,
+        y: cursorY,
+        width: usable - axisW,
+        height: 70,
+      };
+      const geoC = groupedBarChartGeometry(
+        ytd.years.map((year, i) => ({
+          label: String(year),
+          values: ytd.series.map((s) => s.values[i] ?? null),
+        })),
+        chartC,
+        { gapRatio: 0.3, tickCount: 4, seriesNames: ytd.series.map((s) => s.name) },
+      );
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "normal");
+      for (const t of geoC.ticks) {
+        doc.setDrawColor(225);
+        doc.line(chartC.x, t.y, chartC.x + chartC.width, t.y);
+        doc.setTextColor(120);
+        doc.text(formatTsd(t.value), chartC.x - 4, t.y + 2, { align: "right" });
+      }
+      doc.setTextColor(20);
+      for (const group of geoC.groups) {
+        for (const bar of group.bars) {
+          if (bar.value === null) continue;
+          const c = colorOf(bar.name);
+          doc.setFillColor(c[0], c[1], c[2]);
+          if (bar.height > 0) doc.rect(bar.x, bar.y, bar.width, bar.height, "F");
+          // STAT3g — Wertelabel ohne Einheit: „T€" trägt die Achse.
+          doc.setFontSize(5.5);
+          doc.setTextColor(90);
+          doc.text(formatTsdPlain(bar.value), bar.x + bar.width / 2, bar.y - 2, {
+            align: "center",
+          });
+          doc.setTextColor(20);
+        }
+        // Jahreszahl steht auch bei Lücken-Jahren unter der Achse.
+        doc.setFontSize(6.5);
+        doc.text(group.label, group.x + group.width / 2, chartC.y + chartC.height + 9, {
+          align: "center",
+        });
+      }
+      cursorY = chartC.y + chartC.height + 4 + BLOCK_GAP;
+    }
   }
 
   // ── Fußnoten ────────────────────────────────────────────────────────────

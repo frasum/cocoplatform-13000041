@@ -56,6 +56,18 @@ export type StatistikPdfData = {
     kitchenCents: number;
     totalCents: number;
   };
+  /**
+   * STAT3h — Modell-Ergebnis vor Steuern aus dem COCO-Break-even. Nur gesetzt,
+   * wenn Kalendermonat-Modus, abgeschlossener Monat, Scope „Alle Standorte" und
+   * berechenbarer Break-even zusammenkommen; sonst entfällt die Zeile ersatzlos.
+   */
+  preTaxModel?: {
+    resultCents: number;
+    netRevenueCents: number;
+    breakEvenMonthCents: number;
+    /** Deckungsbeitragsquote in Prozent (db × 100). */
+    dbPct: number;
+  };
   personnel: {
     netHours: number;
     laborCostCents: number;

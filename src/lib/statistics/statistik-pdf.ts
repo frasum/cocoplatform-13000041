@@ -16,6 +16,7 @@ import { tipRatePct } from "./revenue-core";
 import {
   barChartGeometry,
   formatTsd,
+  groupedBarChartGeometry,
   lineChartGeometry,
   stackedBarChartGeometry,
   type ChartArea,
@@ -53,16 +54,6 @@ export type StatistikPdfData = {
     serviceCents: number;
     kitchenCents: number;
     totalCents: number;
-    /**
-     * STAT3 — kompakte 3×n-Matrix je Standort. Einzelbeträge je Mitarbeiter
-     * erscheinen bewusst NICHT mehr im PDF (Bank-/Gesellschafter-Versand).
-     */
-    perLocation: Array<{
-      locationName: string;
-      serviceCents: number;
-      kitchenCents: number;
-      totalCents: number;
-    }>;
   };
   personnel: {
     netHours: number;
@@ -95,6 +86,17 @@ export type StatistikPdfData = {
   monthly?: {
     monthLabels: string[];
     series: Array<{ name: string; values: Array<number | null> }>;
+  };
+  /**
+   * STAT3f — kumulierter 5-Jahres-Vergleich (Jan…M) je Standort; kommt fertig
+   * aus `ytdByYear`. Fehlt der Block (freier Zeitraum), entfällt die Grafik.
+   */
+  ytdCompare?: {
+    /** Letzter kumulierter Monat (1..12); 0 ⇒ leeres Fenster ⇒ Hinweis. */
+    throughMonth: number;
+    years: number[];
+    series: Array<{ name: string; values: Array<number | null> }>;
+    incompleteYears: number[];
   };
   comparison: Array<{
     locationName: string;

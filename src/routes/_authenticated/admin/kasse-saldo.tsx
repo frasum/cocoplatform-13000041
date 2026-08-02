@@ -29,6 +29,7 @@ import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { downloadBlob } from "@/lib/time/weekly-export";
 import { formatShortDate } from "@/lib/format-date";
 import { listLocations } from "@/lib/admin/locations.functions";
+import { filterCashEnabled } from "@/lib/locations/cash-enabled";
 import { LocationPills } from "@/components/shared/LocationPills";
 import { toast } from "sonner";
 

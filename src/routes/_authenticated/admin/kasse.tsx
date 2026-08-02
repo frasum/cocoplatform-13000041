@@ -172,10 +172,7 @@ function KassePage() {
 
   // LS1: Die Kasse kennt nur Standorte mit Kassenbetrieb. Reine
   // Planungs-Standorte (cash_enabled = false) erscheinen hier nicht.
-  const cashLocations = useMemo(
-    () => filterCashEnabled(locationsQ.data ?? []),
-    [locationsQ.data],
-  );
+  const cashLocations = useMemo(() => filterCashEnabled(locationsQ.data ?? []), [locationsQ.data]);
 
   useEffect(() => {
     if (!locationId && cashLocations.length > 0) {

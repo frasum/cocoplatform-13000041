@@ -669,7 +669,7 @@ export const setLocationCashEnabled = createServerFn({ method: "POST" })
         "setLocationCashEnabled.load",
       );
       if (!loc) throw new Error("Standort nicht gefunden.");
-      const alreadyInState = loc.cash_enabled !== false === data.cashEnabled;
+      const alreadyInState = (loc.cash_enabled !== false) === data.cashEnabled;
       expectVoid(
         await supabaseAdmin
           .from("locations")

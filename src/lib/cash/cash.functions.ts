@@ -292,10 +292,7 @@ export async function assertLocationInOrg(orgId: string, locationId: string): Pr
 // LS1 — Kassenbetrieb: Standorte mit `cash_enabled = false` sind reine
 // Planungs-Standorte. Neue Sessions dürfen dort nicht entstehen; Dienstplan,
 // Zeiterfassung und Lohn bleiben unberührt.
-export async function assertLocationCashEnabled(
-  orgId: string,
-  locationId: string,
-): Promise<void> {
+export async function assertLocationCashEnabled(orgId: string, locationId: string): Promise<void> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     // ST1: bewusst ungefiltert — Daten-Zugriff (by id).

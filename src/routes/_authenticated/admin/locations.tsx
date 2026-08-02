@@ -642,8 +642,8 @@ function LocationSectionPanel(props: {
           <span>
             <span className="font-medium text-foreground">Kassenbetrieb &amp; Auswertungen</span>
             <span className="block text-xs text-muted-foreground">
-              Aus: Standort erscheint nicht in Tagesabrechnung, Saldoliste und Statistik. Dienstplan,
-              Zeiterfassung und Lohn bleiben unverändert.
+              Aus: Standort erscheint nicht in Tagesabrechnung, Saldoliste und Statistik.
+              Dienstplan, Zeiterfassung und Lohn bleiben unverändert.
             </span>
           </span>
         </label>

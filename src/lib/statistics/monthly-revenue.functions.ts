@@ -80,10 +80,10 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
     const locations = (locRows ?? [])
       .filter((l) => l.cash_enabled !== false)
       .map((l) => ({
-      id: l.id as string,
-      name: l.name as string,
-      inactive: l.is_active === false,
-    }));
+        id: l.id as string,
+        name: l.name as string,
+        inactive: l.is_active === false,
+      }));
 
     // 2) Legacy-Historie (< LIVE_FROM; die Grenze zieht `mergeMonthlyCells`).
     const legacyRows = await selectAllPaged<{

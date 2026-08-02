@@ -351,7 +351,7 @@ describe("groupedBarChartGeometry", () => {
     expect(grp.x + grp.width / 2).toBeCloseTo(area.x + area.width / 2, 6);
   });
 
-  it("alle Werte gleich ⇒ gleiche Höhe, volle Fläche", () => {
+  it("alle Werte gleich ⇒ gleiche Höhe, Skala schließt oberhalb ab", () => {
     const g = groupedBarChartGeometry(
       [
         { label: "a", values: [500, 500] },
@@ -359,8 +359,13 @@ describe("groupedBarChartGeometry", () => {
       ],
       area,
     );
+    // STAT3g — die Fläche endet am obersten Rasterwert, nicht am Datenmaximum:
+    // gleiche Werte ⇒ gleiche Höhe, aber Kopfraum bis zum Tick.
+    const top = topTick(g.ticks);
+    expect(top).toBeGreaterThanOrEqual(500);
     for (const grp of g.groups)
-      for (const b of grp.bars) expect(b.height).toBeCloseTo(area.height, 6);
+      for (const b of grp.bars)
+        expect(b.height).toBeCloseTo(area.height * (500 / top), 6);
   });
 
   it("Skala beginnt bei 0, auch wenn alle Werte hoch liegen (keine Baseline)", () => {

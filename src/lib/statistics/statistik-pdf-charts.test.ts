@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   barChartGeometry,
   formatTsd,
+  groupedBarChartGeometry,
   lineChartGeometry,
   monthWindow,
   niceTicks,
@@ -259,6 +260,89 @@ describe("stackedBarChartGeometry", () => {
   it("leere Reihenliste ergibt keine Stapel", () => {
     const g = stackedBarChartGeometry([], area);
     expect(g.stacks).toEqual([]);
+    expect(g.max).toBe(0);
+  });
+});
+
+// STAT3f — gruppierte Balken (Jahre × Standorte), Skala zwingend 0-basiert.
+describe("groupedBarChartGeometry", () => {
+  const groups = [
+    { label: "2025", values: [100, 50] },
+    { label: "2026", values: [200, 150] },
+  ];
+
+  it("Gruppen und Balken füllen die Fläche ohne Überlappung", () => {
+    const g = groupedBarChartGeometry(groups, area, { seriesNames: ["spicery", "YUM"] });
+    const slot = area.width / 2;
+    expect(g.groups).toHaveLength(2);
+    for (const grp of g.groups) {
+      expect(grp.width).toBeCloseTo(slot * 0.75, 6);
+      expect(grp.bars).toHaveLength(2);
+      expect(grp.bars[0]!.x).toBeGreaterThanOrEqual(area.x - 1e-9);
+      // Balken liegen lückenlos aneinander, aber innerhalb der Gruppe.
+      expect(grp.bars[0]!.x + grp.bars[0]!.width).toBeCloseTo(grp.bars[1]!.x, 6);
+      expect(grp.bars[1]!.x + grp.bars[1]!.width).toBeCloseTo(grp.x + grp.width, 6);
+    }
+    // Gruppen überlappen nicht.
+    const first = g.groups[0]!;
+    expect(first.x + first.width).toBeLessThanOrEqual(g.groups[1]!.x + 1e-9);
+    expect(g.groups[0]!.bars[0]!.name).toBe("spicery");
+    expect(g.groups[0]!.bars[1]!.name).toBe("YUM");
+  });
+
+  it("Maximum füllt die Höhe, alles skaliert linear ab 0", () => {
+    const g = groupedBarChartGeometry(groups, area);
+    expect(g.max).toBe(200);
+    expect(g.groups[1]!.bars[0]!.height).toBeCloseTo(60, 6);
+    expect(g.groups[0]!.bars[0]!.height).toBeCloseTo(30, 6);
+    for (const grp of g.groups)
+      for (const b of grp.bars) expect(b.y + b.height).toBeCloseTo(area.y + area.height, 6);
+  });
+
+  it("null bleibt Lücke (kein 0-Balken)", () => {
+    const g = groupedBarChartGeometry([{ label: "2022", values: [null, 100] }], area);
+    const bars = g.groups[0]!.bars;
+    expect(bars[0]!.value).toBeNull();
+    expect(bars[0]!.height).toBe(0);
+    expect(Number.isNaN(bars[0]!.y)).toBe(false);
+    expect(bars[1]!.value).toBe(100);
+  });
+
+  it("ein einziges Jahr sitzt mittig in der Fläche", () => {
+    const g = groupedBarChartGeometry([{ label: "2026", values: [10, 20] }], area);
+    const grp = g.groups[0]!;
+    expect(grp.x + grp.width / 2).toBeCloseTo(area.x + area.width / 2, 6);
+  });
+
+  it("alle Werte gleich ⇒ gleiche Höhe, volle Fläche", () => {
+    const g = groupedBarChartGeometry(
+      [
+        { label: "a", values: [500, 500] },
+        { label: "b", values: [500, 500] },
+      ],
+      area,
+    );
+    for (const grp of g.groups)
+      for (const b of grp.bars) expect(b.height).toBeCloseTo(area.height, 6);
+  });
+
+  it("Skala beginnt bei 0, auch wenn alle Werte hoch liegen (keine Baseline)", () => {
+    const g = groupedBarChartGeometry(
+      [
+        { label: "a", values: [980_000] },
+        { label: "b", values: [1_000_000] },
+      ],
+      area,
+      { tickCount: 4 },
+    );
+    expect(g.ticks[0]!.value).toBe(0);
+    expect(g.ticks[0]!.y).toBeCloseTo(area.y + area.height, 6);
+    expect(g.groups[0]!.bars[0]!.height).toBeCloseTo(area.height * 0.98, 6);
+  });
+
+  it("leere Eingabe ergibt keine Gruppen", () => {
+    const g = groupedBarChartGeometry([], area);
+    expect(g.groups).toEqual([]);
     expect(g.max).toBe(0);
   });
 });

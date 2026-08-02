@@ -259,6 +259,8 @@ export type LineSeriesGeometry = {
 export type LineGeometry = {
   series: LineSeriesGeometry[];
   max: number;
+  /** Untere Skalengrenze (0 = ungeschnittene Achse). */
+  baseline: number;
   ticks: AxisTick[];
   /** x-Positionen der Rasterpunkte (für Monatskürzel). */
   slotX: number[];
@@ -267,14 +269,24 @@ export type LineGeometry = {
 /**
  * Punktgeometrie für eine oder mehrere Reihen über dieselbe Zeitachse. Die
  * Skala ist reihenübergreifend (Standorte bleiben vergleichbar).
+ *
+ * STAT3e — `baseline: "nice"` schneidet die Achse am größten runden Wert unter
+ * dem Datenminimum (siehe `niceTicks`). Nur für LINIEN erlaubt; Balken bleiben
+ * grundsätzlich 0-basiert, weil dort die Fläche den Wert trägt.
  */
 export function lineChartGeometry(
   series: ReadonlyArray<{ name: string; values: ReadonlyArray<number | null> }>,
   area: ChartArea,
-  opts?: { tickCount?: number },
+  opts?: { tickCount?: number; baseline?: "nice" | 0 },
 ): LineGeometry {
   const count = series.reduce((acc, s) => Math.max(acc, s.values.length), 0);
   const max = maxOf(series.flatMap((s) => [...s.values]));
+  const tickCount = opts?.tickCount ?? 3;
+  const baseline =
+    opts?.baseline === "nice"
+      ? niceTicks(minOf(series.flatMap((s) => [...s.values])), max, tickCount).baseline
+      : 0;
+  const span = max - baseline;
   const slotX: number[] = [];
   for (let i = 0; i < count; i++) {
     slotX.push(count === 1 ? area.x + area.width / 2 : area.x + (i * area.width) / (count - 1));
@@ -286,12 +298,12 @@ export function lineChartGeometry(
       const raw = s.values[index];
       if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
       const value = safeValue(raw);
-      const height = max > 0 ? (value / max) * area.height : 0;
+      const height = span > 0 ? (Math.max(0, value - baseline) / span) * area.height : 0;
       return { index, value, x: slotX[index] ?? area.x, y: area.y + area.height - height };
     }),
   }));
 
-  return { series: out, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3), slotX };
+  return { series: out, max, baseline, ticks: ticksFor(max, area, tickCount, baseline), slotX };
 }
 
 export type MonthSlot = { year: number; month: number; key: string; label: string };

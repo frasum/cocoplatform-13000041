@@ -42,6 +42,14 @@ function weekdayShort(iso: string): string {
   return WEEKDAYS[idx] ?? "—";
 }
 
+/**
+ * EV1-R4: „Heute" nur, wenn der gewählte Geschäftstag der echte aktuelle ist;
+ * sonst das Wochentagskürzel wie in den übrigen Spalten.
+ */
+export function firstColumnLabel(selectedIso: string, actualTodayIso: string): string {
+  return selectedIso === actualTodayIso ? "Heute" : weekdayShort(selectedIso);
+}
+
 function temps(row: WeatherRangeRow): string {
   if (row.tempMaxC === null && row.tempMinC === null) return "—";
   const fmt = (v: number | null) => (v === null ? "—" : `${Math.round(v)}°`);
@@ -55,9 +63,11 @@ function rain(row: WeatherRangeRow): string | null {
 
 export function WeatherWidget({
   today,
+  actualToday,
   rows,
 }: {
   today: string;
+  actualToday: string;
   rows: readonly WeatherRangeRow[];
 }) {
   const days = [0, 1, 2, 3, 4, 5, 6].map((offset) => shiftIsoDate(today, offset));
@@ -86,7 +96,7 @@ export function WeatherWidget({
               title={row ? sym.label : "kein Sync-Datenstand"}
             >
               <span className="text-[9px] font-medium leading-tight text-amber-900/70 dark:text-amber-100/70">
-                {i === 0 ? "Heute" : weekdayShort(iso)}
+                {i === 0 ? firstColumnLabel(iso, actualToday) : weekdayShort(iso)}
               </span>
               <Icon
                 className="h-3.5 w-3.5 text-amber-900 dark:text-amber-100"

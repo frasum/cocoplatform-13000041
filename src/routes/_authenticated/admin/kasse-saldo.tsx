@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { getCashDailyBreakdown, type CashDailyRow } from "@/lib/cash/cash.functions";
 import { buildBargeldXlsx } from "@/lib/cash/bargeld-export";
+import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { downloadBlob } from "@/lib/time/weekly-export";
 import { formatShortDate } from "@/lib/format-date";
 import { listLocations } from "@/lib/admin/locations.functions";
@@ -91,7 +92,8 @@ function monthRange(year: number, month: number): { fromDate: string; toDate: st
 }
 
 function KasseSaldoPage() {
-  const now = useMemo(() => new Date(), []);
+  // Monatsnavigation folgt dem Geschäftstag (3-Uhr-Cut), nicht dem Kalendertag.
+  const now = useMemo(() => cashBusinessMonthAnchor(new Date()), []);
   const months = useMemo(() => buildMonthOptions(now), [now]);
   const [monthKey, setMonthKey] = useState<string>(months[0].key);
   const [locationId, setLocationId] = useState<string | null>(null);

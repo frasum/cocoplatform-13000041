@@ -165,9 +165,11 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     expect(texts).toContain(eurPdf(EXPECTED.totalCents));
 
     // STAT3b — Kanalzeilen stehen in der Tabelle und stammen aus demselben Donut.
+    // STAT3e — im PDF trägt die Zeile das Kurzlabel; das Datenmodell bleibt lang.
     const cells = captured.flatMap((t) => t.body.map((r) => r.map(cell)));
     const woltRow = cells.find((r) => r[0] === "Wolt");
-    const directRow = cells.find((r) => r[0] === "Takeaway direkt (Telefon/Abholung)");
+    const directRow = cells.find((r) => r[0] === "Direkt (Tel./Abholung)");
+    expect(donut.segments[1]!.name).toBe("Takeaway direkt (Telefon/Abholung)");
     expect(woltRow?.[1]).toBe(eurPdf(donut.segments[0]!.amountCents));
     expect(directRow?.[1]).toBe(eurPdf(donut.segments[1]!.amountCents));
     expect(cells.find((r) => r[0] === "Take-Away gesamt")?.[1]).toBe(

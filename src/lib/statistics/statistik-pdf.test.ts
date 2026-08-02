@@ -489,7 +489,22 @@ describe("statistik-pdf — Delta-Färbung und Labels (STAT3e)", () => {
   it("Spaltenkopf der Personalquote ist eindeutig benannt", async () => {
     captured.length = 0;
     texts.length = 0;
-    await generateStatistikPdf(baseData({}));
+    await generateStatistikPdf(
+      baseData({
+        comparison: [
+          {
+            locationName: "Spicery",
+            totalCents: 100_000,
+            tipTotalCents: 1_000,
+            ratioPct: 28.8,
+            netHours: 10,
+            laborCostCents: 1_000,
+            hasMissingRate: false,
+            tipRatePct: 8.9,
+          },
+        ],
+      }),
+    );
     const heads = captured.flatMap((t) =>
       (t.head ?? []).map((r) => r.map((c) => (typeof c === "string" ? c : c.content))),
     );

@@ -345,6 +345,52 @@ export async function generateStatistikPdf(
 
   let cursorY = boxY + boxH + 18;
 
+  // STAT3c/3f/3g — EINE Farbzuordnung und EINE Legenden-Funktion für alle
+  // Grafiken: erst die Monatsreihen (Grafik B), dann die Standorte der
+  // Tagesbalken, dann die YTD-Reihen. Gleicher Standort ⇒ gleiche Farbe in
+  // jeder Grafik. Steht bewusst vor dem ersten Block, damit die Reihenfolge der
+  // gezeichneten Blöcke die Farbzuordnung nicht verschiebt.
+  const seriesColorIndex = new Map<string, number>();
+  const registerSeries = (name: string) => {
+    if (!seriesColorIndex.has(name)) seriesColorIndex.set(name, seriesColorIndex.size);
+  };
+  (data.monthly?.series ?? []).forEach((s) => registerSeries(s.name));
+  // Standortnamen der Tagesbalken in Reihenfolge des ersten Auftretens.
+  const stackNames: string[] = [];
+  for (const day of data.dailyRevenue) {
+    for (const entry of day.byLocation ?? []) {
+      if (!stackNames.includes(entry.name)) stackNames.push(entry.name);
+    }
+  }
+  stackNames.forEach(registerSeries);
+  (data.ytdCompare?.series ?? []).forEach((s) => registerSeries(s.name));
+  const colorOf = (name: string): [number, number, number] =>
+    SERIES_PALETTE[(seriesColorIndex.get(name) ?? 0) % SERIES_PALETTE.length]!;
+  /**
+   * STAT3e — Legende rechtsbündig auf der Titelzeile: erst Breite messen, dann
+   * am rechten Rand beginnen. So klebt sie nie an der Abschnittsüberschrift.
+   */
+  const drawLegend = (
+    names: string[],
+    y: number,
+    marker: (x: number, y: number, color: [number, number, number]) => void,
+  ) => {
+    doc.setFontSize(6.5);
+    doc.setFont("helvetica", "normal");
+    const widths = names.map((n) => doc.getTextWidth(n));
+    let total = 0;
+    for (const w of widths) total += w + 16;
+    let x = marginX + usable - total + 4;
+    names.forEach((name, i) => {
+      const c = colorOf(name);
+      marker(x, y, c);
+      doc.setTextColor(60);
+      doc.text(name, x + 6, y + 3);
+      x += 16 + (widths[i] ?? 0);
+    });
+    doc.setTextColor(20);
+  };
+
   // ── Standort-Vergleich (die wichtigste Tabelle: zuerst) ─────────────────
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");

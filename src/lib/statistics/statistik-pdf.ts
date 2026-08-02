@@ -191,6 +191,48 @@ const MONTH_NAMES_LONG = [
   "Dezember",
 ];
 
+/**
+ * STAT3i — Nutzbreite einer A4-Seite in Punkt (595 − 2 × 36 Rand). Als Konstante
+ * exportiert, damit Tests die Breite einzeiliger Wertezeilen dagegen messen
+ * können, ohne jsPDF zu instanziieren.
+ */
+export const PDF_USABLE_WIDTH = 523;
+
+/** STAT3i — Überschrift der Modell-Ergebniszeile (Test- und Zeichen-Quelle). */
+export const PRE_TAX_HEADING = "Ergebnis vor Steuern (Modell)";
+
+/**
+ * STAT3i — Trinkgeld-Einzeiler als reiner Text (nur Formatierung, keine Logik).
+ * Quoten kommen ausschließlich aus `tipRatePct`.
+ */
+export function tipSummaryText(
+  tips: StatistikPdfData["tips"],
+  houseCents: number,
+): string {
+  return (
+    `Service ${fmtEurRounded(tips.serviceCents)} (${fmtPctDe(
+      tipRatePct(tips.serviceCents, houseCents),
+    )} vom Haus) · Küche ${fmtEurRounded(tips.kitchenCents)} (${fmtPctDe(
+      tipRatePct(tips.kitchenCents, houseCents),
+    )}) · Gesamt ${fmtEurRounded(tips.totalCents)} (${fmtPctDe(
+      tipRatePct(tips.totalCents, houseCents),
+    )})`
+  );
+}
+
+/**
+ * STAT3i — Text NACH dem gefärbten Betrag der Modell-Ergebniszeile.
+ *
+ * Bewusst nur WinAnsi-Zeichen: das typografische Minus (U+2212) hat jsPDF in
+ * einen Ersatzzeichen-/Sperrsatz-Modus gezwungen (siehe assertWinAnsiSafe im
+ * Test). Trenner ist derselbe Mittelpunkt wie in der Trinkgeld-Zeile.
+ */
+export function preTaxTailText(preTax: NonNullable<StatistikPdfData["preTaxModel"]>): string {
+  return `· netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
+    preTax.breakEvenMonthCents,
+  )} · DB-Quote ${fmtPctDe(preTax.dbPct)}`;
+}
+
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
   return cents === null || cents === undefined ? "—" : fmtEurRounded(cents);

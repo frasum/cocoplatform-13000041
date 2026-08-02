@@ -10,6 +10,7 @@ import {
   findPrevMonth,
   findYoy,
   OPEN_DAYS_PER_MONTH,
+  INHOUSE_FOOD_REDUCED_FROM,
   sumRows,
   sumSachkostenDetail,
 } from "./bwa-analytics";
@@ -207,11 +208,87 @@ describe("computeBreakEven", () => {
   });
 });
 
+describe("BWA-V1: USt-Zuordnung Haus-Speisen ab 2026-01", () => {
+  // Ein Monat mit fixem Erlösmix; Kosten so, dass db > 0.
+  const mk = (month: string) =>
+    row({
+      month,
+      umsatzCents: 100_000_00,
+      getraenkeCents: 40_000_00,
+      sonstigeErloeseCents: 10_000_00,
+      speisenHausCents: 30_000_00,
+      speisenAusserHausCents: 20_000_00,
+      wareneinsatzCents: 30_000_00,
+      personalCents: 40_000_00,
+      sachkostenCents: 10_000_00,
+    });
+
+  const months = (year: number, count: number, from = 1) =>
+    Array.from({ length: count }, (_, i) => mk(`${year}-${String(from + i).padStart(2, "0")}-01`));
+
+  it("Stichtags-Konstante ist 2026-01", () => {
+    expect(INHOUSE_FOOD_REDUCED_FROM).toBe("2026-01");
+  });
+
+  it("reine Alt-Periode (12 × 2025): factor wie bisher (Haus-Speisen 19 %)", () => {
+    const be = computeBreakEven(months(2025, 12));
+    if (!be) throw new Error("unreachable");
+    // Σ pro Monat: rev19 = 40+10+30 = 80k, rev7 = 20k
+    const vatPerMonth = 80_000_00 * 0.19 + 20_000_00 * 0.07;
+    const expected = (100_000_00 * 12 + vatPerMonth * 12) / (100_000_00 * 12);
+    expect(be.factor).toBeCloseTo(expected, 12);
+    expect(be.factorCurrent).toBeNull();
+    // Netto-Pfade unberührt
+    expect(be.db).toBeCloseTo(0.7, 12);
+    expect(be.netMonthCents).toBe(Math.round(50_000_00 / 0.7));
+  });
+
+  it("reine Neu-Periode (12 × 2026): Haus-Speisen mit 7 %, factorCurrent === factor", () => {
+    const be = computeBreakEven(months(2026, 12));
+    if (!be) throw new Error("unreachable");
+    const vatPerMonth = 50_000_00 * 0.19 + 50_000_00 * 0.07;
+    const expected = (100_000_00 * 12 + vatPerMonth * 12) / (100_000_00 * 12);
+    expect(be.factor).toBeCloseTo(expected, 12);
+    expect(be.factorCurrent).not.toBeNull();
+    expect(be.factorCurrent).toBeCloseTo(be.factor, 12);
+  });
+
+  it("Mischperiode 5 × 2025 + 7 × 2026: monatsgenaue Summe, factorCurrent nur aus 2026", () => {
+    const rows = [...months(2025, 5, 8), ...months(2026, 7)];
+    const be = computeBreakEven(rows);
+    if (!be) throw new Error("unreachable");
+    const vatOld = 80_000_00 * 0.19 + 20_000_00 * 0.07;
+    const vatNew = 50_000_00 * 0.19 + 50_000_00 * 0.07;
+    const rev = 100_000_00 * 12;
+    expect(be.factor).toBeCloseTo((rev + (5 * vatOld + 7 * vatNew)) / rev, 12);
+    expect(be.factorCurrent).toBeCloseTo((100_000_00 * 7 + 7 * vatNew) / (100_000_00 * 7), 12);
+  });
+
+  it("Fenster komplett vor Stichtag: factorCurrent null ⇒ STAT3h liefert null", () => {
+    const be = computeBreakEven(months(2025, 12));
+    if (!be) throw new Error("unreachable");
+    expect(be.factorCurrent).toBeNull();
+    expect(estimatedPreTaxResultCents(300_000_00, be)).toBeNull();
+  });
+
+  it("STAT3h rechnet mit factorCurrent: höheres Ergebnis als mit dem Misch-factor", () => {
+    const rows = [...months(2025, 5, 8), ...months(2026, 7)];
+    const be = computeBreakEven(rows);
+    if (!be) throw new Error("unreachable");
+    const gross = 344_774_00;
+    const withCurrent = estimatedPreTaxResultCents(gross, be);
+    const withMix = Math.round(be.db * (gross / be.factor - be.netMonthCents));
+    expect(withCurrent).not.toBeNull();
+    expect(withCurrent ?? 0).toBeGreaterThan(withMix);
+  });
+});
+
 describe("estimatedPreTaxResultCents (STAT3h)", () => {
   const be = (o: Partial<BreakEven>): BreakEven => ({
     v: 0.3,
     db: 0.7,
     factor: 1.163,
+    factorCurrent: 1.163,
     months: 12,
     netMonthCents: 280_835_00,
     netDayCents: 0,

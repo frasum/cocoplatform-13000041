@@ -500,10 +500,12 @@ function StatistikPage() {
       : null;
     const resultCents = estimatedPreTaxResultCents(rev.summary.totalCents, be);
     const preTaxModel =
-      be && resultCents !== null
+      be && resultCents !== null && be.factorCurrent
         ? {
             resultCents,
-            netRevenueCents: Math.round(rev.summary.totalCents / be.factor),
+            // BWA-V1: Netto-Umrechnung mit dem Faktor nach aktuellem
+            // Regelstand — identische Quelle wie in `resultCents`.
+            netRevenueCents: Math.round(rev.summary.totalCents / be.factorCurrent),
             breakEvenMonthCents: be.netMonthCents,
             dbPct: be.db * 100,
           }

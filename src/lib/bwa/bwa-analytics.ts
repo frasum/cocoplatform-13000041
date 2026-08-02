@@ -23,6 +23,25 @@ export const OPEN_DAYS_PER_MONTH = 30;
 export const VAT_STANDARD = 0.19;
 export const VAT_REDUCED = 0.07;
 
+/** Ab diesem Monat gilt der ermäßigte Satz (7 %) auch für Speisen IM Haus
+ *  (bundesgesetzliche dauerhafte Senkung ab 01.01.2026; Getränke bleiben 19 %).
+ *  Bauherren-Bestätigung + BWA-Beleg 02.08.2026. */
+export const INHOUSE_FOOD_REDUCED_FROM = "2026-01";
+
+/** True, wenn für den ISO-Monat (YYYY-MM-01 oder YYYY-MM) Haus-Speisen mit
+ *  7 % zu bewerten sind. */
+function inhouseFoodReduced(month: string): boolean {
+  return month.slice(0, 7) >= INHOUSE_FOOD_REDUCED_FROM;
+}
+
+/** USt-Betrag einer einzelnen Monatszeile nach dem im Monat gültigen Recht. */
+function monthVatCents(r: BwaRow): number {
+  const reduced = inhouseFoodReduced(r.month);
+  const rev19 = r.getraenkeCents + r.sonstigeErloeseCents + (reduced ? 0 : r.speisenHausCents);
+  const rev7 = r.speisenAusserHausCents + (reduced ? r.speisenHausCents : 0);
+  return rev19 * VAT_STANDARD + rev7 * VAT_REDUCED;
+}
+
 const CENT_KEYS = [
   "umsatzCents",
   "getraenkeCents",
@@ -181,6 +200,10 @@ export type BreakEven = {
   v: number; // variabler Kostenanteil (WES/Umsatz)
   db: number; // Deckungsbeitragsquote (1 - v)
   factor: number; // Brutto-Faktor aus tatsächlichem USt-Mix
+  /** USt-Faktor nach aktuellem Regelstand: Erlösmix NUR der Monate ab dem
+   *  jüngsten Regelwechsel (>= INHOUSE_FOOD_REDUCED_FROM). null, wenn keine
+   *  solchen Monate im Fenster liegen. */
+  factorCurrent: number | null;
   months: number;
   netMonthCents: number;
   netDayCents: number;
@@ -192,7 +215,9 @@ export type BreakEven = {
 
 /** Rollierender Break-even über bis zu 12 Monate. Fix-Block konservativ =
  *  Personal + Sachkosten + Anlage + Abschreibung; variabel = Wareneinsatz.
- *  USt-Faktor aus dem echten Erlös-Mix der übergebenen Monate.
+ *  USt-Faktor aus dem echten Erlös-Mix der übergebenen Monate, monatsgenau
+ *  nach dem jeweils gültigen Satz für Haus-Speisen (siehe
+ *  INHOUSE_FOOD_REDUCED_FROM).
  *
  *  Sortierung des Inputs ist egal — intern wird absteigend nach `month`
  *  sortiert; gerechnet werden die 12 NEUESTEN Monate. */
@@ -217,10 +242,20 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
   const netMonthCents = bePeriodCents / months;
   const netDayCents = netMonthCents / OPEN_DAYS_PER_MONTH;
 
-  const rev19 = s.getraenkeCents + s.sonstigeErloeseCents + s.speisenHausCents;
-  const rev7 = s.speisenAusserHausCents;
-  const vat = rev19 * VAT_STANDARD + rev7 * VAT_REDUCED;
+  // USt monatsgenau: Haus-Speisen erst ab dem Stichtag mit 7 %.
+  let vat = 0;
+  for (const r of last12) vat += monthVatCents(r);
   const factor = (s.umsatzCents + vat) / s.umsatzCents;
+
+  // Faktor nach aktuellem Regelstand: nur Monate ab dem Stichtag.
+  const currentRows = last12.filter((r) => inhouseFoodReduced(r.month));
+  const currentRevenue = currentRows.reduce((a, r) => a + r.umsatzCents, 0);
+  let factorCurrent: number | null = null;
+  if (currentRows.length > 0 && currentRevenue > 0) {
+    let vatCur = 0;
+    for (const r of currentRows) vatCur += monthVatCents(r);
+    factorCurrent = (currentRevenue + vatCur) / currentRevenue;
+  }
 
   const grossMonthCents = netMonthCents * factor;
   const grossDayCents = netDayCents * factor;
@@ -232,6 +267,7 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
     v,
     db,
     factor,
+    factorCurrent,
     months,
     netMonthCents: Math.round(netMonthCents),
     netDayCents: Math.round(netDayCents),
@@ -243,20 +279,23 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
 }
 
 /** STAT3h — Modell-Ergebnis vor Steuern für einen Monat:
- *  `db × (grossRevenueCents / factor − netMonthCents)`.
+ *  `db × (grossRevenueCents / factorCurrent - netMonthCents)`.
  *
  *  `grossRevenueCents` ist der Kassenumsatz brutto des Monats; die Umrechnung
- *  auf netto läuft über den USt-Mix-Faktor des übergebenen Break-even. Oberhalb
+ *  auf netto läuft über `be.factorCurrent`, also den USt-Mix NUR der Monate nach
+ *  aktuellem Regelstand — der Misch-`factor` würde Alt-Monate mit 19 % auf
+ *  Haus-Speisen mitschleppen. Fehlt `factorCurrent`, gibt die Funktion `null`
+ *  zurück (kein Rechnen mit veraltetem Mix). Oberhalb
  *  des Break-even trägt jeder Euro nur seinen Deckungsbeitrag, deshalb ist es
- *  NICHT die nackte Differenz Umsatz − BE. Negative Ergebnisse (Monat unter dem
+ *  NICHT die nackte Differenz Umsatz - BE. Negative Ergebnisse (Monat unter dem
  *  Break-even) werden bewusst zurückgegeben. `null` bei fehlendem BE. */
 export function estimatedPreTaxResultCents(
   grossRevenueCents: number,
   be: BreakEven | null,
 ): number | null {
   if (be === null) return null;
-  if (be.factor <= 0) return null;
-  const netRevenue = grossRevenueCents / be.factor;
+  if (be.factorCurrent === null || be.factorCurrent <= 0) return null;
+  const netRevenue = grossRevenueCents / be.factorCurrent;
   return Math.round(be.db * (netRevenue - be.netMonthCents));
 }
 

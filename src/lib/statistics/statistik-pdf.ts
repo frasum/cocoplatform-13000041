@@ -519,6 +519,34 @@ export async function generateStatistikPdf(
   doc.text(tipLine, marginX + 90, cursorY);
   cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
 
+  // ── STAT3h — Ergebnis vor Steuern (Modell) ───────────────────────────────
+  // Einzeiler im Stil der Trinkgeld-Zeile. Der Betrag ist ein Bewertungswert,
+  // deshalb dieselbe Färbung wie Deltas (positiv grün, negativ rot).
+  const preTax = data.preTaxModel;
+  if (preTax) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Ergebnis vor Steuern (Modell)", marginX, cursorY);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    const amount = fmtEurRounded(preTax.resultCents);
+    const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    doc.setTextColor(tone[0], tone[1], tone[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text(amount, marginX + 150, cursorY);
+    const amountWidth = doc.getTextWidth(amount);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(20);
+    const preTaxLine = doc.splitTextToSize(
+      `· Umsatz netto ${fmtEurRounded(preTax.netRevenueCents)} − Break-even ${fmtEurRounded(
+        preTax.breakEvenMonthCents,
+      )} netto, davon ${fmtPctDe(preTax.dbPct)} Deckungsbeitrag`,
+      usable - 150 - amountWidth - 8,
+    );
+    doc.text(preTaxLine, marginX + 150 + amountWidth + 8, cursorY);
+    cursorY += BLOCK_GAP + 8 * ((Array.isArray(preTaxLine) ? preTaxLine.length : 1) - 1);
+  }
+
   // ── STAT3b — Take-Away-Kanäle (je Standort, Gesamt, Δ Vorperiode) ───────
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");

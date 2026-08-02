@@ -213,6 +213,7 @@ export const setLocationActive = createServerFn({ method: "POST" })
   .inputValidator((input) =>
     z.object({ locationId: z.string().uuid(), isActive: z.boolean() }).parse(input),
   )
+  // LS1: separater Schalter für „Kassenbetrieb & Auswertungen" siehe unten.
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
     return runGuarded(caller.role, "admin", makeAuditWriter(caller), async () => {

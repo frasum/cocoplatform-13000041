@@ -4875,6 +4875,20 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 
 **Tages-Schlussstand 02.08.:** Anker-Kette des Tages `ac451209` → `a9e850a5` → `0427ad99` → `921717b7` → `80bfade5` → `5d5f118c` → `cd4ca486` → `55530025`. Geliefert: Statistik-PDF-Feinschliff komplett (inkl. BWA-USt-Fund), EV1 Event-Hinweise komplett, WX1/WX2 Wetterdaten + Kassen-Kopfzeile, KA1 Geschäftstags-Fix. Offene Rest-Handgriffe des Bauherrn: `weather_code`-Re-Backfill + Sync (Fragezeichen im Widget verschwinden dann) · Testevent „Test Späte Veranstaltung“ löschen · staff-Gegenprobe an der Kasse. Kritischer Pfad unverändert: **August-Export** (bis 25.08., mit Prüfer-Sichtkontrolle) → **CODE-AUDIT-1** → **PG-Serie**.
 
+## §131 — Drei Merkmale in einem Zug: Ursula, Ferien, TSB (02.08., abends)
+
+**Abnahme-Anker:** HEAD `cba498e9` — vier Gates grün (tsc 0 · eslint 0 · prettier clean · vitest 2378, 0 Skips; 2338 + 40).
+
+**RS1 (`afc97e8d`) — `staff.roster_plannable`:** Feste-Zeiten-Kräfte (Anlass: Ursula, PN 30, arbeitet fix sonntags) erscheinen nicht in Planungsansichten; Zeiterfassung/Lohn unberührt. EINE geteilte pure Funktion `filterPlannable` in allen drei Personenquellen (Roster, Display/TRMNL, Tausch-Kandidaten — Tausch gefiltert per Prüfer-Empfehlung: keine Schichten durch die Hintertür). Stammdaten-Schalter nach dem `participates_in_pool`-Muster inkl. Audit. **Vorlauf-Anekdote als Lehre:** Der Bauherr führte die Skizzen-SQL VOR der Lovable-Runde aus — Lovables Bestandsmeldung fing den Konflikt (§104-Vorbild), die Migration wurde auf idempotenten Kommentar-Nachtrag reduziert. Skizzen tragen künftig den Vermerk „NICHT direkt ausführen“.
+
+**FK1 (`2da375b3`) — Schulferien Bayern als Code-Wahrheit:** `school-holidays.ts` mit sechs amtlichen Schuljahren 2024/25–2029/30 (BayMBl. 2022 Nr. 747, Quellvermerk je Block), Region-Parameter als SaaS-Erweiterungspunkt, KEINE Extrapolation (ab 2030 ⇒ `null`). Strikte Trennung von `bavarianHolidayMap` (Ferien haben keine Lohnwirkung). Ferien-Notices im EV1-Muster (Vortag/laufend Tag x/y) IN der Veranstaltungen-Karte, FERIEN-Badge außerhalb der Impact-Farben, ein Roundtrip (`{ events, schoolHolidays }`). Live-Beleg am Liefertag: „Morgen beginnen die Sommerferien“ (amtlicher Start 03.08. — die Nur-amtlich-Regel korrigierte die Prüfer-Annahme „laufen schon“). **PG0-Bilanz:** Events ✓ Wetter ✓ Ferien ✓ — offen: OpenLigaDB, Tageshistorien-Block.
+
+**LS1 (`90373da6`) — `locations.cash_enabled` („nur Planung“):** TSB wurde reaktiviert (Mitarbeiter Andre wird dort geplant), führt aber keine COCO-Kasse. Merkmal am Standort: Kassen-Standortwahl, `createSession` (serverseitige ABLEHNUNG — Verteidigung in der Tiefe), Statistik-Umschalter/Aggregation und MB1-Standortlisten filtern `cash_enabled`; Dienstplan/TRMNL/Zeiterfassung/Lohn unberührt. Standort-Verwaltung (`locations.tsx`) trägt den Schalter. Dreistufige Standort-/Personen-Systematik jetzt komplett: `is_active` → `cash_enabled` → `roster_plannable`. ⚠ **Merkposten LOHNBÜRO:** TSB ist eigene GmbH — Andres TSB-Stunden laufen über die YUM-Gastronomie-Abrechnung; Verrechnungsfrage (Personalgestellung) VOR dem August-Export beim Lohnbüro anfragen.
+
+**Produktions-Vollzug:** RS1-Kommentar- und LS1-Migration [ausstehend]; Ursula `roster_plannable=false` [ausstehend]; TSB `cash_enabled=false` [ausstehend].
+
+**Offene Merkposten:** wie §130, PLUS Lohnbüro-Anfrage TSB-Personalgestellung · Rest-Sichtprüfungen (staff-Gegenprobe Kasse; Ferien-Hinweis „Tag 1/43“ erscheint am 03.08. automatisch — beiläufig bestätigen).
+
 ## §132 — Kopfzeilen-Design, Lohn-Sichtbarkeit, Realtime-Härtung (02.08., abends)
 
 **Abnahme-Anker:** HEAD `f092b02e` — vier Gates grün (tsc 0 · eslint 0 · prettier clean · vitest 2383, 0 Skips).

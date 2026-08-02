@@ -4394,6 +4394,7 @@ export type Database = {
           participates_in_pool: boolean
           perso_nr: number | null
           phone: string | null
+          roster_plannable: boolean
           updated_at: string
         }
         Insert: {
@@ -4411,6 +4412,7 @@ export type Database = {
           participates_in_pool?: boolean
           perso_nr?: number | null
           phone?: string | null
+          roster_plannable?: boolean
           updated_at?: string
         }
         Update: {
@@ -4428,6 +4430,7 @@ export type Database = {
           participates_in_pool?: boolean
           perso_nr?: number | null
           phone?: string | null
+          roster_plannable?: boolean
           updated_at?: string
         }
         Relationships: [

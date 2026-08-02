@@ -92,6 +92,9 @@ function centsToEuroString(cents: number): string {
 import { SettlementsCard } from "@/components/cash/SettlementsCard";
 import { SessionFieldsCard } from "@/components/cash/SessionFieldsCard";
 import { EventNoticesBlock } from "@/components/cash/EventNoticesBlock";
+import { WeatherWidget } from "@/components/cash/WeatherWidget";
+import { listWeatherRange } from "@/lib/weather/weather.functions";
+import { shiftIsoDate } from "@/lib/weather/weather-core";
 import { listEventNoticesForToday } from "@/lib/events/events.functions";
 import { TipPoolCard } from "@/components/cash/TipPoolCard";
 import { activeSettlements, computeTipTotalCents } from "@/lib/cash/tip-pool";
@@ -191,14 +194,23 @@ function KassePage() {
   });
   const staffQ = useQuery({ queryKey: ["admin-staff"], queryFn: () => fetchStaff() });
 
-  // EV1-R2: Event-Hinweise (heute/morgen). Die Server-Function liefert für
-  // staff ohnehin leer; die UI rendert zusätzlich nur für manager/admin.
+  // EV1-R2/R3: Event-Hinweise (heute/morgen) und Wetter. Die Server-Functions
+  // liefern für staff/payroll ohnehin leer; die UI rendert zusätzlich nur für
+  // admin, manager und planer.
   const fetchEventNotices = useServerFn(listEventNoticesForToday);
-  const noticesEnabled = identity.role === "admin" || identity.role === "manager";
+  const headerCardsEnabled =
+    identity.role === "admin" || identity.role === "manager" || identity.role === "planer";
   const eventNoticesQ = useQuery({
     queryKey: ["events", "notices-today"],
     queryFn: () => fetchEventNotices(),
-    enabled: noticesEnabled,
+    enabled: headerCardsEnabled,
+  });
+  const fetchWeatherRange = useServerFn(listWeatherRange);
+  const weatherQ = useQuery({
+    queryKey: ["weather", "range", businessDate],
+    queryFn: () =>
+      fetchWeatherRange({ data: { from: businessDate, to: shiftIsoDate(businessDate, 3) } }),
+    enabled: headerCardsEnabled,
   });
 
   // Trinkgeld-Pool für die Finalize-Zusammenfassung. Gleicher Query-Key
@@ -588,7 +600,16 @@ function KassePage() {
 
       {ovQ.data?.session && (
         <>
-          {noticesEnabled && <EventNoticesBlock notices={eventNoticesQ.data ?? []} />}
+          {headerCardsEnabled && (
+            <div
+              className={
+                (eventNoticesQ.data?.length ?? 0) > 0 ? "grid gap-3 md:grid-cols-2" : "grid gap-3"
+              }
+            >
+              <EventNoticesBlock notices={eventNoticesQ.data ?? []} />
+              <WeatherWidget today={businessDate} rows={weatherQ.data ?? []} />
+            </div>
+          )}
 
           <SettlementWarningsBanner
             overview={ovQ.data}

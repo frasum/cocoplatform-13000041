@@ -9,6 +9,7 @@
 // Automatischer täglicher Sync (Cron) ist NICHT Teil dieser Runde — Merkposten.
 
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
@@ -59,10 +60,65 @@ function insertPayload(organizationId: string, row: WeatherDayRow): WeatherInser
     temp_min_c: row.tempMinC,
     precipitation_mm: row.precipitationMm,
     sunshine_hours: row.sunshineHours,
+    weather_code: row.weatherCode,
     source: row.source,
     fetched_at: new Date().toISOString(),
   };
 }
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum im Format YYYY-MM-DD erwartet");
+
+const rangeInput = z
+  .object({ from: isoDate, to: isoDate })
+  .refine((v) => v.from <= v.to, { message: "Von-Datum darf nicht nach dem Bis-Datum liegen." });
+
+export type WeatherRangeRow = {
+  businessDate: string;
+  tempMaxC: number | null;
+  tempMinC: number | null;
+  precipitationMm: number | null;
+  weatherCode: number | null;
+  source: string;
+};
+
+/**
+ * WX2 — Lese-Function für die Kassen-Kopfzeile (heute + Folgetage).
+ *
+ * Rollenprüfung wie bei listEventNoticesForToday (Bauherren-Revision 02.08.):
+ * admin, manager UND planer erhalten Inhalte; alle anderen eine leere Liste
+ * statt eines Fehlers.
+ */
+export const listWeatherRange = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => rangeInput.parse(input))
+  .handler(async ({ data, context }): Promise<WeatherRangeRow[]> => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, [
+      "admin",
+      "manager",
+      "staff",
+      "payroll",
+      "planer",
+    ]);
+    if (caller.role !== "admin" && caller.role !== "manager" && caller.role !== "planer") return [];
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("weather_days")
+      .select("business_date, temp_max_c, temp_min_c, precipitation_mm, weather_code, source")
+      .eq("organization_id", caller.organizationId)
+      .gte("business_date", data.from)
+      .lte("business_date", data.to)
+      .order("business_date", { ascending: true });
+    if (error) throw error;
+    return (rows ?? []).map((r) => ({
+      businessDate: r.business_date,
+      tempMaxC: r.temp_max_c,
+      tempMinC: r.temp_min_c,
+      precipitationMm: r.precipitation_mm,
+      weatherCode: r.weather_code,
+      source: r.source,
+    }));
+  });
 
 /**
  * Blockgröße für Lesen/Upsert. Ein einzelner `.in(...)`-Filter über mehrere

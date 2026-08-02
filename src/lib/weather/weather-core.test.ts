@@ -74,6 +74,7 @@ const ARCHIVE_FIXTURE = {
     temperature_2m_min: [12.9, null, null],
     precipitation_sum: [1.24, null, null],
     sunshine_duration: [36000, null, null],
+    weather_code: [61, null, null],
   },
 };
 
@@ -87,6 +88,7 @@ describe("mapOpenMeteoDaily", () => {
       tempMinC: 16.1,
       precipitationMm: 0,
       sunshineHours: 8,
+      weatherCode: null,
       source: "forecast",
     });
     expect(rows[1]?.precipitationMm).toBe(4.3);
@@ -99,6 +101,7 @@ describe("mapOpenMeteoDaily", () => {
     expect(rows[0]?.source).toBe("archive");
     expect(rows[0]?.sunshineHours).toBe(10);
     expect(rows[0]?.precipitationMm).toBe(1.2);
+    expect(rows[0]?.weatherCode).toBe(61);
   });
 
   it("gibt bei fehlendem daily-Block eine leere Liste zurück", () => {
@@ -125,6 +128,7 @@ describe("mapOpenMeteoDaily", () => {
       tempMinC: null,
       precipitationMm: null,
       sunshineHours: null,
+      weatherCode: null,
       source: "forecast",
     });
   });

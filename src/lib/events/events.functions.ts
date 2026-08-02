@@ -279,9 +279,10 @@ export const importEvents = createServerFn({ method: "POST" })
 /**
  * EV1-R2 — Hinweise für die Tagesabrechnung (heute/morgen).
  *
- * Rollenprüfung (F4): nur manager und admin erhalten Inhalte; staff (und
- * Nebenrollen) bekommen eine leere Liste statt eines Fehlers. Der Kalendertag
- * ist der Geschäftstag der Kasse (Europe/Berlin, 3-Uhr-Cutoff).
+ * Rollenprüfung (F4, Bauherren-Revision 02.08.): admin, manager UND planer
+ * erhalten Inhalte — der Planer ist Adressat der Besetzungs-Info; staff (und
+ * payroll) bekommen eine leere Liste statt eines Fehlers. Der Kalendertag ist
+ * der Geschäftstag der Kasse (Europe/Berlin, 3-Uhr-Cutoff).
  */
 export const listEventNoticesForToday = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -293,7 +294,7 @@ export const listEventNoticesForToday = createServerFn({ method: "GET" })
       "payroll",
       "planer",
     ]);
-    if (caller.role !== "admin" && caller.role !== "manager") return [];
+    if (caller.role !== "admin" && caller.role !== "manager" && caller.role !== "planer") return [];
 
     const today = businessDateOf(new Date());
     const windowFrom = shiftIsoDay(today, -1);

@@ -640,9 +640,10 @@ export async function generateStatistikPdf(
       x: marginX + axisW,
       y: cursorY,
       width: usable - axisW,
-      height: 100,
+      // STAT3e — geschnittene Achse bringt mehr Auflösung als Höhe.
+      height: 80,
     };
-    const geo = lineChartGeometry(mv.series, chartB, { tickCount: 3 });
+    const geo = lineChartGeometry(mv.series, chartB, { tickCount: 4, baseline: "nice" });
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     for (const t of geo.ticks) {
@@ -669,18 +670,15 @@ export async function generateStatistikPdf(
       }
       doc.setLineWidth(0.5);
     });
-    // Legende in der Titelzeile (Punkt + Name), damit sie die Fläche nicht überdeckt.
-    doc.setFontSize(6.5);
-    let legendX = marginX + 90;
-    geo.series.forEach((s) => {
-      const color = colorOf(s.name);
-      doc.setFillColor(color[0], color[1], color[2]);
-      doc.circle(legendX, chartB.y - 8, 1.8, "F");
-      doc.setTextColor(60);
-      doc.text(s.name, legendX + 4, chartB.y - 6);
-      legendX += 12 + doc.getTextWidth(s.name);
-    });
-    doc.setTextColor(20);
+    // Legende rechtsbündig in der Titelzeile (siehe drawLegend).
+    drawLegend(
+      geo.series.map((s) => s.name),
+      chartB.y - 9,
+      (x, y, color) => {
+        doc.setFillColor(color[0], color[1], color[2]);
+        doc.circle(x + 2, y + 2, 1.8, "F");
+      },
+    );
     doc.setDrawColor(200);
     doc.setFontSize(5.5);
     doc.setTextColor(90);

@@ -15,6 +15,7 @@ import { growthPct } from "./monthly-core";
 import { tipRatePct } from "./revenue-core";
 import {
   barChartGeometry,
+  dayBands,
   formatTsd,
   formatTsdPlain,
   groupedBarChartGeometry,
@@ -23,6 +24,7 @@ import {
   type ChartArea,
 } from "./statistik-pdf-charts";
 import type { TakeawayMatrix } from "./takeaway-channels";
+import { bavarianHolidayMap } from "@/lib/time/shift-hours";
 
 export type StatistikPdfData = {
   monthLabel: string;
@@ -334,6 +336,27 @@ function lastY(doc: jsPDF): number {
 
 function isSunday(iso: string): boolean {
   return parseIso(iso).getUTCDay() === 0;
+}
+
+/**
+ * STAT3k — markiert ist ein Kalendertag, wenn er Sa/So ist ODER in der
+ * bayerischen Feiertagsliste steht. Die Feiertagsquelle ist bewusst
+ * `bavarianHolidayMap` (SFN-erprobt) — KEINE zweite Liste im PDF.
+ */
+export function markedCalendarDays(dates: readonly string[]): boolean[] {
+  const mapByYear = new Map<number, Map<string, string>>();
+  return dates.map((iso) => {
+    const d = parseIso(iso);
+    const dow = d.getUTCDay();
+    if (dow === 0 || dow === 6) return true;
+    const year = d.getUTCFullYear();
+    let map = mapByYear.get(year);
+    if (!map) {
+      map = bavarianHolidayMap(year);
+      mapByYear.set(year, map);
+    }
+    return map.has(iso.slice(5, 10));
+  });
 }
 
 export async function generateStatistikPdf(

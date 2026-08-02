@@ -646,3 +646,46 @@ export const getOrgTipDefaults = createServerFn({ method: "GET" })
       tipDistributionModeFrom: data?.tip_distribution_mode_from ?? null,
     };
   });
+
+// LS1 — Standort-Merkmal „nur Planung": Kassenbetrieb & Auswertungen
+// ein-/ausschalten. Betrifft NUR Kassen-/Statistikpfade; Dienstplan,
+// Zeiterfassung und Lohn bleiben unberührt.
+export const setLocationCashEnabled = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ locationId: z.string().uuid(), cashEnabled: z.boolean() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    return runGuarded(caller.role, "admin", makeAuditWriter(caller), async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const loc = expectMaybe<{ id: string; name: string; cash_enabled: boolean | null }>(
+        await supabaseAdmin
+          .from("locations")
+          .select("id, name, cash_enabled")
+          .eq("id", data.locationId)
+          .eq("organization_id", caller.organizationId)
+          .maybeSingle(),
+        "setLocationCashEnabled.load",
+      );
+      if (!loc) throw new Error("Standort nicht gefunden.");
+      const alreadyInState = loc.cash_enabled !== false === data.cashEnabled;
+      expectVoid(
+        await supabaseAdmin
+          .from("locations")
+          .update({ cash_enabled: data.cashEnabled })
+          .eq("id", data.locationId)
+          .eq("organization_id", caller.organizationId),
+        "setLocationCashEnabled.update",
+      );
+      return {
+        result: { ok: true as const, changed: !alreadyInState },
+        audit: {
+          action: data.cashEnabled ? "location.cash_enabled" : "location.cash_disabled",
+          entity: "location",
+          entityId: data.locationId,
+          meta: { name: loc.name },
+        },
+      };
+    });
+  });

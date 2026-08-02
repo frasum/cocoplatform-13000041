@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§132: UI2 Kopfzeilen-Eskalation; ZT1 Lohn-Sichtbarkeit admin/payroll; Realtime-Policy-Härtung)
+Stand: 02.08.2026 (§133: 7-Tage-Wetter; Notices folgen dem gewählten Geschäftstag; Realtime-Vollzug belegt)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -4899,6 +4899,18 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 
 **Realtime-Policy-Härtung** (unbeauftragter Lovable-Sicherheitsnachzug, vom Prüfer verifiziert): Policy `realtime_authenticated_only` auf `realtime.messages` (`USING true`) erlaubte jedem angemeldeten Konto mandantenübergreifendes Broadcast-Mitlesen/Senden — gedroppt (Deny-by-default). **Prüfer-Befund:** COCOs drei aktive Realtime-Subscriptions (Dienstplan `roster_shifts`, `RosterAreaBlock`, Aufgaben) sind `postgres_changes` und autorisieren über Tabellen-RLS — vom Drop **UNBERÜHRT**; Broadcast/Presence sind ungenutzt. Der ursprünglich FALSCHE Migrationskommentar („kein `channel()` im Code“) konnte nicht in der Datei selbst korrigiert werden (Toolsperre des Migrations-Systems) — die Richtigstellung erfolgte als **FOLGE-MIGRATION** mit identischem, idempotentem SQL und korrektem Sachverhalt, die die ursprüngliche Datei per Namen referenziert (Bauherren-/Prüfer-Entscheid: Korrektur gehört in die Migrationskette, wo der Fehler steht). Damit ist der alte Merkposten „Realtime channel payload check“ faktisch miterledigt: Payload-Autorisierung läuft über Quelltabellen-RLS (org-scoped). Verbleibender Lovable-Warnbefund „Abhängigkeits-Schwachstellen“ (Supply-Chain) bewusst unangetastet — Merkposten für den nächsten Dependency-Update-Block (TanStack/seroval steht dort ohnehin).
 
-**Produktions-Vollzug:** ZT1 ohne Migration; Realtime-Migrationen (`20260802165312` + Kommentar-Folge-Migration — beide zusammen ausführen, `DROP IF EXISTS` ist idempotent) [ausgeführt / ausstehend].
+**Produktions-Vollzug:** ZT1 ohne Migration; Realtime-Migrationen (`20260802165312` + Kommentar-Folge-Migration — beide zusammen ausführen, `DROP IF EXISTS` ist idempotent) [ausgeführt, s. §133].
 
 **Offene Merkposten:** wie §131, PLUS Manager-Gegenprobe Wochenplan · MINUS „Realtime channel payload check“ (erledigt, s. o.).
+
+## §133 — Kopfzeilen-Mikros + Realtime-Produktionsvollzug (02.08., spätabends)
+
+**Abnahme-Anker:** HEAD `f0c4d4d9` — vier Gates grün (tsc 0 · eslint 0 · prettier clean · vitest 2388, 0 Skips).
+
+**Realtime-Vollzug BELEGT:** Beide Migrationen (`20260802165312` + Kommentar-Folge `20260802171331`) in einer Ausführung in der Produktion ausgeführt; Kontrollabfrage `pg_policies` lieferte 0 Zeilen — die Policy `realtime_authenticated_only` ist entfernt (Screenshot-Beleg 02.08., 19:37). §132-Vollzugszeile damit: **ausgeführt**.
+
+**WX2-b (`47ba8c22`):** Wetter-Widget zeigt Heute + 6 Folgetage (7 Spalten; Abfragefenster `businessDate+6`, Sync-Daten reichen 16 Tage).
+
+**EV1-R4 (`f0c4d4d9`) — Bauherren-Fund am Vortags-Rückblick:** Die Events-Karte rechnete fest mit dem Server-Heute und zeigte auf der 01.08.-Ansicht den 02.08.-Hinweis („Morgen beginnen die Sommerferien") — während das Wetter dem Seiten-Datum bereits folgte. Fix: `listEventNoticesForToday` → `listEventNotices` mit optionalem `businessDate` (Default: aktueller Geschäftstag), `kasse.tsx` übergibt das Seiten-Datum, Query-Key datumsbehaftet; Kernlogik unverändert. Wetter-Spalte 1 heißt nur noch „Heute", wenn der gewählte Tag der echte aktuelle Geschäftstag ist (`weather-labels.ts`, pure, DST-fest via UTC-Mittag). Tests: 01.08. ⇒ keine Ferien-Zeile · 02.08. ⇒ `tomorrow` · 03.08. ⇒ `running` 1/43. **Semantik-Grundsatz dokumentiert:** ALLE Karten der Tagesabrechnung beziehen sich auf den GEWÄHLTEN Geschäftstag.
+
+**Offene Merkposten:** wie §132 (insb. Manager-Gegenprobe Wochenplan, staff-Gegenprobe Kasse, §131-Vollzüge falls offen, Lohnbüro TSB).

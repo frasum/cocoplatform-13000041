@@ -922,13 +922,20 @@ export async function generateStatistikPdf(
 
     const amount = fmtEurRounded(preTax.resultCents);
     const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    // STAT3l — Marge am Bruttoumsatz: gleiche Bewertung wie der Betrag, deshalb
+    // dieselbe `tone`-Färbung, nur kleiner gesetzt.
+    const marginText = preTaxMarginText(
+      preTaxMarginPct(preTax.resultCents, data.revenue.totalCents),
+    );
     // Zeile 1 mittig: Überschrift + deutlich größerer, gefärbter Betrag.
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
     doc.setFontSize(13.5);
     const amountWidth = doc.getTextWidth(amount);
-    const lineWidth = headingWidth + 10 + amountWidth;
+    doc.setFontSize(8);
+    const marginWidth = marginText === "" ? 0 : 6 + doc.getTextWidth(marginText);
+    const lineWidth = headingWidth + 10 + amountWidth + marginWidth;
     const startX = centerX - lineWidth / 2;
     const baseline1 = cursorY + 18;
     doc.setFontSize(8);
@@ -937,6 +944,10 @@ export async function generateStatistikPdf(
     doc.setFontSize(13.5);
     doc.setTextColor(tone[0], tone[1], tone[2]);
     doc.text(amount, startX + headingWidth + 10, baseline1);
+    if (marginText !== "") {
+      doc.setFontSize(8);
+      doc.text(marginText, startX + headingWidth + 10 + amountWidth + 6, baseline1);
+    }
     doc.setFont("helvetica", "normal");
     doc.setTextColor(20);
 

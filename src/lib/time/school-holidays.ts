@@ -61,13 +61,17 @@ const BY_PERIODS: readonly SchoolHolidayPeriod[] = [
   { name: "Osterferien", from: "2029-03-26", to: "2029-04-06" },
   { name: "Pfingstferien", from: "2029-05-22", to: "2029-06-01" },
   // Schuljahr 2029/2030 — BayMBl. 2022 Nr. 747, Nr. 1.6
-  // (nur die Zeiträume des Schuljahresbeginns bis Weihnachten sind für uns
-  //  relevant erfassbar; die Bekanntmachung endet mit den Weihnachtsferien
-  //  2029/2030 — die Frühjahrs-/Oster-/Pfingstferien 2030 liegen im nächsten,
-  //  noch NICHT veröffentlichten Bekanntmachungszeitraum.)
   { name: "Sommerferien", from: "2029-07-30", to: "2029-09-10" },
   { name: "Herbstferien", from: "2029-10-29", to: "2029-11-02" },
   { name: "Weihnachtsferien", from: "2029-12-24", to: "2030-01-04" },
+  { name: "Frühjahrsferien", from: "2030-03-04", to: "2030-03-08" },
+  { name: "Osterferien", from: "2030-04-15", to: "2030-04-26" },
+  { name: "Pfingstferien", from: "2030-06-11", to: "2030-06-21" },
+  // Letzter amtlich bekanntgegebener Zeitraum dieser Bekanntmachung
+  // („Die Sommerferien 2030 beginnen am 29. Juli 2030 und enden am
+  //  9. September 2030."). Danach ist NICHTS veröffentlicht — es wird nicht
+  // extrapoliert, schoolHolidayOn liefert dort null.
+  { name: "Sommerferien", from: "2030-07-29", to: "2030-09-09" },
 ];
 
 // Buß- und Bettag: in Bayern kein gesetzlicher Feiertag, aber vom

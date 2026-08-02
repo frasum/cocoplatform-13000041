@@ -1,4 +1,4 @@
-// WX2 — Wetter-Widget der Tagesabrechnung: heute + drei Folgetage.
+// WX2 — Wetter-Widget der Tagesabrechnung: heute + sechs Folgetage (7 Spalten).
 // Reine Anzeige der in weather_days gesammelten Werte (Open-Meteo). Kein
 // Fetch-Fallback, kein Raten: fehlt ein Tag, steht dort „—".
 
@@ -60,7 +60,7 @@ export function WeatherWidget({
   today: string;
   rows: readonly WeatherRangeRow[];
 }) {
-  const days = [0, 1, 2, 3].map((offset) => shiftIsoDate(today, offset));
+  const days = [0, 1, 2, 3, 4, 5, 6].map((offset) => shiftIsoDate(today, offset));
   const byDate = new Map(rows.map((r) => [r.businessDate, r]));
   return (
     <Card className="h-full space-y-1 overflow-hidden rounded-l-none border-l-4 border-amber-200 border-l-amber-500 bg-amber-50/80 p-2.5 dark:border-amber-900 dark:border-l-amber-500 dark:bg-amber-950/30">
@@ -71,7 +71,9 @@ export function WeatherWidget({
         </span>
         <span className="text-[10px] text-amber-900/60 dark:text-amber-100/60">Open-Meteo</span>
       </div>
-      <div className="grid grid-cols-4 gap-1">
+      {/* 7 Spalten in halber Zeilenbreite: sehr enge Abstände; auf schmalen
+          Viewports darf horizontal gescrollt werden statt abzuschneiden. */}
+      <div className="-mx-0.5 flex gap-0 overflow-x-auto px-0.5">
         {days.map((iso, i) => {
           const row = byDate.get(iso);
           const sym = weatherSymbol(row?.weatherCode ?? null);
@@ -80,18 +82,21 @@ export function WeatherWidget({
           return (
             <div
               key={iso}
-              className="flex flex-col items-center gap-0.5 text-center"
+              className="flex min-w-[2.1rem] flex-1 shrink-0 flex-col items-center gap-0.5 text-center"
               title={row ? sym.label : "kein Sync-Datenstand"}
             >
-              <span className="text-[10px] font-medium text-amber-900/70 dark:text-amber-100/70">
+              <span className="text-[9px] font-medium leading-tight text-amber-900/70 dark:text-amber-100/70">
                 {i === 0 ? "Heute" : weekdayShort(iso)}
               </span>
-              <Icon className="h-4 w-4 text-amber-900 dark:text-amber-100" aria-label={sym.label} />
-              <span className="text-xs leading-tight text-amber-950 dark:text-amber-50">
+              <Icon
+                className="h-3.5 w-3.5 text-amber-900 dark:text-amber-100"
+                aria-label={sym.label}
+              />
+              <span className="text-[10px] leading-tight text-amber-950 dark:text-amber-50">
                 {row ? temps(row) : "—"}
               </span>
               {mm && (
-                <span className="text-[10px] leading-tight text-amber-900/70 dark:text-amber-100/70">
+                <span className="text-[9px] leading-tight text-amber-900/70 dark:text-amber-100/70">
                   {mm}
                 </span>
               )}

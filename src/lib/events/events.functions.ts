@@ -13,6 +13,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { makeAuditWriter } from "@/lib/admin/audit";
+import { businessDateOf } from "@/lib/business-date";
+import { eventNotices, shiftIsoDay, type EventNotice } from "./event-notices";
 import {
   EVENT_IMPACTS,
   detectTermChanges,
@@ -272,4 +274,40 @@ export const importEvents = createServerFn({ method: "POST" })
     });
 
     return { created, updated, failed, termChanges };
+  });
+
+/**
+ * EV1-R2 — Hinweise für die Tagesabrechnung (heute/morgen).
+ *
+ * Rollenprüfung (F4): nur manager und admin erhalten Inhalte; staff (und
+ * Nebenrollen) bekommen eine leere Liste statt eines Fehlers. Der Kalendertag
+ * ist der Geschäftstag der Kasse (Europe/Berlin, 3-Uhr-Cutoff).
+ */
+export const listEventNoticesForToday = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<EventNotice[]> => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, [
+      "admin",
+      "manager",
+      "staff",
+      "payroll",
+      "planer",
+    ]);
+    if (caller.role !== "admin" && caller.role !== "manager") return [];
+
+    const today = businessDateOf(new Date());
+    const windowFrom = shiftIsoDay(today, -1);
+    const windowTo = shiftIsoDay(today, 1);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("events")
+      .select(SELECT_COLS)
+      .eq("organization_id", caller.organizationId)
+      .gte("date_to", windowFrom)
+      .lte("date_from", windowTo);
+    if (error) throw error;
+
+    const rows = (data ?? []).map((r) => rowFromDb(r as unknown as DbRow));
+    return eventNotices(rows, today);
   });

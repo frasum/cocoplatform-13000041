@@ -91,6 +91,8 @@ function centsToEuroString(cents: number): string {
 }
 import { SettlementsCard } from "@/components/cash/SettlementsCard";
 import { SessionFieldsCard } from "@/components/cash/SessionFieldsCard";
+import { EventNoticesBlock } from "@/components/cash/EventNoticesBlock";
+import { listEventNoticesForToday } from "@/lib/events/events.functions";
 import { TipPoolCard } from "@/components/cash/TipPoolCard";
 import { activeSettlements, computeTipTotalCents } from "@/lib/cash/tip-pool";
 import { fmtCents } from "@/lib/format";
@@ -188,6 +190,16 @@ function KassePage() {
     enabled: locationId !== "",
   });
   const staffQ = useQuery({ queryKey: ["admin-staff"], queryFn: () => fetchStaff() });
+
+  // EV1-R2: Event-Hinweise (heute/morgen). Die Server-Function liefert für
+  // staff ohnehin leer; die UI rendert zusätzlich nur für manager/admin.
+  const fetchEventNotices = useServerFn(listEventNoticesForToday);
+  const noticesEnabled = identity.role === "admin" || identity.role === "manager";
+  const eventNoticesQ = useQuery({
+    queryKey: ["events", "notices-today"],
+    queryFn: () => fetchEventNotices(),
+    enabled: noticesEnabled,
+  });
 
   // Trinkgeld-Pool für die Finalize-Zusammenfassung. Gleicher Query-Key
   // wie in TipPoolCard, damit bereits im Cache liegende Daten sofort
@@ -576,6 +588,8 @@ function KassePage() {
 
       {ovQ.data?.session && (
         <>
+          {noticesEnabled && <EventNoticesBlock notices={eventNoticesQ.data ?? []} />}
+
           <SettlementWarningsBanner
             overview={ovQ.data}
             channels={channelsQ.data ?? []}

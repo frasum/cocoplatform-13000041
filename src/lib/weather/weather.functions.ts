@@ -9,7 +9,6 @@
 // Automatischer täglicher Sync (Cron) ist NICHT Teil dieser Runde — Merkposten.
 
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
@@ -19,6 +18,7 @@ import {
   ARCHIVE_LOOKBACK_DAYS,
   FORECAST_DAYS_AHEAD,
   archiveUrl,
+  backfillInputSchema,
   forecastUrl,
   mapOpenMeteoDaily,
   mayOverwrite,
@@ -28,10 +28,6 @@ import {
   type WeatherDayRow,
   type WeatherSource,
 } from "./weather-core";
-
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum im Format YYYY-MM-DD erwartet");
-
-const backfillInput = z.object({ from: isoDate, to: isoDate });
 
 type WeatherInsert = Database["public"]["Tables"]["weather_days"]["Insert"];
 
@@ -171,7 +167,7 @@ export const syncWeather = createServerFn({ method: "POST" })
 
 export const backfillWeather = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => backfillInput.parse(input))
+  .inputValidator((input: unknown) => backfillInputSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, ["admin"]);
     const today = businessDateOf(new Date());

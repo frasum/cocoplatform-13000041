@@ -201,6 +201,10 @@ export type BreakEven = {
   v: number; // variabler Kostenanteil (WES/Umsatz)
   db: number; // Deckungsbeitragsquote (1 - v)
   factor: number; // Brutto-Faktor aus tatsächlichem USt-Mix
+  /** USt-Faktor nach aktuellem Regelstand: Erlösmix NUR der Monate ab dem
+   *  jüngsten Regelwechsel (>= INHOUSE_FOOD_REDUCED_FROM). null, wenn keine
+   *  solchen Monate im Fenster liegen. */
+  factorCurrent: number | null;
   months: number;
   netMonthCents: number;
   netDayCents: number;
@@ -212,7 +216,9 @@ export type BreakEven = {
 
 /** Rollierender Break-even über bis zu 12 Monate. Fix-Block konservativ =
  *  Personal + Sachkosten + Anlage + Abschreibung; variabel = Wareneinsatz.
- *  USt-Faktor aus dem echten Erlös-Mix der übergebenen Monate.
+ *  USt-Faktor aus dem echten Erlös-Mix der übergebenen Monate, monatsgenau
+ *  nach dem jeweils gültigen Satz für Haus-Speisen (siehe
+ *  INHOUSE_FOOD_REDUCED_FROM).
  *
  *  Sortierung des Inputs ist egal — intern wird absteigend nach `month`
  *  sortiert; gerechnet werden die 12 NEUESTEN Monate. */

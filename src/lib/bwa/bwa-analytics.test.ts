@@ -7,6 +7,7 @@ import {
   deltas,
   deriveKpis,
   estimatedPreTaxResultCents,
+  preTaxMarginPct,
   findPrevMonth,
   findYoy,
   OPEN_DAYS_PER_MONTH,

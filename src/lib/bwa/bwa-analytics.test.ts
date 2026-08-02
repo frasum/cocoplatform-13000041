@@ -6,12 +6,14 @@ import {
   compareCostCenters,
   deltas,
   deriveKpis,
+  estimatedPreTaxResultCents,
   findPrevMonth,
   findYoy,
   OPEN_DAYS_PER_MONTH,
   sumRows,
   sumSachkostenDetail,
 } from "./bwa-analytics";
+import type { BreakEven } from "./bwa-analytics";
 import type { BwaRow } from "./bwa.functions";
 
 function row(overrides: Partial<BwaRow>): BwaRow {

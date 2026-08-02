@@ -413,39 +413,6 @@ export async function generateStatistikPdf(
     cursorY = lastY(doc) + 12;
   }
 
-  // ── Trinkgeld kompakt (3×n) + Takeaway einzeilig ────────────────────────
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld", marginX, cursorY);
-  const tipCols = data.tips.perLocation;
-  autoTable(doc, {
-    startY: cursorY + 5,
-    margin: { left: marginX, right: marginX },
-    styles: { fontSize: 7.5, cellPadding: 3, overflow: "visible", halign: "right" },
-    headStyles: { fillColor: [230, 230, 230], textColor: 20, fontSize: 7, halign: "right" },
-    columnStyles: { 0: { cellWidth: 88, halign: "left", fontStyle: "bold" } },
-    head: [["Bereich", ...tipCols.map((t) => t.locationName), "Gesamt"]],
-    body: [
-      [
-        "Service",
-        ...tipCols.map((t) => fmtEurRounded(t.serviceCents)),
-        fmtEurRounded(data.tips.serviceCents),
-      ],
-      [
-        "Küche",
-        ...tipCols.map((t) => fmtEurRounded(t.kitchenCents)),
-        fmtEurRounded(data.tips.kitchenCents),
-      ],
-      [
-        "Gesamt",
-        ...tipCols.map((t) => fmtEurRounded(t.totalCents)),
-        fmtEurRounded(data.tips.totalCents),
-      ],
-    ],
-    theme: "grid",
-  });
-  cursorY = lastY(doc) + 12;
-
   // ── STAT3b — Take-Away-Kanäle (je Standort, Gesamt, Δ Vorperiode) ───────
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");

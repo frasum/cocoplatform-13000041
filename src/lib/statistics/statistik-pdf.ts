@@ -844,6 +844,11 @@ export async function generateStatistikPdf(
     // STAT3d — Rundung ist Präsentation, keine Nachjustierung der Summen.
     "Beträge kaufmännisch auf ganze Euro gerundet; Summen können rundungsbedingt um ±1 € abweichen. Centgenaue Werte in COCO.",
   ];
+  if (preTax) {
+    notes.push(
+      "Ergebnis vor Steuern als Modellrechnung: Kostenstruktur und USt-Mix der rollierenden 12-Monats-BWA auf den Kassenumsatz angewandt (30 Öffnungstage-Konvention); ersetzt nicht die BWA des Steuerbüros.",
+    );
+  }
   if (hasMissingAny || data.personnel.staffWithoutRateNames.length > 0) {
     notes.push(
       `* Ohne hinterlegten Stundenlohn: ${

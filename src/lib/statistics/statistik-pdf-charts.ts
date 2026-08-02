@@ -334,16 +334,27 @@ export type GroupedBarGeometry = {
  *
  * `null` bleibt Lücke — kein 0-Balken, damit fehlende Historie nicht wie ein
  * Umsatz von null aussieht.
+ *
+ * STAT3j — `fineSteps` erlaubt hier (nur hier) das feinere 1/2/2.5/5-Raster,
+ * damit der oberste Tick näher über dem Datenmaximum abschließt. Die
+ * Grundregel „oberster Tick >= Maximum" bleibt unverändert.
  */
 export function groupedBarChartGeometry(
   groups: ReadonlyArray<{ label: string; values: ReadonlyArray<number | null> }>,
   area: ChartArea,
-  opts?: { gapRatio?: number; tickCount?: number; seriesNames?: readonly string[] },
+  opts?: {
+    gapRatio?: number;
+    tickCount?: number;
+    seriesNames?: readonly string[];
+    fineSteps?: boolean;
+  },
 ): GroupedBarGeometry {
   const gapRatio = clamp(opts?.gapRatio ?? 0.25, 0, 0.8);
   const groupCount = groups.length;
   const seriesCount = groups.reduce((acc, g) => Math.max(acc, g.values.length), 0);
-  const axis = axisFor(maxOf(groups.flatMap((g) => [...g.values])), area, opts?.tickCount ?? 3);
+  const axis = axisFor(maxOf(groups.flatMap((g) => [...g.values])), area, opts?.tickCount ?? 3, 0, {
+    fineSteps: opts?.fineSteps === true,
+  });
   const max = axis.top;
   const slot = groupCount > 0 ? area.width / groupCount : 0;
   const groupWidth = slot * (1 - gapRatio);

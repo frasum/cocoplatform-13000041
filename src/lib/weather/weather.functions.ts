@@ -57,6 +57,12 @@ function insertPayload(organizationId: string, row: WeatherDayRow): WeatherInser
 }
 
 /**
+ * Blockgröße für Lesen/Upsert. Ein einzelner `.in(...)`-Filter über mehrere
+ * Jahre sprengt die PostgREST-Header-Grenze (~16 kB URL) — daher stückeln.
+ */
+const CHUNK_SIZE = 120;
+
+/**
  * Upsert unter Beachtung von mayOverwrite. Liest die Bestands-Quellen des
  * Fensters EINMAL und entscheidet je Tag; Rückgabe: geschrieben / übersprungen.
  */
@@ -66,28 +72,31 @@ async function upsertRows(
 ): Promise<{ written: number; skipped: number }> {
   if (rows.length === 0) return { written: 0, skipped: 0 };
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const dates = rows.map((r) => r.businessDate);
-  const { data: existing, error: readErr } = await supabaseAdmin
-    .from("weather_days")
-    .select("business_date, source")
-    .eq("organization_id", organizationId)
-    .in("business_date", dates);
-  if (readErr) throw readErr;
-
   const bySource = new Map<string, WeatherSource>();
-  for (const r of existing ?? []) {
-    bySource.set(r.business_date, r.source === "archive" ? "archive" : "forecast");
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const dates = rows.slice(i, i + CHUNK_SIZE).map((r) => r.businessDate);
+    const { data: existing, error: readErr } = await supabaseAdmin
+      .from("weather_days")
+      .select("business_date, source")
+      .eq("organization_id", organizationId)
+      .in("business_date", dates);
+    if (readErr) throw readErr;
+    for (const r of existing ?? []) {
+      bySource.set(r.business_date, r.source === "archive" ? "archive" : "forecast");
+    }
   }
 
   const writable = rows.filter((r) => mayOverwrite(bySource.get(r.businessDate), r.source));
   const skipped = rows.length - writable.length;
   if (writable.length === 0) return { written: 0, skipped };
 
-  const { error: upsertErr } = await supabaseAdmin.from("weather_days").upsert(
-    writable.map((r) => insertPayload(organizationId, r)),
-    { onConflict: "organization_id,business_date" },
-  );
-  if (upsertErr) throw upsertErr;
+  for (let i = 0; i < writable.length; i += CHUNK_SIZE) {
+    const { error: upsertErr } = await supabaseAdmin.from("weather_days").upsert(
+      writable.slice(i, i + CHUNK_SIZE).map((r) => insertPayload(organizationId, r)),
+      { onConflict: "organization_id,business_date" },
+    );
+    if (upsertErr) throw upsertErr;
+  }
   return { written: writable.length, skipped };
 }
 

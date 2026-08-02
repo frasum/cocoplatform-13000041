@@ -1272,6 +1272,65 @@ export type Database = {
           },
         ]
       }
+      events: {
+        Row: {
+          category: string
+          created_at: string
+          date_from: string
+          date_to: string
+          distance_text: string | null
+          id: string
+          impact: string
+          location_text: string | null
+          name: string
+          organization_id: string
+          provisional: boolean
+          recommendation: string | null
+          source: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          date_from: string
+          date_to: string
+          distance_text?: string | null
+          id?: string
+          impact: string
+          location_text?: string | null
+          name: string
+          organization_id: string
+          provisional?: boolean
+          recommendation?: string | null
+          source?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          date_from?: string
+          date_to?: string
+          distance_text?: string | null
+          id?: string
+          impact?: string
+          location_text?: string | null
+          name?: string
+          organization_id?: string
+          provisional?: boolean
+          recommendation?: string | null
+          source?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generated_documents: {
         Row: {
           content: string

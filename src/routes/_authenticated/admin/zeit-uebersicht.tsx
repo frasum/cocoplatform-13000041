@@ -121,7 +121,6 @@ function ZeitUebersichtPage() {
   const { identity } = useAuth();
   const isAdmin = identity?.role === "admin";
   const isPayroll = identity?.role === "payroll";
-  const isPlaner = identity?.role === "planer";
   const canOpenStaff = isAdmin || isPayroll;
   // ZT1 — Lohn-/Abrechnungs-Tabs (Zusammenfassung, Buchhaltung, Perioden,
   // Brutto/Netto, Provision) nur für admin & payroll. manager/planer sehen
@@ -764,7 +763,7 @@ function ZeitUebersichtPage() {
       fetchRecurring({
         data: { locationId: isAllLocations ? null : effectiveLocationId || null },
       }),
-    enabled: isAllLocations || Boolean(effectiveLocationId),
+    enabled: canSeePayrollTabs && (isAllLocations || Boolean(effectiveLocationId)),
   });
   const invalidateRecurring = () => {
     void qc.invalidateQueries({ queryKey: ["payroll-recurring"] });
@@ -1369,21 +1368,27 @@ function ZeitUebersichtPage() {
 
       <Tabs value={effectiveTab} onValueChange={setActiveTab}>
         <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
-          <TabButton
-            active={effectiveTab === "weekly"}
-            onClick={() => setActiveTab("weekly")}
-          >
+          <TabButton active={effectiveTab === "weekly"} onClick={() => setActiveTab("weekly")}>
             Wochenplan
           </TabButton>
           {canSeePayrollTabs && (
             <>
-              <TabButton active={effectiveTab === "summary"} onClick={() => setActiveTab("summary")}>
+              <TabButton
+                active={effectiveTab === "summary"}
+                onClick={() => setActiveTab("summary")}
+              >
                 Zusammenfassung
               </TabButton>
-              <TabButton active={effectiveTab === "payroll"} onClick={() => setActiveTab("payroll")}>
+              <TabButton
+                active={effectiveTab === "payroll"}
+                onClick={() => setActiveTab("payroll")}
+              >
                 Buchhaltung
               </TabButton>
-              <TabButton active={effectiveTab === "periods"} onClick={() => setActiveTab("periods")}>
+              <TabButton
+                active={effectiveTab === "periods"}
+                onClick={() => setActiveTab("periods")}
+              >
                 Perioden
               </TabButton>
               <TabButton
@@ -1402,7 +1407,9 @@ function ZeitUebersichtPage() {
           )}
         </div>
 
-        {(effectiveTab === "summary" || effectiveTab === "payroll" || effectiveTab === "provision") && (
+        {(effectiveTab === "summary" ||
+          effectiveTab === "payroll" ||
+          effectiveTab === "provision") && (
           <Card className="my-3 p-3">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
@@ -1440,7 +1447,9 @@ function ZeitUebersichtPage() {
         {/* WZ1: Lücken-Banner in Standort-Sicht (nicht bei "Alle Standorte").
             unlocated = Einträge ohne location_id, open = laufende Schichten
             im Zeitraum an DIESEM Standort. Rein informativ, keine Aktion. */}
-        {(effectiveTab === "summary" || effectiveTab === "payroll" || effectiveTab === "provision") &&
+        {(effectiveTab === "summary" ||
+          effectiveTab === "payroll" ||
+          effectiveTab === "provision") &&
           !isAllLocations &&
           overviewQ.data?.gaps &&
           (overviewQ.data.gaps.unlocatedShifts > 0 || overviewQ.data.gaps.openShifts > 0) && (

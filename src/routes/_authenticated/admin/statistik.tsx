@@ -494,7 +494,7 @@ function StatistikPage() {
     const be = bwaRows
       ? computeBreakEven(
           aggregateGroup(bwaRows.filter((r) => r.entity === PRETAX_ENTITY)).filter(
-            (r) => r.month < `${month}-01`,
+            (r) => r.month <= `${month}-01`,
           ),
         )
       : null;

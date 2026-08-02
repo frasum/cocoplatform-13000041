@@ -26,6 +26,7 @@ import {
 import { getTipRemainderByPeriod } from "@/lib/cash/cash.functions";
 import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { listLocations } from "@/lib/admin/locations.functions";
+import { filterCashEnabled } from "@/lib/locations/cash-enabled";
 import { LocationPills } from "@/components/shared/LocationPills";
 import { formatShortDate } from "@/lib/format-date";
 
@@ -114,13 +115,16 @@ function TipRemainderPage() {
     enabled: identity.role === "admin",
   });
 
-  useEffect(() => {
-    if (locationId === null && locationsQ.data && locationsQ.data.length > 0) {
-      setLocationId(locationsQ.data[0].id);
-    }
-  }, [locationId, locationsQ.data]);
+  // LS1: nur Kassen-Standorte.
+  const cashLocations = useMemo(() => filterCashEnabled(locationsQ.data ?? []), [locationsQ.data]);
 
-  const allLocationIds = useMemo(() => (locationsQ.data ?? []).map((l) => l.id), [locationsQ.data]);
+  useEffect(() => {
+    if (locationId === null && cashLocations.length > 0) {
+      setLocationId(cashLocations[0].id);
+    }
+  }, [locationId, cashLocations]);
+
+  const allLocationIds = useMemo(() => cashLocations.map((l) => l.id), [cashLocations]);
   const isAll = locationId === "";
   const targetLocationIds = isAll ? allLocationIds : locationId ? [locationId] : [];
 
@@ -188,7 +192,7 @@ function TipRemainderPage() {
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <LocationPills
-            locations={locationsQ.data ?? []}
+            locations={cashLocations}
             value={locationId || "__all__"}
             onChange={(v) => setLocationId(v === "__all__" ? "" : v)}
             includeAll

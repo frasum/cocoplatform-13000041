@@ -34,6 +34,7 @@ import { MonthNav } from "@/components/shared/MonthNav";
 import { MonatsentwicklungTab } from "@/components/statistik/MonatsentwicklungTab";
 import { Input } from "@/components/ui/input";
 import { listLocations } from "@/lib/admin/locations.functions";
+import { filterCashEnabled } from "@/lib/locations/cash-enabled";
 import { getRevenueStats } from "@/lib/statistics/revenue-stats.functions";
 import { getTipStats } from "@/lib/statistics/tip-stats.functions";
 import { getPersonnelStats } from "@/lib/statistics/personnel-stats.functions";
@@ -222,7 +223,9 @@ function StatistikPage() {
     queryKey: ["admin-locations"],
     queryFn: () => listLocations(),
   });
-  const locations = useMemo(() => locationsQ.data ?? [], [locationsQ.data]);
+  // LS1: Auswertungen zeigen nur Kassen-Standorte (reine Planungs-Standorte
+  // wie TSB liefern keine Umsätze und würden Aggregate/PDF verzerren).
+  const locations = useMemo(() => filterCashEnabled(locationsQ.data ?? []), [locationsQ.data]);
 
   const statsQ = useQuery({
     queryKey: ["stats", "revenue", mode, month, startDate, endDate, locationFilter],

@@ -203,6 +203,35 @@ export function barChartGeometry(
 
 export type LinePoint = { index: number; value: number; x: number; y: number };
 
+export type DayBand = { x: number; y: number; w: number; h: number };
+
+/**
+ * STAT3k — vertikale Hintergrundbänder für markierte Tage (Wochenende/Feiertag).
+ *
+ * Zusammenhängende markierte Tage werden zu EINEM Band gemergt (Sa+So = ein
+ * Band; Fr-Feiertag+Sa+So = ein Band). Bandbreite = Balken-Slot inklusive der
+ * halben Lücken beidseits, Höhe = volle Chart-Höhe. An den Rändern endet das
+ * Band exakt an der Chart-Kante (kein Überstand).
+ */
+export function dayBands(marked: readonly boolean[], area: ChartArea): DayBand[] {
+  const count = marked.length;
+  if (count === 0) return [];
+  const slot = area.width / count;
+  const bands: DayBand[] = [];
+  let start: number | null = null;
+  for (let i = 0; i <= count; i += 1) {
+    const on = i < count && marked[i] === true;
+    if (on && start === null) start = i;
+    if (!on && start !== null) {
+      const x = area.x + start * slot;
+      const w = (i - start) * slot;
+      bands.push({ x, y: area.y, w, h: area.height });
+      start = null;
+    }
+  }
+  return bands;
+}
+
 export type StackSegment = {
   seriesIndex: number;
   name: string;

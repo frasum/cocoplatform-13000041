@@ -31,7 +31,7 @@ export function EventNoticesBlock({
     <Card className="h-full space-y-1 border-blue-200 bg-blue-50/70 p-2.5 dark:border-blue-900 dark:bg-blue-950/30">
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-blue-900/70 dark:text-blue-100/70">
         <CalendarClock className="h-3 w-3" />
-        Veranstaltungen
+        Messen & VERANSTALTUNGEN & FERIEN
       </div>
       {notices.map((n, i) => (
         <div

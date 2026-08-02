@@ -364,8 +364,7 @@ describe("groupedBarChartGeometry", () => {
     const top = topTick(g.ticks);
     expect(top).toBeGreaterThanOrEqual(500);
     for (const grp of g.groups)
-      for (const b of grp.bars)
-        expect(b.height).toBeCloseTo(area.height * (500 / top), 6);
+      for (const b of grp.bars) expect(b.height).toBeCloseTo(area.height * (500 / top), 6);
   });
 
   it("Skala beginnt bei 0, auch wenn alle Werte hoch liegen (keine Baseline)", () => {

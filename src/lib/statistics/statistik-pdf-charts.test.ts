@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   barChartGeometry,
   formatTsd,
+  formatTsdPlain,
   groupedBarChartGeometry,
   lineChartGeometry,
   monthWindow,
@@ -15,6 +16,11 @@ import {
 } from "./statistik-pdf-charts";
 
 const area: ChartArea = { x: 40, y: 100, width: 300, height: 60 };
+
+/** STAT3g — obere Skalengrenze muss die Daten fassen, sonst wirkt der Chart abgeschnitten. */
+function topTick(ticks: ReadonlyArray<{ value: number }>): number {
+  return ticks.reduce((acc, t) => Math.max(acc, t.value), 0);
+}
 
 describe("barChartGeometry", () => {
   it("skaliert den Maximalwert auf die volle Höhe, andere linear", () => {

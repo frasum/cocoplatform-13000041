@@ -591,49 +591,7 @@ export async function generateStatistikPdf(
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.text("Tagesumsatz", marginX, cursorY);
-  // STAT3c — Farbindex reihenübergreifend: erst die Monatsreihen (Grafik B),
-  // dann etwaige weitere Standorte der Tagesbalken. Gleicher Standort ⇒ gleiche
-  // Farbe in beiden Grafiken.
-  const seriesColorIndex = new Map<string, number>();
-  const registerSeries = (name: string) => {
-    if (!seriesColorIndex.has(name)) seriesColorIndex.set(name, seriesColorIndex.size);
-  };
-  (data.monthly?.series ?? []).forEach((s) => registerSeries(s.name));
-  // Standortnamen der Tagesbalken in Reihenfolge des ersten Auftretens.
-  const stackNames: string[] = [];
-  for (const day of data.dailyRevenue) {
-    for (const entry of day.byLocation ?? []) {
-      if (!stackNames.includes(entry.name)) stackNames.push(entry.name);
-    }
-  }
-  stackNames.forEach(registerSeries);
-  const colorOf = (name: string): [number, number, number] =>
-    SERIES_PALETTE[(seriesColorIndex.get(name) ?? 0) % SERIES_PALETTE.length]!;
   const stacked = stackNames.length > 0;
-  /**
-   * STAT3e — Legende rechtsbündig auf der Titelzeile: erst Breite messen, dann
-   * am rechten Rand beginnen. So klebt sie nie an der Abschnittsüberschrift.
-   */
-  const drawLegend = (
-    names: string[],
-    y: number,
-    marker: (x: number, y: number, color: [number, number, number]) => void,
-  ) => {
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "normal");
-    const widths = names.map((n) => doc.getTextWidth(n));
-    let total = 0;
-    for (const w of widths) total += w + 16;
-    let x = marginX + usable - total + 4;
-    names.forEach((name, i) => {
-      const c = colorOf(name);
-      marker(x, y, c);
-      doc.setTextColor(60);
-      doc.text(name, x + 6, y + 3);
-      x += 16 + (widths[i] ?? 0);
-    });
-    doc.setTextColor(20);
-  };
   if (stacked) {
     drawLegend(stackNames, cursorY - 5, (x, y, c) => {
       doc.setFillColor(c[0], c[1], c[2]);

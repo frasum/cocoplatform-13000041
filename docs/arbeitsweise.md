@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§128: STAT3l Ergebnis-Marge; EV1-Export; WX1 Wetterdaten — zweiter PG0-Baustein vorgezogen)
+Stand: 02.08.2026 (§129: WX1-b Härtung; Backfill-Chunking; EV1-R3/WX2 Kassen-Kopfzeile mit Wetter-Widget)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -4846,3 +4846,21 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 **Produktions-Vollzug WX1:** Migration ausgeführt und belegt (Kontroll-CSV `pg_get_constraintdef`); Backfill 16.02.–gestern **ausstehend**; erster Sync **ausstehend** — unbestätigte Schritte bleiben ausdrücklich als „ausstehend“ stehen.
 
 **Offene Merkposten:** wie §127, PLUS: WX-Cron (täglicher automatischer Sync via Cloudflare Cron — bis dahin trägt der Knopf) · WX1-Vollzug bestätigen (Backfill + erster Sync, s. o.). **PG0-Zwischenstand:** Events ✓ (EV1), Wetter ✓ (WX1) — es fehlen Ferienkalender-Anbindung an die Prognose-Achse, OpenLigaDB-Prüfung und der Tageshistorien-Prüfblock (TA-Archiv/Vectron, N1/N2).
+
+## §129 — Wetter-Härtung, Chunking, Kassen-Kopfzeile (02.08., nachmittags)
+
+**Abnahme-Anker:** HEAD `cd4ca486` — vier Gates grün (`tsc` 0 · `eslint` 0 · `prettier` clean · `vitest` 2332, 0 Skips; 2319 + 13).
+
+**WX1-Produktionsvollzug:** Migration belegt (`pg_get_constraintdef`-CSV, UNIQUE org+business_date). Erster Backfill-Versuch scheiterte lehrreich: Datepicker machte aus zweistelliger Eingabe das Jahr `0025` ⇒ Open-Meteo HTTP 400. Danach erfolgreicher Backfill (578 Tage 2025-01-01–2026-08-01), vom Bauherrn später auf ~3,5 Jahre erweitert (Wetter-Vorrat für die N2-Vectron-Option).
+
+**WX1-b (`e9ca6641`):** `WEATHER_BACKFILL_MIN="2000-01-01"` als Konstante — Zod-Refine serverseitig **UND** `min`/`max`-Attribute im UI (doppelte Sperre); Open-Meteo-Fehler als verständlicher Satz mit HTTP-Detail; Fehlerstate wird nach Erfolg geleert; Von-Feld-Vorbelegung gefixt.
+
+**Bauherren-Direktrunde (`5a7fef84`):** Der 3,5-Jahres-Backfill sprengte mit >1200 Datumswerten im `.in()`-Filter die PostgREST-URL-Grenze (~16 kB) — Lese- und Upsert-Pfad arbeiten jetzt in 120er-Chunks (Begründungskommentar im Code). Vom Prüfer nachträglich gesichtet, sauber.
+
+**EV1-R3/WX2 (`cd4ca486`) — Kassen-Kopfzeile:** `weather_code`-Spalte (WMO, nullable; Re-Backfill füllt rückwirkend via `mayOverwrite`). `weatherSymbol` als reine Funktion (Gruppen 0–99, unbekannt ⇒ „—“, kein Raten; getestet). `listWeatherRange` (read) nach dem Notices-Muster. `kasse.tsx`: zweispaltige Kopfzeile nach Session-Start — links `EventNoticesBlock` kompakt + **BLAU** getönt (Design-Token; entfällt ohne Notices, Wetter nimmt dann volle Breite), rechts `WeatherWidget` (Heute + 3 Tage: Symbol, Tmax/Tmin, Regen-mm nur > 0; fehlender Tag „—“ mit Sync-Tooltip; Quelle Open-Meteo).
+
+**F4-Revision + GERARD-Entscheid (b):** Sichtbarkeit der Kopfzeile admin + manager + **PLANER** in Server-Functions und UI-Gate **vorbereitet** — der Routen-Guard des Admin-Bereichs bleibt aber unverändert zu (§104-Meldung Lovables: `planer` erreicht `/admin/kasse` nicht; Whitelist dienstplan/urlaub/zeit-uebersicht). Bauherren-Entscheid Option b: **KEIN** Kassen-Lesezugang als Krücke — der Planer erhält Events + Wetter mit der künftigen PG-Prognose-Ansicht (14-Tage-Blick, laut PG-F6/F7 ohnehin für admin+planer); die vorbereitete Rollenlogik wird dann konsumiert. Der Manager sieht beides ab sofort in der Tagesabrechnung (Wetterumschwung ⇒ Dienstplan-Anpassung, F1-Zweck).
+
+**Produktions-Vollzug R3/WX2:** `weather_code`-Migration **belegt**; Re-Backfill + Sync **ausstehend** (unbestätigt).
+
+**Offene Merkposten:** wie §128, MINUS WX1-Vollzug (erledigt/belegt), PLUS: R3/WX2-Vollzug bestätigen (Re-Backfill + Sync) · EV1-Sichtprüfung REST: staff-Gegenprobe + Testevent „Test Späte Veranstaltung“ löschen (admin-Sicht ist belegt, Screenshot 02.08. 14:06).

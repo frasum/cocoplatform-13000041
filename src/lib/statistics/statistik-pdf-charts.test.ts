@@ -428,3 +428,65 @@ describe("groupedBarChartGeometry", () => {
     expect(coarse.max).toBe(1_500);
   });
 });
+
+// ── STAT3k — dayBands ─────────────────────────────────────────────────────
+describe("dayBands", () => {
+  const area = { x: 100, y: 50, width: 310, height: 100 };
+
+  it("liefert für keinen markierten Tag ein leeres Ergebnis", () => {
+    expect(dayBands(new Array(31).fill(false), area)).toEqual([]);
+  });
+
+  it("markiert einen Einzeltag als genau einen Slot", () => {
+    const marked = new Array(31).fill(false);
+    marked[10] = true;
+    const bands = dayBands(marked, area);
+    const slot = area.width / 31;
+    expect(bands).toHaveLength(1);
+    expect(bands[0]!.w).toBeCloseTo(slot, 10);
+    expect(bands[0]!.x).toBeCloseTo(area.x + 10 * slot, 10);
+    expect(bands[0]!.y).toBe(area.y);
+    expect(bands[0]!.h).toBe(area.height);
+  });
+
+  it("merged Sa+So zu einem Band", () => {
+    const marked = new Array(31).fill(false);
+    marked[5] = true;
+    marked[6] = true;
+    const bands = dayBands(marked, area);
+    const slot = area.width / 31;
+    expect(bands).toHaveLength(1);
+    expect(bands[0]!.w).toBeCloseTo(2 * slot, 10);
+  });
+
+  it("merged Feiertag + Wochenende zu einem zusammenhängenden Band", () => {
+    const marked = new Array(31).fill(false);
+    marked[3] = true; // Fr-Feiertag
+    marked[4] = true; // Sa
+    marked[5] = true; // So
+    marked[9] = true; // separates Wochenende
+    const bands = dayBands(marked, area);
+    const slot = area.width / 31;
+    expect(bands).toHaveLength(2);
+    expect(bands[0]!.w).toBeCloseTo(3 * slot, 10);
+    expect(bands[1]!.w).toBeCloseTo(slot, 10);
+  });
+
+  it("hält erste und letzte Bänder an der Chart-Kante (kein Überstand)", () => {
+    const marked = new Array(28).fill(false);
+    marked[0] = true;
+    marked[27] = true;
+    const bands = dayBands(marked, area);
+    expect(bands).toHaveLength(2);
+    expect(bands[0]!.x).toBe(area.x);
+    expect(bands[1]!.x + bands[1]!.w).toBeCloseTo(area.x + area.width, 10);
+  });
+
+  it("skaliert Slotbreiten mit der Monatslänge (28 vs. 31 Tage)", () => {
+    const b28 = dayBands([true, ...new Array(27).fill(false)], area);
+    const b31 = dayBands([true, ...new Array(30).fill(false)], area);
+    expect(b28[0]!.w).toBeCloseTo(area.width / 28, 10);
+    expect(b31[0]!.w).toBeCloseTo(area.width / 31, 10);
+    expect(b28[0]!.w).toBeGreaterThan(b31[0]!.w);
+  });
+});

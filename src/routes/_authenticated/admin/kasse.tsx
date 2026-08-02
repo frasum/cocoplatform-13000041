@@ -217,7 +217,7 @@ function KassePage() {
   const weatherQ = useQuery({
     queryKey: ["weather", "range", businessDate],
     queryFn: () =>
-      fetchWeatherRange({ data: { from: businessDate, to: shiftIsoDate(businessDate, 3) } }),
+      fetchWeatherRange({ data: { from: businessDate, to: shiftIsoDate(businessDate, 6) } }),
     enabled: headerCardsEnabled,
   });
 

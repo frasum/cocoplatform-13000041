@@ -72,6 +72,9 @@ import { fillDailyGaps } from "@/lib/statistics/chart-fill";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+/** STAT3h — eindeutige Entität für die Break-even-Modellzeile (vgl. BWA-Modul). */
+const PRETAX_ENTITY = "YUM Gastronomie GmbH";
+
 export const Route = createFileRoute("/_authenticated/admin/statistik")({
   head: () => ({ meta: [{ title: "Statistik" }] }),
   component: StatistikPage,

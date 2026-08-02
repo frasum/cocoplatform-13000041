@@ -202,6 +202,31 @@ export const PDF_USABLE_WIDTH = 523;
 export const PRE_TAX_HEADING = "Ergebnis vor Steuern (Modell)";
 
 /**
+ * STAT3j — Marker der drei PERMANENTEN, stellengebundenen Fußnoten.
+ *
+ * Der Fußnotenblock fährt bewusst ZWEI Konventionen, und das ist keine
+ * Inkonsistenz zum Aufräumen:
+ * - hochgestellte Ziffern (¹ ² ³) für die drei dauerhaft vorhandenen Hinweise,
+ *   die einer konkreten Stelle im Dokument zugeordnet sind (Lohnbasis,
+ *   Kanal-Vergleichsbasis, TG-Quoten-Basis),
+ * - `*` für KONDITIONALE Hinweise, die nur bei Datenlage erscheinen
+ *   (fehlender Stundenlohn u. Ä.) — eine Nummer dafür würde die Nummerierung
+ *   je Bericht verschieben.
+ *
+ * Bei ³ ist ZWINGEND Schluss: ¹ ² ³ sind U+00B9/U+00B2/U+00B3 und damit in
+ * WinAnsi enthalten, ⁴ wäre U+2074 — außerhalb WinAnsi. Genau solche Zeichen
+ * zwingen die jsPDF-Standardschrift in den Ersatzzeichen-/Sperrsatz-Modus
+ * (Fehlerbild: „U m s a t z …" hinter dem Zeichen, siehe STAT3i und
+ * `src/test/win-ansi.ts`). Wer hier eine vierte Ziffer ergänzt oder auf ein
+ * „einheitliches" System umstellt, läuft in dieselbe Falle.
+ */
+export const FOOTNOTE_MARKS = {
+  labor: "\u00b9",
+  channel: "\u00b2",
+  tipRate: "\u00b3",
+} as const;
+
+/**
  * STAT3i — Trinkgeld-Einzeiler als reiner Text (nur Formatierung, keine Logik).
  * Quoten kommen ausschließlich aus `tipRatePct`.
  */
@@ -223,7 +248,15 @@ export function tipSummaryText(tips: StatistikPdfData["tips"], houseCents: numbe
  * Test). Trenner ist derselbe Mittelpunkt wie in der Trinkgeld-Zeile.
  */
 export function preTaxTailText(preTax: NonNullable<StatistikPdfData["preTaxModel"]>): string {
-  return `· netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
+  return `· ${preTaxChainText(preTax)}`;
+}
+
+/**
+ * STAT3j — Rechenkette der Banner-Zeile 2 (ohne führenden Trenner, weil sie
+ * mittig unter der Überschrift steht). Gleiche Werte und Formate wie bisher.
+ */
+export function preTaxChainText(preTax: NonNullable<StatistikPdfData["preTaxModel"]>): string {
+  return `netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
     preTax.breakEvenMonthCents,
   )} · DB-Quote ${fmtPctDe(preTax.dbPct)}`;
 }
@@ -350,7 +383,7 @@ export async function generateStatistikPdf(
       title: "Personalquote",
       value: fmtPctDe(data.personnel.ratioPct),
       lead: fmtEurRounded(data.personnel.laborCostCents),
-      leadLabel: "Basis-Lohnkosten",
+      leadLabel: `Basis-Lohnkosten${FOOTNOTE_MARKS.labor}`,
       // STAT3b: kein Umsatzwert in der Lohnkosten-Kachel (missverständlich).
       // Der Takeaway-Gesamtwert steht in der Kopfzeile des Takeaway-Blocks.
       foot: "Basis-Brutto ohne AG-SV/SFN",
@@ -507,8 +540,8 @@ export async function generateStatistikPdf(
           "vs. Vorjahr",
           "vs. Vormonat",
           "Trinkgeld ges.",
-          "TG-Quote",
-          "Pers.-Quote",
+          `TG-Quote${FOOTNOTE_MARKS.tipRate}`,
+          `Pers.-Quote${FOOTNOTE_MARKS.labor}`,
           "Netto-Std.",
           "€ / Gast",
           "€ / Std.",
@@ -564,7 +597,9 @@ export async function generateStatistikPdf(
     columnStyles: {
       0: { cellWidth: 116, halign: "left", fontStyle: "bold" },
     },
-    head: [["Kanal", ...tw.locationNames, "Gesamt", "Anteil", "vs. Vorperiode"]],
+    head: [
+      ["Kanal", ...tw.locationNames, "Gesamt", "Anteil", `vs. Vorperiode${FOOTNOTE_MARKS.channel}`],
+    ],
     body: twBody,
     didParseCell: (hook) => {
       if (hook.section === "body" && hook.row.index === twBody.length - 1) {
@@ -769,9 +804,15 @@ export async function generateStatistikPdf(
           values: ytd.series.map((s) => s.values[i] ?? null),
         })),
         chartC,
-        // STAT3i — dichteres Tick-Ziel: der oberste Rasterwert liegt damit
-        // näher über dem Datenmaximum (weniger Luft über den Balken).
-        { gapRatio: 0.3, tickCount: 5, seriesNames: ytd.series.map((s) => s.name) },
+        // STAT3j — dichteres Tick-Ziel PLUS feineres 1/2/2.5/5-Raster: der
+        // oberste Rasterwert liegt damit knapp über dem Datenmaximum
+        // (1.171 T€ ⇒ 1.250 statt 1.500), die Balken nutzen die Fläche.
+        {
+          gapRatio: 0.3,
+          tickCount: 5,
+          fineSteps: true,
+          seriesNames: ytd.series.map((s) => s.name),
+        },
       );
       doc.setFontSize(6.5);
       doc.setFont("helvetica", "normal");
@@ -811,7 +852,7 @@ export async function generateStatistikPdf(
   // Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der Standort-Tabelle.
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld", marginX, cursorY);
+  doc.text(`Trinkgeld${FOOTNOTE_MARKS.tipRate}`, marginX, cursorY);
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   const tipLine = doc.splitTextToSize(
@@ -821,38 +862,58 @@ export async function generateStatistikPdf(
   doc.text(tipLine, marginX + 90, cursorY);
   cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
 
-  // ── STAT3h/3i — Ergebnis vor Steuern (Modell) ────────────────────────────
-  // Der Betrag ist ein Bewertungswert, deshalb dieselbe Färbung wie Deltas.
-  // Nach dem gefärbten Betrag werden Font UND Textfarbe explizit zurückgesetzt.
+  // ── STAT3h/3i/3j — Fazit-Banner „Ergebnis vor Steuern (Modell)" ───────────
+  // Der Kasten bleibt bei JEDEM Vorzeichen neutral (helles Grau); die Bewertung
+  // trägt allein der Betrag über `deltaTone`. Nach dem gefärbten Betrag werden
+  // Font UND Textfarbe explizit zurückgesetzt (Lehre aus STAT3i).
   if (preTax) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(PRE_TAX_HEADING, marginX, cursorY);
-    const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
-    doc.setFontSize(7.5);
+    const bannerH = 38;
+    const centerX = marginX + usable / 2;
+    doc.setDrawColor(200);
+    doc.setLineWidth(0.5);
+    doc.setFillColor(247, 247, 247);
+    doc.roundedRect(marginX, cursorY, usable, bannerH, 3, 3, "FD");
+
     const amount = fmtEurRounded(preTax.resultCents);
     const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    // Zeile 1 mittig: Überschrift + deutlich größerer, gefärbter Betrag.
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(tone[0], tone[1], tone[2]);
-    const amountX = marginX + headingWidth + 10;
-    doc.text(amount, amountX, cursorY);
+    doc.setFontSize(8);
+    const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
+    doc.setFontSize(13.5);
     const amountWidth = doc.getTextWidth(amount);
+    const lineWidth = headingWidth + 10 + amountWidth;
+    const startX = centerX - lineWidth / 2;
+    const baseline1 = cursorY + 18;
+    doc.setFontSize(8);
+    doc.setTextColor(70);
+    doc.text(PRE_TAX_HEADING, startX, baseline1);
+    doc.setFontSize(13.5);
+    doc.setTextColor(tone[0], tone[1], tone[2]);
+    doc.text(amount, startX + headingWidth + 10, baseline1);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(20);
-    const tailX = amountX + amountWidth + 6;
-    doc.text(preTaxTailText(preTax), tailX, cursorY);
-    cursorY += BLOCK_GAP;
+
+    // Zeile 2 mittig, klein: die Rechenkette.
+    doc.setFontSize(7);
+    doc.setTextColor(90);
+    doc.text(preTaxChainText(preTax), centerX, cursorY + 30, { align: "center" });
+    doc.setTextColor(20);
+    cursorY += bannerH + BLOCK_GAP;
   }
 
   // ── Fußnoten ────────────────────────────────────────────────────────────
   doc.setFontSize(6.5);
   doc.setFont("helvetica", "italic");
+  // STAT3j — erst die drei nummerierten (stellengebundenen) Fußnoten in der
+  // Reihenfolge ¹ ² ³, danach die GLOBALEN ohne Marker (Rundung gilt dem ganzen
+  // Dokument, die Modell-Fußnote ist über „(Modell)" im Banner zugeordnet).
   const notes: string[] = [
-    "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.",
+    `${FOOTNOTE_MARKS.labor} Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.`,
     // ASCII statt Delta-Zeichen: die jsPDF-Standardschrift (WinAnsi) kennt kein U+0394.
-    "Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.",
+    `${FOOTNOTE_MARKS.channel} Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.`,
     // STAT2d — Bezugsbasis der Quote muss im Dokument stehen.
-    "TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).",
+    `${FOOTNOTE_MARKS.tipRate} TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).`,
     // STAT3d — Rundung ist Präsentation, keine Nachjustierung der Summen.
     "Beträge kaufmännisch auf ganze Euro gerundet; Summen können rundungsbedingt um ±1 € abweichen. Centgenaue Werte in COCO.",
   ];

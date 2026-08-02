@@ -401,4 +401,30 @@ describe("groupedBarChartGeometry", () => {
     for (const grp of g.groups)
       for (const b of grp.bars) expect(b.y).toBeGreaterThanOrEqual(area.y - 1e-9);
   });
+
+  // STAT3j — feineres 1/2/2.5/5-Raster: 1.171 schließt mit 1.250 ab (250er
+  // Schritt) statt mit 1.500 (500er Schritt). Grundregel „Tick >= Max" bleibt.
+  it("fineSteps: Maximum 1.171 ergibt Skalenabschluss 1.250 im 250er-Raster", () => {
+    const fine = groupedBarChartGeometry(
+      [
+        { label: "a", values: [1_171] },
+        { label: "b", values: [640] },
+      ],
+      area,
+      { tickCount: 5, fineSteps: true },
+    );
+    expect(fine.max).toBe(1_250);
+    expect(fine.ticks.map((t) => t.value)).toEqual([0, 250, 500, 750, 1_000, 1_250]);
+
+    // Ohne die Option bleibt das klassische Raster bit-stabil (1.500).
+    const coarse = groupedBarChartGeometry(
+      [
+        { label: "a", values: [1_171] },
+        { label: "b", values: [640] },
+      ],
+      area,
+      { tickCount: 5 },
+    );
+    expect(coarse.max).toBe(1_500);
+  });
 });

@@ -26,10 +26,12 @@ import {
   fmtPctDe,
   generateStatistikPdf,
   pdfChannelLabel,
+  preTaxChainText,
   preTaxTailText,
   tipSummaryText,
   PDF_USABLE_WIDTH,
   PRE_TAX_HEADING,
+  FOOTNOTE_MARKS,
   type StatistikPdfData,
 } from "./statistik-pdf";
 
@@ -49,6 +51,7 @@ vi.mock("jspdf", () => {
     setTextColor() {}
     setLineWidth() {}
     rect() {}
+    roundedRect() {}
     line() {}
     circle() {}
     getTextWidth(t: string) {
@@ -422,11 +425,13 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       dbPct: 70,
     };
     const tail = preTaxTailText(preTax);
+    const chain = preTaxChainText(preTax);
     const tip = tipSummaryText(
       { serviceCents: 3_000_00, kitchenCents: 1_000_00, totalCents: 4_000_00 },
       100_000_00,
     );
     assertWinAnsiSafe(tail, "Ergebnis-Zeile");
+    assertWinAnsiSafe(chain, "Banner-Rechenkette");
     assertWinAnsiSafe(tip, "Trinkgeld-Zeile");
     assertWinAnsiSafe(PRE_TAX_HEADING, "Ergebnis-Überschrift");
 
@@ -438,6 +443,56 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       6 +
       estimateHelveticaWidth(tail, 7.5);
     expect(width).toBeLessThanOrEqual(PDF_USABLE_WIDTH);
+  });
+
+  it("STAT3j: Banner-Zeilen sind WinAnsi-fähig und passen in die Nutzbreite", () => {
+    const preTax = {
+      resultCents: 109_321_000,
+      netRevenueCents: 296_455_000,
+      breakEvenMonthCents: 280_835_000,
+      dbPct: 70,
+    };
+    const amount = fmtEurRounded(preTax.resultCents);
+    // Zeile 1: Überschrift (8 pt) + Abstand + Betrag (13,5 pt).
+    const line1 =
+      estimateHelveticaWidth(PRE_TAX_HEADING, 8) + 10 + estimateHelveticaWidth(amount, 13.5);
+    // Zeile 2: die Rechenkette (7 pt).
+    const line2 = estimateHelveticaWidth(preTaxChainText(preTax), 7);
+    expect(line1).toBeLessThanOrEqual(PDF_USABLE_WIDTH);
+    expect(line2).toBeLessThanOrEqual(PDF_USABLE_WIDTH);
+  });
+
+  it("STAT3j: Fußnoten-Marker sind WinAnsi-fähig und bleiben bei drei Ziffern", () => {
+    const marks = Object.values(FOOTNOTE_MARKS);
+    expect(marks).toEqual(["\u00b9", "\u00b2", "\u00b3"]);
+    for (const m of marks) {
+      assertWinAnsiSafe(m, "Fußnoten-Marker");
+      expect(m.codePointAt(0)!).toBeLessThanOrEqual(0xff);
+    }
+    // Dokumentation der Grenze: die vierte hochgestellte Ziffer ist NICHT
+    // WinAnsi-fähig — deshalb bleibt es bei ¹ ² ³ plus „*" für Konditionale.
+    expect(() => assertWinAnsiSafe("\u2074", "vierte Ziffer")).toThrow();
+  });
+
+  it("STAT3j: Marker stehen an ihren Bezugsstellen und in den Fußnoten", async () => {
+    captured.length = 0;
+    texts.length = 0;
+    await generateStatistikPdf(
+      baseData({
+        preTaxModel: {
+          resultCents: 1_093_210,
+          netRevenueCents: 29_645_229,
+          breakEvenMonthCents: 28_083_500,
+          dbPct: 70,
+        },
+      }),
+    );
+    const all = texts.join("\n");
+    expect(all).toContain(`Basis-Lohnkosten${FOOTNOTE_MARKS.labor}`);
+    expect(all).toContain(`Trinkgeld${FOOTNOTE_MARKS.tipRate}`);
+    expect(all).toContain(`${FOOTNOTE_MARKS.labor} Basis-Brutto`);
+    expect(all).toContain(`${FOOTNOTE_MARKS.channel} Kanal-Vergleich`);
+    expect(all).toContain(`${FOOTNOTE_MARKS.tipRate} TG-Quote bezogen`);
   });
 
   it("freier Zeitraum: Δ-Spalten neutral, kein Monatsverlauf", async () => {
@@ -600,7 +655,8 @@ describe("statistik-pdf — Delta-Färbung und Labels (STAT3e)", () => {
       (t.head ?? []).map((r) => r.map((c) => (typeof c === "string" ? c : c.content))),
     );
     const locationHead = heads.find((h) => h[0] === "Standort");
-    expect(locationHead).toContain("Pers.-Quote");
+    // STAT3j — der Kopf trägt jetzt den Fußnoten-Marker ¹.
+    expect(locationHead).toContain(`Pers.-Quote${FOOTNOTE_MARKS.labor}`);
     expect(locationHead).not.toContain("Quote");
   });
 });

@@ -25,6 +25,7 @@ import {
   fmtHoursRoundedDe,
   fmtPctDe,
   generateStatistikPdf,
+  markedCalendarDays,
   pdfChannelLabel,
   preTaxChainText,
   preTaxTailText,
@@ -658,5 +659,30 @@ describe("statistik-pdf — Delta-Färbung und Labels (STAT3e)", () => {
     // STAT3j — der Kopf trägt jetzt den Fußnoten-Marker ¹.
     expect(locationHead).toContain(`Pers.-Quote${FOOTNOTE_MARKS.labor}`);
     expect(locationHead).not.toContain("Quote");
+  });
+});
+
+// ── STAT3k — Wochenend-/Feiertags-Markierung ──────────────────────────────
+describe("markedCalendarDays", () => {
+  it("markiert Sa und So, Feiertage unter der Woche, sonst nicht", () => {
+    // 2026-06-04 = Fronleichnam (BY, Donnerstag); 2026-06-03 = normaler Mittwoch.
+    const dates = ["2026-06-03", "2026-06-04", "2026-06-06", "2026-06-07"];
+    expect(markedCalendarDays(dates)).toEqual([false, true, true, true]);
+  });
+
+  it("markiert Neujahr über den Jahreswechsel hinweg", () => {
+    expect(markedCalendarDays(["2025-12-31", "2026-01-01"])).toEqual([false, true]);
+  });
+
+  it("leere Eingabe ⇒ leeres Ergebnis", () => {
+    expect(markedCalendarDays([])).toEqual([]);
+  });
+});
+
+describe("STAT3k — Bänder-Fußnote", () => {
+  it("Hinweistext ist WinAnsi-sicher und ohne Ziffern-Marker", () => {
+    const note = "Grau hinterlegt: Wochenenden und Feiertage (Bayern).";
+    assertWinAnsiSafe(note, "Bänder-Fußnote");
+    for (const m of Object.values(FOOTNOTE_MARKS)) expect(note.includes(m)).toBe(false);
   });
 });

@@ -32,7 +32,10 @@ export type AxisTick = { value: number; y: number };
 
 export type BarGeometry = {
   bars: BarRect[];
-  /** Skalierungs-Maximum (0, wenn keine positiven Werte vorliegen). */
+  /**
+   * STAT3g — Skalen-Obergrenze = oberster Nice-Tick (≥ Datenmaximum);
+   * 0, wenn keine positiven Werte vorliegen.
+   */
   max: number;
   ticks: AxisTick[];
 };
@@ -109,26 +112,44 @@ export function niceTicks(min: number, max: number, targetCount = 4): NiceTicks 
   return { baseline, top, step, values };
 }
 
+export type Axis = {
+  /** Untere Skalengrenze (0 bei Balken, ggf. geschnitten bei Linien). */
+  baseline: number;
+  /** Obere Skalengrenze = oberster Rasterwert, garantiert ≥ Datenmaximum. */
+  top: number;
+  ticks: AxisTick[];
+};
+
 /**
- * Achsenbeschriftung für eine Fläche, die von `baseline` bis `max` skaliert.
- * Rasterwerte oberhalb des Datenmaximums werden weggelassen, damit keine Linie
- * über den Rahmen läuft (die Balken-/Punkt-Skala bleibt unverändert).
+ * STAT3g — Achse für eine Fläche: die Skala schließt IMMER mit einem Rasterwert
+ * ≥ Datenmaximum ab, und alle Rasterwerte werden gezeichnet.
+ *
+ * Vorher lief die Skala bis zum rohen Datenmaximum, während Ticks darüber
+ * weggefiltert wurden — dadurch ragten Balken/Punkte über den obersten Tick
+ * hinaus und wirkten abgeschnitten. Die untere Kappung (`baseline`, nur Linien)
+ * bleibt unberührt.
  */
-function ticksFor(max: number, area: ChartArea, tickCount: number, baseline = 0): AxisTick[] {
-  if (max <= 0) return [{ value: 0, y: area.y + area.height }];
-  const nice = niceTicks(baseline, max, tickCount);
-  const span = max - nice.baseline;
-  const kept = nice.values.filter((v) => v >= nice.baseline - 1e-9 && v <= max + 1e-9);
-  const list = kept.length > 0 ? kept : [nice.baseline];
-  return list.map((value) => ({
-    value,
-    y: area.y + area.height - (span > 0 ? ((value - nice.baseline) / span) * area.height : 0),
-  }));
+function axisFor(dataMax: number, area: ChartArea, tickCount: number, baseline = 0): Axis {
+  if (dataMax <= 0) {
+    return { baseline: 0, top: 0, ticks: [{ value: 0, y: area.y + area.height }] };
+  }
+  const nice = niceTicks(baseline, dataMax, tickCount);
+  const top = Math.max(nice.top, dataMax);
+  const span = top - nice.baseline;
+  const values = nice.values.length > 0 ? nice.values : [nice.baseline];
+  return {
+    baseline: nice.baseline,
+    top,
+    ticks: values.map((value) => ({
+      value,
+      y: area.y + area.height - (span > 0 ? ((value - nice.baseline) / span) * area.height : 0),
+    })),
+  };
 }
 
 /**
- * Balkengeometrie: der größte Wert füllt die Fläche exakt aus, alle übrigen
- * skalieren linear. Leere Reihen ergeben Balken der Höhe 0.
+ * Balkengeometrie: alle Werte skalieren linear gegen die Skalen-Obergrenze
+ * (STAT3g: oberster Nice-Tick). Leere Reihen ergeben Balken der Höhe 0.
  */
 export function barChartGeometry(
   values: readonly (number | null | undefined)[],
@@ -136,7 +157,8 @@ export function barChartGeometry(
   opts?: { gapRatio?: number; tickCount?: number },
 ): BarGeometry {
   const gapRatio = clamp(opts?.gapRatio ?? 0.25, 0, 0.8);
-  const max = maxOf(values);
+  const axis = axisFor(maxOf(values), area, opts?.tickCount ?? 3);
+  const max = axis.top;
   const count = values.length;
   const slot = count > 0 ? area.width / count : 0;
   const width = slot * (1 - gapRatio);
@@ -155,7 +177,7 @@ export function barChartGeometry(
     };
   });
 
-  return { bars, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3) };
+  return { bars, max, ticks: axis.ticks };
 }
 
 export type LinePoint = { index: number; value: number; x: number; y: number };
@@ -185,7 +207,7 @@ export type BarStack = {
 
 export type StackedBarGeometry = {
   stacks: BarStack[];
-  /** Maximum der Tages-SUMMEN (nicht der Einzelreihen). */
+  /** STAT3g — Skalen-Obergrenze über die Tages-SUMMEN (oberster Nice-Tick). */
   max: number;
   ticks: AxisTick[];
 };
@@ -215,7 +237,8 @@ export function stackedBarChartGeometry(
   const totals = Array.from({ length: count }, (_, i) =>
     series.reduce((acc, s) => acc + safeValue(s.values[i]), 0),
   );
-  const max = maxOf(totals);
+  const axis = axisFor(maxOf(totals), area, opts?.tickCount ?? 3);
+  const max = axis.top;
   const slot = count > 0 ? area.width / count : 0;
   const width = slot * (1 - gapRatio);
   const offset = (slot - width) / 2;
@@ -247,7 +270,7 @@ export function stackedBarChartGeometry(
     return { index, total, x, width, y: baseline - height, height, segments };
   });
 
-  return { stacks, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3) };
+  return { stacks, max, ticks: axis.ticks };
 }
 
 export type LineSeriesGeometry = {
@@ -278,6 +301,7 @@ export type BarGroup = {
 
 export type GroupedBarGeometry = {
   groups: BarGroup[];
+  /** STAT3g — Skalen-Obergrenze (oberster Nice-Tick ≥ Datenmaximum). */
   max: number;
   ticks: AxisTick[];
 };
@@ -298,7 +322,8 @@ export function groupedBarChartGeometry(
   const gapRatio = clamp(opts?.gapRatio ?? 0.25, 0, 0.8);
   const groupCount = groups.length;
   const seriesCount = groups.reduce((acc, g) => Math.max(acc, g.values.length), 0);
-  const max = maxOf(groups.flatMap((g) => [...g.values]));
+  const axis = axisFor(maxOf(groups.flatMap((g) => [...g.values])), area, opts?.tickCount ?? 3);
+  const max = axis.top;
   const slot = groupCount > 0 ? area.width / groupCount : 0;
   const groupWidth = slot * (1 - gapRatio);
   const offset = (slot - groupWidth) / 2;
@@ -325,11 +350,12 @@ export function groupedBarChartGeometry(
     return { index, label: g.label, x: gx, width: groupWidth, bars };
   });
 
-  return { groups: out, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3) };
+  return { groups: out, max, ticks: axis.ticks };
 }
 
 export type LineGeometry = {
   series: LineSeriesGeometry[];
+  /** STAT3g — Skalen-Obergrenze (oberster Nice-Tick ≥ Datenmaximum). */
   max: number;
   /** Untere Skalengrenze (0 = ungeschnittene Achse). */
   baseline: number;
@@ -352,12 +378,15 @@ export function lineChartGeometry(
   opts?: { tickCount?: number; baseline?: "nice" | 0 },
 ): LineGeometry {
   const count = series.reduce((acc, s) => Math.max(acc, s.values.length), 0);
-  const max = maxOf(series.flatMap((s) => [...s.values]));
+  const dataMax = maxOf(series.flatMap((s) => [...s.values]));
   const tickCount = opts?.tickCount ?? 3;
-  const baseline =
+  const lowerBaseline =
     opts?.baseline === "nice"
-      ? niceTicks(minOf(series.flatMap((s) => [...s.values])), max, tickCount).baseline
+      ? niceTicks(minOf(series.flatMap((s) => [...s.values])), dataMax, tickCount).baseline
       : 0;
+  const axis = axisFor(dataMax, area, tickCount, lowerBaseline);
+  const max = axis.top;
+  const baseline = axis.baseline;
   const span = max - baseline;
   const slotX: number[] = [];
   for (let i = 0; i < count; i++) {
@@ -375,7 +404,7 @@ export function lineChartGeometry(
     }),
   }));
 
-  return { series: out, max, baseline, ticks: ticksFor(max, area, tickCount, baseline), slotX };
+  return { series: out, max, baseline, ticks: axis.ticks, slotX };
 }
 
 export type MonthSlot = { year: number; month: number; key: string; label: string };
@@ -404,4 +433,12 @@ export function monthWindow(year: number, month: number, count = 13): MonthSlot[
 /** Achsen-/Wertbeschriftung in T€ mit deutschen Tausenderpunkten. */
 export function formatTsd(cents: number): string {
   return `${displayTsd(cents).toLocaleString("de-DE")} T€`;
+}
+
+/**
+ * STAT3g — Wertelabel in T€ OHNE Einheit („1.171"). Die Einheit trägt die
+ * Achsenbeschriftung; über den Balken wäre sie nur Wiederholung.
+ */
+export function formatTsdPlain(cents: number): string {
+  return displayTsd(cents).toLocaleString("de-DE");
 }

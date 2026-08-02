@@ -340,6 +340,48 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     expect(allRows.some((r) => r[0] === "Service")).toBe(false);
   });
 
+  // STAT3g — Erzählreihenfolge: Kennzahl → Standorte → Trinkgeld → Kanäle → Grafiken.
+  it("Blockreihenfolge und einzeilige Trinkgeld-Zeile", async () => {
+    captured.length = 0;
+    texts.length = 0;
+    await generateStatistikPdf(
+      baseData({
+        revenue: { houseCents: 100_000, takeawayCents: 0, totalCents: 100_000, daysWithRevenue: 1 },
+        tips: { serviceCents: 3_000, kitchenCents: 1_000, totalCents: 4_000 },
+        dailyRevenue: [{ businessDate: "2026-07-01", totalCents: 100_000 }],
+        monthly: {
+          monthLabels: ["Jul"],
+          series: [{ name: "Spicery", values: [100_000] }],
+        },
+        ytdCompare: {
+          years: [2025, 2026],
+          throughMonth: 6,
+          incompleteYears: [],
+          series: [{ name: "Spicery", values: [100_000, 120_000] }],
+        },
+        comparison,
+      }),
+    );
+
+    const at = (part: string) => texts.findIndex((t) => t.includes(part));
+    const order = [
+      at("Standort-Vergleich"),
+      at("Trinkgeld"),
+      at("Take-Away-Kanäle"),
+      at("Tagesumsatz"),
+      at("13-Monats-Verlauf"),
+      at("kumuliert im"),
+    ];
+    for (const i of order) expect(i).toBeGreaterThanOrEqual(0);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+
+    // Eine Zeile, drei Werte, Quoten gegen den Haus-Umsatz.
+    const line = drawn("Service ", "Küche ", "Gesamt ");
+    expect(line).toContain(`Service ${eur(3_000)} (3,0 % vom Haus)`);
+    expect(line).toContain(`Küche ${eur(1_000)} (1,0 %)`);
+    expect(line).toContain(`Gesamt ${eur(4_000)} (4,0 %)`);
+  });
+
   it("freier Zeitraum: Δ-Spalten neutral, kein Monatsverlauf", async () => {
     captured.length = 0;
     texts.length = 0;

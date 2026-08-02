@@ -600,7 +600,16 @@ function KassePage() {
 
       {ovQ.data?.session && (
         <>
-          {noticesEnabled && <EventNoticesBlock notices={eventNoticesQ.data ?? []} />}
+          {headerCardsEnabled && (
+            <div
+              className={
+                (eventNoticesQ.data?.length ?? 0) > 0 ? "grid gap-3 md:grid-cols-2" : "grid gap-3"
+              }
+            >
+              <EventNoticesBlock notices={eventNoticesQ.data ?? []} />
+              <WeatherWidget today={businessDate} rows={weatherQ.data ?? []} />
+            </div>
+          )}
 
           <SettlementWarningsBanner
             overview={ovQ.data}

@@ -205,19 +205,14 @@ export const PRE_TAX_HEADING = "Ergebnis vor Steuern (Modell)";
  * STAT3i — Trinkgeld-Einzeiler als reiner Text (nur Formatierung, keine Logik).
  * Quoten kommen ausschließlich aus `tipRatePct`.
  */
-export function tipSummaryText(
-  tips: StatistikPdfData["tips"],
-  houseCents: number,
-): string {
-  return (
-    `Service ${fmtEurRounded(tips.serviceCents)} (${fmtPctDe(
-      tipRatePct(tips.serviceCents, houseCents),
-    )} vom Haus) · Küche ${fmtEurRounded(tips.kitchenCents)} (${fmtPctDe(
-      tipRatePct(tips.kitchenCents, houseCents),
-    )}) · Gesamt ${fmtEurRounded(tips.totalCents)} (${fmtPctDe(
-      tipRatePct(tips.totalCents, houseCents),
-    )})`
-  );
+export function tipSummaryText(tips: StatistikPdfData["tips"], houseCents: number): string {
+  return `Service ${fmtEurRounded(tips.serviceCents)} (${fmtPctDe(
+    tipRatePct(tips.serviceCents, houseCents),
+  )} vom Haus) · Küche ${fmtEurRounded(tips.kitchenCents)} (${fmtPctDe(
+    tipRatePct(tips.kitchenCents, houseCents),
+  )}) · Gesamt ${fmtEurRounded(tips.totalCents)} (${fmtPctDe(
+    tipRatePct(tips.totalCents, houseCents),
+  )})`;
 }
 
 /**

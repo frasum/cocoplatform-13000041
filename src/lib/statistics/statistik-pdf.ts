@@ -695,6 +695,13 @@ export async function generateStatistikPdf(
     const slots = stackedGeo
       ? stackedGeo.stacks.map((s) => ({ index: s.index, x: s.x, width: s.width }))
       : flatGeo!.bars.map((b) => ({ index: b.index, x: b.x, width: b.width }));
+    // STAT3k — Wochenend-/Feiertagsbänder ZUERST: sie liegen hinter Gitter und
+    // Balken. Sie hängen am Kalendertag, gelten also für beide Scopes.
+    const marked = markedCalendarDays(data.dailyRevenue.map((d) => d.businessDate));
+    doc.setFillColor(247, 247, 247);
+    for (const band of dayBands(marked, chartA)) {
+      doc.rect(band.x, band.y, band.w, band.h, "F");
+    }
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     for (const t of ticks) {
@@ -937,6 +944,8 @@ export async function generateStatistikPdf(
     `${FOOTNOTE_MARKS.channel} Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.`,
     // STAT2d — Bezugsbasis der Quote muss im Dokument stehen.
     `${FOOTNOTE_MARKS.tipRate} TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).`,
+    // STAT3k — allgemeiner Hinweis ohne Ziffern-Marker (¹²³ sind belegt).
+    "Grau hinterlegt: Wochenenden und Feiertage (Bayern).",
     // STAT3d — Rundung ist Präsentation, keine Nachjustierung der Summen.
     "Beträge kaufmännisch auf ganze Euro gerundet; Summen können rundungsbedingt um ±1 € abweichen. Centgenaue Werte in COCO.",
   ];

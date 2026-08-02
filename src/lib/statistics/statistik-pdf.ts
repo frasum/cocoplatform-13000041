@@ -574,7 +574,7 @@ export async function generateStatistikPdf(
             ),
           })),
           chartA,
-          { gapRatio: 0.25, tickCount: 3 },
+          { gapRatio: 0.25, tickCount: 4 },
         )
       : null;
     const flatGeo = stackedGeo
@@ -582,7 +582,7 @@ export async function generateStatistikPdf(
       : barChartGeometry(
           data.dailyRevenue.map((d) => d.totalCents),
           chartA,
-          { gapRatio: 0.25, tickCount: 3 },
+          { gapRatio: 0.25, tickCount: 4 },
         );
     const ticks = stackedGeo ? stackedGeo.ticks : flatGeo!.ticks;
     const slots = stackedGeo

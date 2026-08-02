@@ -9,6 +9,7 @@ import {
   geocodeLocation,
   listLocations,
   setLocationActive,
+  setLocationCashEnabled,
   updateLocation,
   updateLocationGeo,
 } from "@/lib/admin/locations.functions";
@@ -116,6 +117,7 @@ function LocationsPage() {
   const callUpdate = useServerFn(updateLocation);
   const callDelete = useServerFn(deleteLocation);
   const callSetActive = useServerFn(setLocationActive);
+  const callSetCashEnabled = useServerFn(setLocationCashEnabled);
   const { loc: locParam, tab } = Route.useSearch();
   const navigate = useNavigate({ from: "/admin/locations" });
   const [newName, setNewName] = useState("");
@@ -184,6 +186,13 @@ function LocationsPage() {
       setConfirmActive(null);
       return refresh();
     },
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler."),
+  });
+
+  const setCashEnabledMut = useMutation({
+    mutationFn: ({ id, cashEnabled }: { id: string; cashEnabled: boolean }) =>
+      callSetCashEnabled({ data: { locationId: id, cashEnabled } }),
+    onSuccess: refresh,
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler."),
   });
 
@@ -323,6 +332,10 @@ function LocationsPage() {
             onToggleActive={(next) => {
               setMsg(null);
               setConfirmActive({ loc: activeLoc, next });
+            }}
+            onToggleCashEnabled={(next) => {
+              setMsg(null);
+              setCashEnabledMut.mutate({ id: activeLoc.id, cashEnabled: next });
             }}
             onGeoChanged={refresh}
           />
@@ -563,6 +576,7 @@ type LocationRowData = {
   cashBalanceTargetCents?: number | null;
   cashBalanceTargetResolvedCents?: number | null;
   isActive?: boolean;
+  cashEnabled?: boolean;
   enabled_service_periods?: string[] | null;
   tip_service_pool_enabled?: boolean;
   kitchen_tip_rate_override?: number | string | null;
@@ -578,6 +592,7 @@ function LocationSectionPanel(props: {
   onSave: (name: string, details: LocationDetails) => void;
   onDelete: () => void;
   onToggleActive: (next: boolean) => void;
+  onToggleCashEnabled: (next: boolean) => void;
   onGeoChanged: () => void;
 }) {
   const { loc, section } = props;
@@ -603,6 +618,7 @@ function LocationSectionPanel(props: {
     details.contact_phone !== (loc.contact_phone ?? "");
 
   const isActive = loc.isActive !== false;
+  const cashEnabled = loc.cashEnabled !== false;
 
   if (section === "allgemein") {
     return (
@@ -615,6 +631,22 @@ function LocationSectionPanel(props: {
           />
         </Field>
         <DetailsFields value={details} onChange={setDetails} />
+        {/* LS1: reine Planungs-Standorte — Dienstplan/Zeit ja, Kasse/Statistik nein. */}
+        <label className="flex items-start gap-3 border-t border-input pt-3 text-sm">
+          <input
+            type="checkbox"
+            checked={cashEnabled}
+            onChange={(e) => props.onToggleCashEnabled(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-input"
+          />
+          <span>
+            <span className="font-medium text-foreground">Kassenbetrieb &amp; Auswertungen</span>
+            <span className="block text-xs text-muted-foreground">
+              Aus: Standort erscheint nicht in Tagesabrechnung, Saldoliste und Statistik.
+              Dienstplan, Zeiterfassung und Lohn bleiben unverändert.
+            </span>
+          </span>
+        </label>
         <div className="flex flex-wrap items-center gap-2 border-t border-input pt-3">
           <button
             onClick={() => props.onSave(name, details)}

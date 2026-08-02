@@ -29,6 +29,7 @@ import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { downloadBlob } from "@/lib/time/weekly-export";
 import { formatShortDate } from "@/lib/format-date";
 import { listLocations } from "@/lib/admin/locations.functions";
+import { filterCashEnabled } from "@/lib/locations/cash-enabled";
 import { LocationPills } from "@/components/shared/LocationPills";
 import { toast } from "sonner";
 
@@ -107,17 +108,19 @@ function KasseSaldoPage() {
     queryKey: ["admin-locations"],
     queryFn: () => fetchLocations(),
   });
+  // LS1: nur Kassen-Standorte.
+  const cashLocations = useMemo(() => filterCashEnabled(locationsQ.data ?? []), [locationsQ.data]);
 
   useEffect(() => {
-    if (locationId === null && locationsQ.data && locationsQ.data.length > 0) {
-      setLocationId(locationsQ.data[0].id);
+    if (locationId === null && cashLocations.length > 0) {
+      setLocationId(cashLocations[0].id);
     }
-  }, [locationId, locationsQ.data]);
+  }, [locationId, cashLocations]);
 
   const locationName = useMemo(() => {
     if (!locationId) return "Alle Standorte";
-    return locationsQ.data?.find((l) => l.id === locationId)?.name ?? "Standort";
-  }, [locationId, locationsQ.data]);
+    return cashLocations.find((l) => l.id === locationId)?.name ?? "Standort";
+  }, [locationId, cashLocations]);
 
   // YUM zeigt keine FineDine-Spalte (dort nicht genutzt).
   const hideFineDine = locationName.trim().toLowerCase() === "yum";
@@ -198,7 +201,7 @@ function KasseSaldoPage() {
         </div>
         <div className="flex flex-wrap items-end gap-3">
           <LocationPills
-            locations={locationsQ.data ?? []}
+            locations={cashLocations}
             value={locationId || "__all__"}
             onChange={(v) => setLocationId(v === "__all__" ? "" : v)}
             includeAll

@@ -1841,6 +1841,7 @@ export type Database = {
       locations: {
         Row: {
           cash_balance_target_cents: number | null
+          cash_enabled: boolean
           city: string | null
           commission_enabled: boolean
           commission_min_revenue_cents: number
@@ -1873,6 +1874,7 @@ export type Database = {
         }
         Insert: {
           cash_balance_target_cents?: number | null
+          cash_enabled?: boolean
           city?: string | null
           commission_enabled?: boolean
           commission_min_revenue_cents?: number
@@ -1905,6 +1907,7 @@ export type Database = {
         }
         Update: {
           cash_balance_target_cents?: number | null
+          cash_enabled?: boolean
           city?: string | null
           commission_enabled?: boolean
           commission_min_revenue_cents?: number

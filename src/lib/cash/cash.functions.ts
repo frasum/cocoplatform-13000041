@@ -289,6 +289,27 @@ export async function assertLocationInOrg(orgId: string, locationId: string): Pr
   if (!data) throw new ForbiddenError();
 }
 
+// LS1 — Kassenbetrieb: Standorte mit `cash_enabled = false` sind reine
+// Planungs-Standorte. Neue Sessions dürfen dort nicht entstehen; Dienstplan,
+// Zeiterfassung und Lohn bleiben unberührt.
+export async function assertLocationCashEnabled(orgId: string, locationId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    // ST1: bewusst ungefiltert — Daten-Zugriff (by id).
+    .from("locations")
+    .select("id, name, cash_enabled")
+    .eq("id", locationId)
+    .eq("organization_id", orgId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new ForbiddenError();
+  if (data.cash_enabled === false) {
+    throw new Error(
+      `Standort „${data.name}" ist ein reiner Planungs-Standort (kein Kassenbetrieb).`,
+    );
+  }
+}
+
 export async function assertStaffBoundToLocation(
   orgId: string,
   staffId: string,
@@ -1220,6 +1241,8 @@ export async function getOrCreateOpenSessionCore(
   return runGuarded(caller.role, "manager", makeAuditWriter(caller), async () => {
     const businessDate = data.businessDate ?? (await getCurrentBusinessDate());
     await assertLocationInOrg(caller.organizationId, data.locationId);
+    // LS1: keine Kassen-Session an reinen Planungs-Standorten.
+    await assertLocationCashEnabled(caller.organizationId, data.locationId);
     const outcome = await ensureOpenSessionRaw({
       organizationId: caller.organizationId,
       locationId: data.locationId,

@@ -71,15 +71,19 @@ export const getMonthlyRevenueMatrix = createServerFn({ method: "GET" })
     // 1) Standorte (Namen für die Umschalter und das PDF).
     const { data: locRows, error: locErr } = await supabaseAdmin
       .from("locations")
-      .select("id, name, is_active")
+      .select("id, name, is_active, cash_enabled")
       .eq("organization_id", org)
       .order("name", { ascending: true });
     if (locErr) throw locErr;
-    const locations = (locRows ?? []).map((l) => ({
-      id: l.id as string,
-      name: l.name as string,
-      inactive: l.is_active === false,
-    }));
+    // LS1: reine Planungs-Standorte (cash_enabled = false) gehören nicht in
+    // die Monatsentwicklung — sie führen keine Kasse.
+    const locations = (locRows ?? [])
+      .filter((l) => l.cash_enabled !== false)
+      .map((l) => ({
+        id: l.id as string,
+        name: l.name as string,
+        inactive: l.is_active === false,
+      }));
 
     // 2) Legacy-Historie (< LIVE_FROM; die Grenze zieht `mergeMonthlyCells`).
     const legacyRows = await selectAllPaged<{

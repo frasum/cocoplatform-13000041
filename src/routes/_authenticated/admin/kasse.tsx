@@ -7,7 +7,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Lock, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,7 @@ import {
 import { buildDailySummaryData } from "@/lib/cash/daily-summary-data";
 import { printDailySummary } from "@/components/cash/DailyPrintView";
 import { DateSelector } from "@/components/shared/DateSelector";
+import { filterCashEnabled } from "@/lib/locations/cash-enabled";
 import { LocationPills } from "@/components/shared/LocationPills";
 import { parseEuroToCents } from "@/lib/cash/kasse-helpers";
 import { SettlementWarningsBanner } from "@/components/cash/SettlementWarningsBanner";
@@ -169,11 +170,15 @@ function KassePage() {
     queryFn: () => fetchLocations(),
   });
 
+  // LS1: Die Kasse kennt nur Standorte mit Kassenbetrieb. Reine
+  // Planungs-Standorte (cash_enabled = false) erscheinen hier nicht.
+  const cashLocations = useMemo(() => filterCashEnabled(locationsQ.data ?? []), [locationsQ.data]);
+
   useEffect(() => {
-    if (!locationId && locationsQ.data && locationsQ.data.length > 0) {
-      setLocationId(locationsQ.data[0].id);
+    if (!locationId && cashLocations.length > 0) {
+      setLocationId(cashLocations[0].id);
     }
-  }, [locationId, locationsQ.data]);
+  }, [locationId, cashLocations]);
 
   const ovQ = useQuery({
     queryKey: ["cash", "overview", businessDate, locationId],
@@ -236,7 +241,7 @@ function KassePage() {
   const correctable =
     (sessionStatus === "open" || sessionStatus === "finalized") && !underWaterline;
 
-  const currentLocation = (locationsQ.data ?? []).find((l) => l.id === locationId);
+  const currentLocation = cashLocations.find((l) => l.id === locationId);
   const cashBalanceTargetResolvedCents = Number(
     currentLocation?.cashBalanceTargetResolvedCents ?? 200_000,
   );
@@ -435,7 +440,7 @@ function KassePage() {
         isGl: t.isGl,
       })),
       staffById: new Map((staffQ.data ?? []).map((s) => [s.id, s.displayName])),
-      locationName: (locationsQ.data ?? []).find((l) => l.id === locationId)?.name ?? undefined,
+      locationName: cashLocations.find((l) => l.id === locationId)?.name ?? undefined,
       createdByName: identity.displayName ?? null,
       managerOnDutyNames: ov.managerOnDutyNames ?? [],
       cashBalanceTargetCents: cashBalanceTargetResolvedCents,
@@ -528,7 +533,7 @@ function KassePage() {
             <Label htmlFor="loc">Standort</Label>
             <div id="loc" className="flex h-9 items-center">
               <LocationPills
-                locations={locationsQ.data ?? []}
+                locations={cashLocations}
                 value={locationId}
                 onChange={setLocationId}
               />

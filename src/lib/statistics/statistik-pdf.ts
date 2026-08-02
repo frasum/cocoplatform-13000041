@@ -522,20 +522,34 @@ export async function generateStatistikPdf(
   const colorOf = (name: string): [number, number, number] =>
     SERIES_PALETTE[(seriesColorIndex.get(name) ?? 0) % SERIES_PALETTE.length]!;
   const stacked = stackNames.length > 0;
-  if (stacked) {
-    // Kleine Legende in der Titelzeile (wie beim 13-Monats-Verlauf).
+  /**
+   * STAT3e — Legende rechtsbündig auf der Titelzeile: erst Breite messen, dann
+   * am rechten Rand beginnen. So klebt sie nie an der Abschnittsüberschrift.
+   */
+  const drawLegend = (
+    names: string[],
+    y: number,
+    marker: (x: number, y: number, color: [number, number, number]) => void,
+  ) => {
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
-    let legendX = marginX + 62;
-    for (const name of stackNames) {
+    const widths = names.map((n) => doc.getTextWidth(n));
+    const total = widths.reduce((a, w) => a + w + 16, 0);
+    let x = marginX + usable - total + 4;
+    names.forEach((name, i) => {
       const c = colorOf(name);
-      doc.setFillColor(c[0], c[1], c[2]);
-      doc.rect(legendX, cursorY - 5, 4, 4, "F");
+      marker(x, y, c);
       doc.setTextColor(60);
-      doc.text(name, legendX + 6, cursorY - 2);
-      legendX += 16 + doc.getTextWidth(name);
-    }
+      doc.text(name, x + 6, y + 3);
+      x += 16 + (widths[i] ?? 0);
+    });
     doc.setTextColor(20);
+  };
+  if (stacked) {
+    drawLegend(stackNames, cursorY - 5, (x, y, c) => {
+      doc.setFillColor(c[0], c[1], c[2]);
+      doc.rect(x, y, 4, 4, "F");
+    });
   }
   cursorY += 6;
   const axisW = 42;

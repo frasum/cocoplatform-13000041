@@ -256,6 +256,15 @@ function StatistikPage() {
     queryFn: () => getMonthlyRevenueMatrix({ data: {} }),
   });
 
+  // STAT3h — Break-even-Grundlage für die Modellzeile im PDF. Nur relevant im
+  // Scope „Alle Standorte" (eindeutige Entität) und bei abgeschlossenem Monat.
+  const preTaxEligible = mode === "month" && locationFilter === "all" && month < currentMonth();
+  const bwaQ = useQuery({
+    queryKey: ["bwa", "months"],
+    queryFn: () => listBwaMonths(),
+    enabled: preTaxEligible,
+  });
+
   // Compare-Queries (alle Standorte, ignorieren den Pill-Filter) — genau einmal
   // hier deklariert, damit der PDF-Export dieselben Daten nutzen kann wie die
   // Vergleichstabelle. LocationCompareSection erhält die Ergebnisse als Props.
@@ -524,6 +533,7 @@ function StatistikPage() {
       },
       ...(monthly ? { monthly } : {}),
       ...(ytdCompare ? { ytdCompare } : {}),
+      ...(preTaxModel ? { preTaxModel } : {}),
       comparison,
     };
 

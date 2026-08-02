@@ -29,6 +29,7 @@ import {
   pdfChannelLabel,
   preTaxChainText,
   preTaxTailText,
+  preTaxMarginText,
   tipSummaryText,
   PDF_USABLE_WIDTH,
   PRE_TAX_HEADING,
@@ -454,13 +455,27 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
       dbPct: 70,
     };
     const amount = fmtEurRounded(preTax.resultCents);
+    // STAT3l — Klammerteil (Marge) gehört zur Zeile 1 und muss mitpassen.
+    const margin = preTaxMarginText(36.9);
+    assertWinAnsiSafe(margin, "Banner-Marge");
     // Zeile 1: Überschrift (8 pt) + Abstand + Betrag (13,5 pt).
     const line1 =
-      estimateHelveticaWidth(PRE_TAX_HEADING, 8) + 10 + estimateHelveticaWidth(amount, 13.5);
+      estimateHelveticaWidth(PRE_TAX_HEADING, 8) +
+      10 +
+      estimateHelveticaWidth(amount, 13.5) +
+      6 +
+      estimateHelveticaWidth(margin, 8);
     // Zeile 2: die Rechenkette (7 pt).
     const line2 = estimateHelveticaWidth(preTaxChainText(preTax), 7);
     expect(line1).toBeLessThanOrEqual(PDF_USABLE_WIDTH);
     expect(line2).toBeLessThanOrEqual(PDF_USABLE_WIDTH);
+  });
+
+  it("STAT3l: Marge-Klammerteil formatiert deutsch, negativ mit ASCII-Minus", () => {
+    expect(preTaxMarginText(7.0)).toBe("(7,0 % vom Bruttoumsatz)");
+    expect(preTaxMarginText(-3.25)).toBe("(-3,3 % vom Bruttoumsatz)");
+    expect(preTaxMarginText(null)).toBe("");
+    assertWinAnsiSafe(preTaxMarginText(-3.25), "Banner-Marge negativ");
   });
 
   it("STAT3j: Fußnoten-Marker sind WinAnsi-fähig und bleiben bei drei Ziffern", () => {

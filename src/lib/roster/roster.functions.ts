@@ -507,7 +507,9 @@ export const getStaffForRoster = createServerFn({ method: "GET" })
     const payrollIds = new Set((payrollRows ?? []).map((r) => r.staff_id as string));
     const { data: rows, error } = await supabaseAdmin
       .from("staff_locations")
-      .select("staff_id, department, staff(id, display_name, is_active)")
+      // RS1 — roster_plannable mitlesen: Feste-Zeiten-Kräfte erscheinen nicht
+      // in Planungslisten (Wochenplan, Zuweisung).
+      .select("staff_id, department, staff(id, display_name, is_active, roster_plannable)")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId);
     if (error) throw error;
@@ -521,8 +523,9 @@ export const getStaffForRoster = createServerFn({ method: "GET" })
           .filter((id) => {
             const s = visibleRows.find((x) => x.staff_id === id)?.staff as {
               is_active: boolean;
+              roster_plannable: boolean | null;
             } | null;
-            return s?.is_active !== false;
+            return isPlannable({ isActive: s?.is_active, rosterPlannable: s?.roster_plannable });
           }),
       ),
     );
@@ -555,8 +558,8 @@ export const getStaffForRoster = createServerFn({ method: "GET" })
 
     return visibleRows
       .filter((r) => {
-        const s = r.staff as { is_active: boolean } | null;
-        return s?.is_active !== false;
+        const s = r.staff as { is_active: boolean; roster_plannable: boolean | null } | null;
+        return isPlannable({ isActive: s?.is_active, rosterPlannable: s?.roster_plannable });
       })
       .map((r) => ({
         staffId: r.staff_id as string,

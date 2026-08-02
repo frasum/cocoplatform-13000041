@@ -868,38 +868,58 @@ export async function generateStatistikPdf(
   doc.text(tipLine, marginX + 90, cursorY);
   cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
 
-  // ── STAT3h/3i — Ergebnis vor Steuern (Modell) ────────────────────────────
-  // Der Betrag ist ein Bewertungswert, deshalb dieselbe Färbung wie Deltas.
-  // Nach dem gefärbten Betrag werden Font UND Textfarbe explizit zurückgesetzt.
+  // ── STAT3h/3i/3j — Fazit-Banner „Ergebnis vor Steuern (Modell)" ───────────
+  // Der Kasten bleibt bei JEDEM Vorzeichen neutral (helles Grau); die Bewertung
+  // trägt allein der Betrag über `deltaTone`. Nach dem gefärbten Betrag werden
+  // Font UND Textfarbe explizit zurückgesetzt (Lehre aus STAT3i).
   if (preTax) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(PRE_TAX_HEADING, marginX, cursorY);
-    const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
-    doc.setFontSize(7.5);
+    const bannerH = 38;
+    const centerX = marginX + usable / 2;
+    doc.setDrawColor(200);
+    doc.setLineWidth(0.5);
+    doc.setFillColor(247, 247, 247);
+    doc.roundedRect(marginX, cursorY, usable, bannerH, 3, 3, "FD");
+
     const amount = fmtEurRounded(preTax.resultCents);
     const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    // Zeile 1 mittig: Überschrift + deutlich größerer, gefärbter Betrag.
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(tone[0], tone[1], tone[2]);
-    const amountX = marginX + headingWidth + 10;
-    doc.text(amount, amountX, cursorY);
+    doc.setFontSize(8);
+    const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
+    doc.setFontSize(13.5);
     const amountWidth = doc.getTextWidth(amount);
+    const lineWidth = headingWidth + 10 + amountWidth;
+    const startX = centerX - lineWidth / 2;
+    const baseline1 = cursorY + 18;
+    doc.setFontSize(8);
+    doc.setTextColor(70);
+    doc.text(PRE_TAX_HEADING, startX, baseline1);
+    doc.setFontSize(13.5);
+    doc.setTextColor(tone[0], tone[1], tone[2]);
+    doc.text(amount, startX + headingWidth + 10, baseline1);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(20);
-    const tailX = amountX + amountWidth + 6;
-    doc.text(preTaxTailText(preTax), tailX, cursorY);
-    cursorY += BLOCK_GAP;
+
+    // Zeile 2 mittig, klein: die Rechenkette.
+    doc.setFontSize(7);
+    doc.setTextColor(90);
+    doc.text(preTaxChainText(preTax), centerX, cursorY + 30, { align: "center" });
+    doc.setTextColor(20);
+    cursorY += bannerH + BLOCK_GAP;
   }
 
   // ── Fußnoten ────────────────────────────────────────────────────────────
   doc.setFontSize(6.5);
   doc.setFont("helvetica", "italic");
+  // STAT3j — erst die drei nummerierten (stellengebundenen) Fußnoten in der
+  // Reihenfolge ¹ ² ³, danach die GLOBALEN ohne Marker (Rundung gilt dem ganzen
+  // Dokument, die Modell-Fußnote ist über „(Modell)" im Banner zugeordnet).
   const notes: string[] = [
-    "Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.",
+    `${FOOTNOTE_MARKS.labor} Basis-Brutto (Netto-Stunden × Stundenlohn) — ohne AG-SV, SFN, Zweitsatz. Detailzahlen je Tag und Mitarbeiter stehen in COCO.`,
     // ASCII statt Delta-Zeichen: die jsPDF-Standardschrift (WinAnsi) kennt kein U+0394.
-    "Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.",
+    `${FOOTNOTE_MARKS.channel} Kanal-Vergleich gegen die Vorperiode; ein Vorjahresvergleich je Kanal liegt in der Monatshistorie nicht vor.`,
     // STAT2d — Bezugsbasis der Quote muss im Dokument stehen.
-    "TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).",
+    `${FOOTNOTE_MARKS.tipRate} TG-Quote bezogen auf Haus-Umsatz (Trinkgeld gesamt / Haus-Umsatz).`,
     // STAT3d — Rundung ist Präsentation, keine Nachjustierung der Summen.
     "Beträge kaufmännisch auf ganze Euro gerundet; Summen können rundungsbedingt um ±1 € abweichen. Centgenaue Werte in COCO.",
   ];

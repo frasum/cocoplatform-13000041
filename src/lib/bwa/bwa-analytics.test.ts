@@ -327,6 +327,23 @@ describe("estimatedPreTaxResultCents (STAT3h)", () => {
   });
 });
 
+describe("preTaxMarginPct (STAT3l)", () => {
+  it("24.110,00 € von 344.774,18 € brutto ⇒ 7,0 (Rundung erst im Format)", () => {
+    const pct = preTaxMarginPct(24_110_00, 344_774_18);
+    expect(pct).not.toBeNull();
+    expect((pct ?? 0).toFixed(1)).toBe("7.0");
+  });
+
+  it("negatives Ergebnis ⇒ negative Quote", () => {
+    expect(preTaxMarginPct(-12_000_00, 344_774_18) ?? 0).toBeLessThan(0);
+  });
+
+  it("Bruttoumsatz 0 oder negativ ⇒ null", () => {
+    expect(preTaxMarginPct(24_110_00, 0)).toBeNull();
+    expect(preTaxMarginPct(24_110_00, -1)).toBeNull();
+  });
+});
+
 describe("sumRows / findYoy / findPrevMonth", () => {
   it("sumRows summiert alle Cent-Felder", () => {
     const a = row({ umsatzCents: 100, personalCents: 40 });

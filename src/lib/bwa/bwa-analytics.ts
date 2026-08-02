@@ -243,10 +243,20 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
   const netMonthCents = bePeriodCents / months;
   const netDayCents = netMonthCents / OPEN_DAYS_PER_MONTH;
 
-  const rev19 = s.getraenkeCents + s.sonstigeErloeseCents + s.speisenHausCents;
-  const rev7 = s.speisenAusserHausCents;
-  const vat = rev19 * VAT_STANDARD + rev7 * VAT_REDUCED;
+  // USt monatsgenau: Haus-Speisen erst ab dem Stichtag mit 7 %.
+  let vat = 0;
+  for (const r of last12) vat += monthVatCents(r);
   const factor = (s.umsatzCents + vat) / s.umsatzCents;
+
+  // Faktor nach aktuellem Regelstand: nur Monate ab dem Stichtag.
+  const currentRows = last12.filter((r) => inhouseFoodReduced(r.month));
+  const currentRevenue = currentRows.reduce((a, r) => a + r.umsatzCents, 0);
+  let factorCurrent: number | null = null;
+  if (currentRows.length > 0 && currentRevenue > 0) {
+    let vatCur = 0;
+    for (const r of currentRows) vatCur += monthVatCents(r);
+    factorCurrent = (currentRevenue + vatCur) / currentRevenue;
+  }
 
   const grossMonthCents = netMonthCents * factor;
   const grossDayCents = netDayCents * factor;
@@ -258,6 +268,7 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
     v,
     db,
     factor,
+    factorCurrent,
     months,
     netMonthCents: Math.round(netMonthCents),
     netDayCents: Math.round(netDayCents),
@@ -269,20 +280,23 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
 }
 
 /** STAT3h — Modell-Ergebnis vor Steuern für einen Monat:
- *  `db × (grossRevenueCents / factor − netMonthCents)`.
+ *  `db × (grossRevenueCents / factorCurrent - netMonthCents)`.
  *
  *  `grossRevenueCents` ist der Kassenumsatz brutto des Monats; die Umrechnung
- *  auf netto läuft über den USt-Mix-Faktor des übergebenen Break-even. Oberhalb
+ *  auf netto läuft über `be.factorCurrent`, also den USt-Mix NUR der Monate nach
+ *  aktuellem Regelstand — der Misch-`factor` würde Alt-Monate mit 19 % auf
+ *  Haus-Speisen mitschleppen. Fehlt `factorCurrent`, gibt die Funktion `null`
+ *  zurück (kein Rechnen mit veraltetem Mix). Oberhalb
  *  des Break-even trägt jeder Euro nur seinen Deckungsbeitrag, deshalb ist es
- *  NICHT die nackte Differenz Umsatz − BE. Negative Ergebnisse (Monat unter dem
+ *  NICHT die nackte Differenz Umsatz - BE. Negative Ergebnisse (Monat unter dem
  *  Break-even) werden bewusst zurückgegeben. `null` bei fehlendem BE. */
 export function estimatedPreTaxResultCents(
   grossRevenueCents: number,
   be: BreakEven | null,
 ): number | null {
   if (be === null) return null;
-  if (be.factor <= 0) return null;
-  const netRevenue = grossRevenueCents / be.factor;
+  if (be.factorCurrent === null || be.factorCurrent <= 0) return null;
+  const netRevenue = grossRevenueCents / be.factorCurrent;
   return Math.round(be.db * (netRevenue - be.netMonthCents));
 }
 

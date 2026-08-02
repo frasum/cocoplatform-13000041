@@ -303,11 +303,17 @@ export async function generateStatistikPdf(
     doc.setFont("helvetica", "bold");
     doc.text(k.value, x + 6, boxY + 30);
     doc.setFontSize(13);
+    // STAT3e — Kachel-Deltas dezent einfärben (Bestandswerte bleiben neutral).
+    const leadTone = deltaTone(k.lead);
+    doc.setTextColor(leadTone[0], leadTone[1], leadTone[2]);
     doc.text(k.lead, x + 6, boxY + 49);
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(90);
     doc.text(k.leadLabel, x + 6, boxY + 59);
+    const footDelta = k.foot.split(":")[1];
+    const footTone = deltaTone(footDelta);
+    doc.setTextColor(footTone[0], footTone[1], footTone[2]);
     doc.text(k.foot, x + 6, boxY + 68);
     doc.setTextColor(20);
   });
@@ -381,7 +387,7 @@ export async function generateStatistikPdf(
           "vs. Vormonat",
           "Trinkgeld ges.",
           "TG-Quote",
-          "Quote",
+          "Pers.-Quote",
           "Netto-Std.",
           "€ / Gast",
           "€ / Std.",
@@ -394,6 +400,10 @@ export async function generateStatistikPdf(
         }
         if (hook.section === "head" && hook.column.index === 0) {
           hook.cell.styles.halign = "left";
+        }
+        // STAT3e — nur Veränderungsspalten färben (2 = vs. Vorjahr, 3 = vs. Vormonat).
+        if (hook.section === "body" && (hook.column.index === 2 || hook.column.index === 3)) {
+          hook.cell.styles.textColor = deltaTone(hook.cell.text.join(""));
         }
       },
       theme: "grid",

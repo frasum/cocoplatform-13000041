@@ -51,6 +51,7 @@ vi.mock("jspdf", () => {
     setTextColor() {}
     setLineWidth() {}
     rect() {}
+    roundedRect() {}
     line() {}
     circle() {}
     getTextWidth(t: string) {
@@ -654,7 +655,8 @@ describe("statistik-pdf — Delta-Färbung und Labels (STAT3e)", () => {
       (t.head ?? []).map((r) => r.map((c) => (typeof c === "string" ? c : c.content))),
     );
     const locationHead = heads.find((h) => h[0] === "Standort");
-    expect(locationHead).toContain("Pers.-Quote");
+    // STAT3j — der Kopf trägt jetzt den Fußnoten-Marker ¹.
+    expect(locationHead).toContain(`Pers.-Quote${FOOTNOTE_MARKS.labor}`);
     expect(locationHead).not.toContain("Quote");
   });
 });

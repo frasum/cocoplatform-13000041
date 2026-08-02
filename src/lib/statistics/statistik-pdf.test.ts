@@ -26,10 +26,12 @@ import {
   fmtPctDe,
   generateStatistikPdf,
   pdfChannelLabel,
+  preTaxChainText,
   preTaxTailText,
   tipSummaryText,
   PDF_USABLE_WIDTH,
   PRE_TAX_HEADING,
+  FOOTNOTE_MARKS,
   type StatistikPdfData,
 } from "./statistik-pdf";
 

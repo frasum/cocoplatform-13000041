@@ -2,7 +2,7 @@
 // Die Kernlogik selbst ist unverändert; getestet wird die Tagesabhängigkeit.
 import { describe, expect, it } from "vitest";
 import { schoolHolidayNotices } from "./school-holiday-notices";
-import { firstColumnLabel } from "@/components/cash/WeatherWidget";
+import { firstColumnLabel } from "@/lib/weather/weather-labels";
 
 describe("schoolHolidayNotices am gewählten Tag", () => {
   it("2026-08-01 (Vortag des Vortags) → kein Hinweis", () => {

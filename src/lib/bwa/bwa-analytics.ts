@@ -37,8 +37,7 @@ function inhouseFoodReduced(month: string): boolean {
 /** USt-Betrag einer einzelnen Monatszeile nach dem im Monat gültigen Recht. */
 function monthVatCents(r: BwaRow): number {
   const reduced = inhouseFoodReduced(r.month);
-  const rev19 =
-    r.getraenkeCents + r.sonstigeErloeseCents + (reduced ? 0 : r.speisenHausCents);
+  const rev19 = r.getraenkeCents + r.sonstigeErloeseCents + (reduced ? 0 : r.speisenHausCents);
   const rev7 = r.speisenAusserHausCents + (reduced ? r.speisenHausCents : 0);
   return rev19 * VAT_STANDARD + rev7 * VAT_REDUCED;
 }

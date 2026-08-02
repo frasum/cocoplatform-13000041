@@ -224,9 +224,7 @@ describe("BWA-V1: USt-Zuordnung Haus-Speisen ab 2026-01", () => {
     });
 
   const months = (year: number, count: number, from = 1) =>
-    Array.from({ length: count }, (_, i) =>
-      mk(`${year}-${String(from + i).padStart(2, "0")}-01`),
-    );
+    Array.from({ length: count }, (_, i) => mk(`${year}-${String(from + i).padStart(2, "0")}-01`));
 
   it("Stichtags-Konstante ist 2026-01", () => {
     expect(INHOUSE_FOOD_REDUCED_FROM).toBe("2026-01");
@@ -263,10 +261,7 @@ describe("BWA-V1: USt-Zuordnung Haus-Speisen ab 2026-01", () => {
     const vatNew = 50_000_00 * 0.19 + 50_000_00 * 0.07;
     const rev = 100_000_00 * 12;
     expect(be.factor).toBeCloseTo((rev + (5 * vatOld + 7 * vatNew)) / rev, 12);
-    expect(be.factorCurrent).toBeCloseTo(
-      (100_000_00 * 7 + 7 * vatNew) / (100_000_00 * 7),
-      12,
-    );
+    expect(be.factorCurrent).toBeCloseTo((100_000_00 * 7 + 7 * vatNew) / (100_000_00 * 7), 12);
   });
 
   it("Fenster komplett vor Stichtag: factorCurrent null ⇒ STAT3h liefert null", () => {

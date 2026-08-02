@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   barChartGeometry,
+  dayBands,
   formatTsd,
   formatTsdPlain,
   groupedBarChartGeometry,

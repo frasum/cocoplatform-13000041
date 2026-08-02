@@ -140,6 +140,25 @@ function orNull(s: string): string | null {
   return s === "" ? null : s;
 }
 
+/**
+ * Zerlegt eine Impact-Zelle der Form „Hoch (Mittag)“ in Grundstufe und
+ * Klammerzusatz. Ohne Klammer bleibt der Text unverändert, der Zusatz ist
+ * `null`. Die Grundstufe wird NICHT geraten — das Mapping entscheidet.
+ */
+export function splitImpactCell(raw: SheetCell): { base: string; qualifier: string | null } {
+  const s = text(raw);
+  const m = /^(.*?)\s*\(([^()]*)\)\s*$/.exec(s);
+  if (!m) return { base: s, qualifier: null };
+  const qualifier = (m[2] ?? "").trim();
+  return { base: (m[1] ?? "").trim(), qualifier: qualifier === "" ? null : qualifier };
+}
+
+function withTimeWindow(recommendation: string, qualifier: string | null): string | null {
+  if (!qualifier) return orNull(recommendation);
+  const prefix = `Zeitfenster: ${qualifier}`;
+  return recommendation === "" ? prefix : `${prefix} — ${recommendation}`;
+}
+
 export function parseEventsSheet(raw: readonly SheetRow[]): ParseEventsResult {
   const cols = findColumns(raw);
   const rows: ParsedEventRow[] = [];
@@ -171,7 +190,8 @@ export function parseEventsSheet(raw: readonly SheetRow[]): ParseEventsResult {
       errors.push({ sheetRow, message: `„${name}“: Bis-Datum liegt vor dem Von-Datum.` });
       continue;
     }
-    const impact = mapImpact(impactRaw);
+    const { base: impactBase, qualifier: impactQualifier } = splitImpactCell(impactRaw);
+    const impact = mapImpact(impactBase);
     if (!impact) {
       errors.push({
         sheetRow,
@@ -194,7 +214,7 @@ export function parseEventsSheet(raw: readonly SheetRow[]): ParseEventsResult {
       locationText: orNull(text(row[cols.location])),
       distanceText: orNull(text(row[cols.distance])),
       impact,
-      recommendation: orNull(text(row[cols.recommendation])),
+      recommendation: withTimeWindow(text(row[cols.recommendation]), impactQualifier),
       source: orNull(text(row[cols.source])),
     });
   }

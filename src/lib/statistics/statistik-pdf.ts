@@ -554,12 +554,14 @@ export async function generateStatistikPdf(
     },
     theme: "grid",
   });
-  cursorY = lastY(doc) + BLOCK_GAP;
+  cursorY = lastY(doc) + 10;
   if (tw.warning) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
-    doc.text(tw.warning, marginX, cursorY - BLOCK_GAP + 10);
+    doc.text(tw.warning, marginX, cursorY);
+    cursorY += 4;
   }
+  cursorY += BLOCK_GAP - 10 + 6;
 
   // ── Grafik A — Tagesumsatz-Balken ───────────────────────────────────────
   doc.setFontSize(10);

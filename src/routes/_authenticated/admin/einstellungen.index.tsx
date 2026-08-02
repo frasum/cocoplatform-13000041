@@ -33,6 +33,7 @@ import { TelegramTagesberichtSection } from "@/components/settings/TelegramTages
 import { SkillsSection } from "@/components/settings/SkillsSection";
 import { ArtikelPflegeSection } from "@/components/settings/ArtikelPflegeSection";
 import { TaxonomySection } from "@/components/settings/TaxonomySection";
+import { WetterSection } from "@/components/settings/WetterSection";
 
 // AP1-A — Tabs sind single-sourced. `adminOnly: true` versteckt einen Tab
 // generisch in der Nav (route.tsx filtert) und schaltet den Content-Fallback.
@@ -46,6 +47,8 @@ export const SUB_TABS = [
   { key: "skills", label: "Skills" },
   { key: "artikel", label: "Artikel", adminOnly: true },
   { key: "stammdaten", label: "Kategorien & Einheiten", adminOnly: true },
+  // WX1 — Betriebs-Karte der Wetter-Erfassung (nur Sammeln, keine Auswertung).
+  { key: "wetter", label: "Wetterdaten", adminOnly: true },
 ] as const satisfies ReadonlyArray<SubTab>;
 
 export type TabKey = (typeof SUB_TABS)[number]["key"];
@@ -288,6 +291,8 @@ function OrgSettingsPage() {
         {tab === "artikel" && identity.role === "admin" && <ArtikelPflegeSection />}
 
         {tab === "stammdaten" && identity.role === "admin" && <TaxonomySection />}
+
+        {tab === "wetter" && identity.role === "admin" && <WetterSection />}
       </div>
     </div>
   );

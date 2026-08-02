@@ -1,54 +1,42 @@
-## Bestandsmeldung
+## Bestand
 
-Basis `origin/main`, HEAD `359ec6df2` („style: prettier autofix [bot]", nach STAT3f). Reine Präsentationsrunde in `src/lib/statistics/statistik-pdf.ts` + `statistik-pdf-charts.ts`.
+Basis `af16af5b2` auf origin/main (Stand nach STAT3l + Veranstaltungs-Export). `src/lib/weather/` existiert noch nicht, es gibt keine Wetter-Tabelle. Admin-Server-Functions folgen durchgehend dem Muster `requireSupabaseAuth` + `loadAdminCaller(...)` + `makeAuditWriter`, `supabaseAdmin` wird erst im Handler geladen. Die Einstellungen-Tabs sind in `einstellungen.index.tsx` als `SUB_TABS` single-sourced (Nav in `admin/route.tsx` leitet sich daraus ab).
 
-### Befund zu Punkt 1 (Ursache, nicht still gefixt)
+## Schritt 1 — Migration (Ausführung Bauherr)
 
-Skala und Ticks stammen aus **zwei verschiedenen Obergrenzen** — und zwar in allen Chart-Typen:
-- Die Geometrien skalieren mit `(value / dataMax)` bzw. `(value - baseline) / (dataMax - baseline)`, also gegen das **rohe Datenmaximum**.
-- Die Achsenwerte kommen aus `ticksFor(dataMax, …)`, das `niceTicks(baseline, dataMax)` bildet und danach **jeden Rasterwert > dataMax wegfiltert**.
+Neue Migration mit `public.weather_days` exakt nach Skizze: `organization_id` → `organizations(id)`, `business_date`, `temp_max_c/temp_min_c numeric(4,1)`, `precipitation_mm numeric(5,1)`, `sunshine_hours numeric(4,1)`, `source text CHECK IN ('forecast','archive')`, `fetched_at`, `UNIQUE (organization_id, business_date)`. Kommentar begründet `numeric` (Messwerte, keine Geldgrößen).
 
-Ergebnis: der oberste gezeichnete Tick liegt unter dem Datenmaximum, Balken/Punkte ragen darüber hinaus und wirken abgeschnitten (5-Jahres-Grafik 1.171 über 1.000er-Tick, Tagesumsatz über 10-T€-Tick, Dezember der 13-Monats-Linie über 180er-Tick). Der Filter war für die geschnittene Linien-Achse gedacht, ist aber für das obere Ende überall falsch.
+Reihenfolge wie im Projekt üblich: CREATE TABLE → GRANTs → RLS enable → Policies (Drops vor Creates).
+- `GRANT SELECT ON public.weather_days TO authenticated;` `GRANT ALL ... TO service_role;` kein `anon`.
+- Policy: SELECT für `authenticated` mit `organization_id = public.current_organization_id()`.
+- Kein INSERT/UPDATE/DELETE für `authenticated` (DENY-ALL beim Schreiben) — Schreiben ausschließlich über die Server-Functions mit Service-Role.
 
-## Änderungen
+## Schritt 2 — `src/lib/weather/`
 
-### 1. Skalen-Abschluss für ALLE Chart-Typen
-In `statistik-pdf-charts.ts` ersetzt eine gemeinsame Achsenfunktion `axisFor(dataMax, area, tickCount, baseline)` das heutige `ticksFor`:
-- Obergrenze der Skala = `niceTicks(baseline, dataMax, tickCount).top` — per Konstruktion ≥ Datenmaximum (1.171 ⇒ 1.250 im 250er-Raster).
-- Alle Rasterwerte werden gezeichnet, keine Filterung des oberen Endes mehr.
-- Die untere Kappung (`baseline`) bleibt exakt wie heute: 0 bei allen Balken-Charts, `niceTicks`-Baseline nur bei `lineChartGeometry` mit `baseline: "nice"`.
+- `weather-core.ts` (rein, getestet):
+  - `WEATHER_COORDS = { lat: 48.137, lon: 11.575 }` mit Kommentar „SaaS-Erweiterungspunkt, analog holiday_region".
+  - `mapOpenMeteoDaily(json, source)` → Zeilen `{ businessDate, tempMaxC, tempMinC, precipitationMm, sunshineHours, source }`. `sunshine_duration` (Sekunden) → Stunden, 1 Nachkommastelle. `null` bleibt `null` (kein 0-Fake). Tage ohne jeden Messwert werden übersprungen (Archive-Nachhinken).
+  - `mayOverwrite(existing, incoming)`: `archive` überschreibt `forecast` und `archive`; `forecast` überschreibt nur `forecast`, nie `archive`.
+  - URL-Builder für Forecast- und Archive-Endpoint (Datumsfenster, `timezone=Europe/Berlin`).
+- `weather-core.test.ts`: Fixture-JSON (Forecast + Archive, inkl. `null`-Werten und Sekunden-Umrechnung), alle vier `mayOverwrite`-Kombinationen, Bereichsvalidierung.
+- `weather.functions.ts` (dünner Wrapper: nur Imports, Zod, Deklarationen):
+  - `syncWeather` (admin): Forecast heute…+16 Tage, Archive letzte 10 Tage; vorhandene Zeilen des Fensters lesen, `mayOverwrite` anwenden, Upsert auf `(organization_id, business_date)`; Rückgabe `{ forecastWritten, archiveWritten, skipped }`.
+  - `backfillWeather({ from, to })` (admin): Zod-Validierung `from <= to`, `to <= heute` (Geschäftstag-Logik via `businessDateOf`), Archive-Abruf, `source: 'archive'`, Batch-Upsert; Rückgabe `{ written, skipped }`.
+  - `getWeatherStatus` (admin, read): `{ dayCount, oldest, newest, forecastCount }`.
+  - Reines `fetch` (kein SDK), Worker-tauglich; `supabaseAdmin` per `await import(...)` im Handler; Audit-Eintrag über `makeAuditWriter`.
 
-Angewendet auf `barChartGeometry`, `stackedBarChartGeometry`, `groupedBarChartGeometry` und `lineChartGeometry`. Das zurückgegebene Feld `max` bedeutet künftig „Skalen-Obergrenze" (Doku-Kommentar entsprechend).
+## Schritt 3 — Verwaltungs-UI
 
-Blockierende Tests je Chart-Typ in `statistik-pdf-charts.test.ts`: „oberster Tick ≥ Datenmaximum" plus Nachweis, dass kein Balken/Punkt die Fläche nach oben verlässt (`y >= area.y`); für die 5-Jahres-Grafik konkret max 1.171 ⇒ oberster Tick 1.250. Bestehende Tests, die die alte „Maximum füllt die Fläche exakt"-Annahme prüfen (u. a. `[1.400, 900]`, `[500, 500]`, Linien-Baseline-Fall), werden auf die neue Regel nachgezogen.
-
-### 2. Wertelabels ohne Einheit
-Neue reine Formathilfe `formatTsdPlain(cents)` (Tausenderpunkt, kein „T€"). Nur die Balkenlabels der 5-Jahres-Grafik nutzen sie; Achsenlabels behalten „T€". Kurzer Formattest.
-
-### 3. Neue Trinkgeld-Zeile
-Direkt unter der Standort-Tabelle, im Stil der Takeaway-Kopfzeile (fette Blocküberschrift „Trinkgeld" + eine Wertezeile):
-
-```text
-Trinkgeld   Service 12.480 € (4,2 % vom Haus) · Küche 3.120 € (1,1 %) · Gesamt 15.600 € (5,3 %)
-```
-
-- Beträge über `fmtEurRounded` (STAT3d), Quoten über den bestehenden Prozent-Formatierer (eine Nachkommastelle).
-- Quoten ausschließlich über die bestehende `tipRatePct(tip, houseCents)`. `houseCents ≤ 0` ⇒ `null` ⇒ „—" (Variante B).
-- Werte aus dem vorhandenen `data.tips` + `data.revenue.houseCents`; Scope-Logik liegt schon im Aufrufer. Keine Standort-Aufschlüsselung.
-
-Blockierender Selbsttest: Die Gesamt-Quote der Zeile ist zeichengleich mit der TG-Quote-Zelle der Gesamt-Zeile der Standort-Tabelle (gleiche Fixture, beide aus dem gezeichneten PDF gelesen).
-
-### 4. Blockreihenfolge
-KPI-Kacheln → Standort-Vergleich → Trinkgeld-Zeile → Take-Away-Kanäle → Tagesumsatz → 13-Monats-Verlauf → Jan–&lt;M&gt; kumuliert (5 Jahre) → Fußnoten. Die 5-Jahres-Grafik wandert von zwischen den Tabellen ans Ende der Grafik-Sequenz. Inhalte unverändert; die gemeinsame Farb-/Legendenzuordnung (`registerSeries`, `colorOf`, `drawLegend`) wird vor den ersten Block gezogen, damit Standortfarben über alle drei Grafiken identisch bleiben.
-
-### 5. Einheitliche Blockabstände
-Eine Konstante `BLOCK_GAP` (Blockende → nächste Überschrift) statt der heutigen Streuwerte (12 / 10 / 18 / 20), überall verwendet. Innenabstände (Überschrift → Tabelle/Chart) bleiben.
+Neuer Sub-Tab `{ key: "wetter", label: "Wetterdaten", adminOnly: true }` in `SUB_TABS` (Nav zieht automatisch nach) mit Karte `src/components/settings/WetterSection.tsx`:
+- Statuszeile: Anzahl Tage, ältester/neuester Tag, davon Forecast.
+- Knopf „Jetzt synchronisieren" → `syncWeather`, Ergebnis als Toast.
+- Backfill-Dialog Von/Bis, vorbelegt `2026-02-16` … gestern, Ergebnis-Meldung.
+- Kein Chart, keine Auswertung. Kommentar hält den Merkposten „täglicher Cron-Sync = späterer Baustein".
 
 ## Nicht angefasst
-Rechen- und Datenpfade, `tipRatePct` selbst, STAT3d-Rundung, STAT3e-Farben, Stapel-Logik, Kanaltabelle, KPI-Kacheln, Fußnoten-Inhalte, `monatsbericht-pdf.ts`, Bildschirm-Ansichten, `pap-2026/**`.
 
-## Testanpassungen
-`statistik-pdf.test.ts` und `stat1-e2e.test.ts` an neue Reihenfolge und die Trinkgeld-Zeile anpassen, ohne bestehende Wertprüfungen aufzuweichen.
+PG-/Statistik-/Kassen-Module, `events`, Dienstplan, `pap-2026/**`. Keine Prognoselogik.
 
 ## Gates
-`tsc --noEmit`, `eslint . --max-warnings=0`, `prettier --check .` (nach `prettier --write`), `vitest run` — alle grün, eine Runde = ein Commit. Visuelle QA am gerenderten PDF beim Bauherrn.
+
+`prettier --write` vor Commit, dann `tsc --noEmit`, `eslint . --max-warnings=0`, `prettier --check .`, `vitest run` — alle vier grün auf dem Liefer-SHA. Eine Runde = ein Commit. Migration führt der Bauherr aus, danach Backfill (2026-02-16..gestern) + einmal Sync.

@@ -5722,6 +5722,50 @@ export type Database = {
           },
         ]
       }
+      weather_days: {
+        Row: {
+          business_date: string
+          fetched_at: string
+          id: string
+          organization_id: string
+          precipitation_mm: number | null
+          source: string
+          sunshine_hours: number | null
+          temp_max_c: number | null
+          temp_min_c: number | null
+        }
+        Insert: {
+          business_date: string
+          fetched_at?: string
+          id?: string
+          organization_id: string
+          precipitation_mm?: number | null
+          source: string
+          sunshine_hours?: number | null
+          temp_max_c?: number | null
+          temp_min_c?: number | null
+        }
+        Update: {
+          business_date?: string
+          fetched_at?: string
+          id?: string
+          organization_id?: string
+          precipitation_mm?: number | null
+          source?: string
+          sunshine_hours?: number | null
+          temp_max_c?: number | null
+          temp_min_c?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_days_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wine_quiz_scores: {
         Row: {
           correct_answers: number

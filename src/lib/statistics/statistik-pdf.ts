@@ -598,13 +598,7 @@ export async function generateStatistikPdf(
       0: { cellWidth: 116, halign: "left", fontStyle: "bold" },
     },
     head: [
-      [
-        "Kanal",
-        ...tw.locationNames,
-        "Gesamt",
-        "Anteil",
-        `vs. Vorperiode${FOOTNOTE_MARKS.channel}`,
-      ],
+      ["Kanal", ...tw.locationNames, "Gesamt", "Anteil", `vs. Vorperiode${FOOTNOTE_MARKS.channel}`],
     ],
     body: twBody,
     didParseCell: (hook) => {

@@ -83,12 +83,10 @@ async function upsertRows(
   const skipped = rows.length - writable.length;
   if (writable.length === 0) return { written: 0, skipped };
 
-  const { error: upsertErr } = await supabaseAdmin
-    .from("weather_days")
-    .upsert(
-      writable.map((r) => insertPayload(organizationId, r)),
-      { onConflict: "organization_id,business_date" },
-    );
+  const { error: upsertErr } = await supabaseAdmin.from("weather_days").upsert(
+    writable.map((r) => insertPayload(organizationId, r)),
+    { onConflict: "organization_id,business_date" },
+  );
   if (upsertErr) throw upsertErr;
   return { written: writable.length, skipped };
 }

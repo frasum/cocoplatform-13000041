@@ -8,11 +8,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  backfillWeather,
-  getWeatherStatus,
-  syncWeather,
-} from "@/lib/weather/weather.functions";
+import { backfillWeather, getWeatherStatus, syncWeather } from "@/lib/weather/weather.functions";
 import { shiftIsoDate } from "@/lib/weather/weather-core";
 
 const BACKFILL_START = "2026-02-16";
@@ -75,8 +71,8 @@ export function WetterSection() {
       <div>
         <h2 className="text-base font-semibold text-foreground">Wetterdaten</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Tageswetter für München (Open-Meteo, DWD/ICON). Grundlage für die spätere
-          Umsatzprognose — hier werden die Daten nur gesammelt, nicht ausgewertet.
+          Tageswetter für München (Open-Meteo, DWD/ICON). Grundlage für die spätere Umsatzprognose —
+          hier werden die Daten nur gesammelt, nicht ausgewertet.
         </p>
       </div>
 

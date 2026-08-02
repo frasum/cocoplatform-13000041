@@ -195,9 +195,11 @@ async function eligiblePeerStaffIds(
   if (candidateIds.length === 0) return [];
   const { data: activeRows, error: activeErr } = await admin
     .from("staff")
+    // RS1 — nicht planbare Kräfte erhalten keine neuen Schichten per Tausch.
     .select("id")
     .eq("organization_id", organizationId)
     .eq("is_active", true)
+    .eq("roster_plannable", true)
     .in("id", candidateIds);
   if (activeErr) throw activeErr;
   const activeSet = new Set((activeRows ?? []).map((r) => r.id as string));

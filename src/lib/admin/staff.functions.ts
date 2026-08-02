@@ -348,6 +348,7 @@ export const getStaff = createServerFn({ method: "GET" })
       perso_nr: number | null;
       is_active: boolean;
       participates_in_pool: boolean;
+      roster_plannable: boolean;
       role_assignments: unknown;
       staff_locations: unknown;
       staff_pins: unknown;
@@ -355,7 +356,7 @@ export const getStaff = createServerFn({ method: "GET" })
       await supabaseAdmin
         .from("staff")
         .select(
-          "id, organization_id, first_name, last_name, display_name, email, phone, perso_nr, is_active, participates_in_pool, role_assignments(role), staff_locations(location_id), staff_pins(id)",
+          "id, organization_id, first_name, last_name, display_name, email, phone, perso_nr, is_active, participates_in_pool, roster_plannable, role_assignments(role), staff_locations(location_id), staff_pins(id)",
         )
         .eq("id", data.staffId)
         .eq("organization_id", caller.organizationId)
@@ -374,6 +375,8 @@ export const getStaff = createServerFn({ method: "GET" })
       persoNr: staff.perso_nr,
       isActive: staff.is_active,
       participatesInPool: staff.participates_in_pool,
+      // RS1 — Merkmal „im Dienstplan planbar".
+      rosterPlannable: staff.roster_plannable,
       role: (ra && ra.length > 0 ? ra[0].role : null) as AppRole | null,
       locationIds: ((staff.staff_locations ?? []) as { location_id: string }[]).map(
         (l) => l.location_id,
@@ -559,6 +562,38 @@ export const setStaffParticipatesInPool = createServerFn({ method: "POST" })
           entity: "staff",
           entityId: data.staffId,
           meta: { participates: data.participates },
+        },
+      };
+    });
+  });
+
+// RS1 — Merkmal „im Dienstplan planbar". Aus = die Person erscheint nicht in
+// Planungs-Personenlisten (Wochenplan, Zuweisung, Displays, Tausch-Peers);
+// Zeiterfassung und Lohn bleiben unberührt. Admin-only.
+export const setStaffRosterPlannable = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ staffId: z.string().uuid(), plannable: z.boolean() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin"]);
+    return runAllowed(caller.role, ["admin"], makeAuditWriter(caller), async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      expectVoid(
+        await supabaseAdmin
+          .from("staff")
+          .update({ roster_plannable: data.plannable })
+          .eq("id", data.staffId)
+          .eq("organization_id", caller.organizationId),
+        "setStaffRosterPlannable",
+      );
+      return {
+        result: { ok: true as const },
+        audit: {
+          action: "staff.set_roster_plannable",
+          entity: "staff",
+          entityId: data.staffId,
+          meta: { plannable: data.plannable },
         },
       };
     });

@@ -11,6 +11,7 @@ import { todayIso } from "@/lib/format";
 import { resolveCellKind } from "@/lib/display/cell";
 import { currentPeriodEnd, nextPeriodEnd, periodLabel } from "@/lib/display/period-split";
 import { computeCrossBookingFlags, type ShiftForFlag } from "@/lib/roster/cross-booking";
+import { isPlannable } from "@/lib/roster/roster-plannable";
 import {
   loadRosterShiftsRaw,
   loadRosterAbsencesRaw,
@@ -251,7 +252,9 @@ export async function buildDisplayData(
 
   const { data: slRows, error: slErr } = await supabaseAdmin
     .from("staff_locations")
-    .select("staff_id, department, staff(id, display_name, is_active)")
+    // RS1 — roster_plannable mitlesen: nicht planbare Kräfte erscheinen nicht
+    // auf Restaurant-Display / TRMNL-Feeds.
+    .select("staff_id, department, staff(id, display_name, is_active, roster_plannable)")
     .eq("organization_id", organizationId)
     .eq("location_id", locationId);
   if (slErr) return { ok: false, status: 500, message: "Daten konnten nicht geladen werden." };
@@ -266,8 +269,12 @@ export async function buildDisplayData(
   for (const r of slRows ?? []) {
     const staffId = r.staff_id as string;
     if (payrollIds.has(staffId)) continue;
-    const st = r.staff as { display_name: string | null; is_active: boolean } | null;
-    if (st?.is_active === false) continue;
+    const st = r.staff as {
+      display_name: string | null;
+      is_active: boolean;
+      roster_plannable: boolean | null;
+    } | null;
+    if (!isPlannable({ isActive: st?.is_active, rosterPlannable: st?.roster_plannable })) continue;
     const dept = r.department as "kitchen" | "service" | "gl" | null;
     const area: "kitchen" | "service" = dept === "kitchen" ? "kitchen" : "service";
     const key = `${staffId}|${area}`;

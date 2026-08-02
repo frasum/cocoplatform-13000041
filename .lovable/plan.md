@@ -1,37 +1,36 @@
-## Bestandsmeldung
+## Bestandsmeldung (Konflikt melden, nicht still lösen)
 
-Anker: `e9ca6641f` ("Backfill-Grenzen & UI gehärtet", origin/main nach WX1-b).
+- Basis: `origin/main`, HEAD `13b92e106` (danach `582771776` = §130-Doku-Vertrag). Anker 55530025 liegt darunter.
+- **Abweichung zu Schritt 1:** Die Spalte `public.staff.roster_plannable` (boolean, NOT NULL, DEFAULT true) **existiert in der Datenbank bereits** und ist in `src/integrations/supabase/types.ts` generiert. Im Anwendungscode wird sie **nirgends** verwendet. Es ist also nur noch der Spalten-Kommentar offen, keine Struktur-Migration. Ich lege daher nur eine kleine, idempotente Migration (`ADD COLUMN IF NOT EXISTS` + `COMMENT ON COLUMN`) an — falls du sie gar nicht ausführen willst, entfällt lediglich der Kommentar.
 
-**§104-Klärung (blockierend für den planer-Teil):** Die Rolle `planer` kann `/admin/kasse` **nicht** erreichen. Der Routen-Guard in `src/routes/_authenticated/admin/route.tsx` leitet planer auf alles außer `/admin/dienstplan`, `/admin/urlaub`, `/admin/zeit-uebersicht` nach `/admin/dienstplan` um; die planer-Navigation zeigt die Tagesabrechnung auch nicht an. Ich bohre den Routen-Zugriff **nicht** eigenmächtig auf.
+## Fundliste der Planungs-Personenquellen (geprüft)
 
-Vorschlag: Rollenlogik in Server-Function und UI-Gate wie beauftragt auf `admin/manager/planer` erweitern (wirkungslos, aber vorbereitet); der Routen-Guard bleibt unverändert, bis du entscheidest (Nur-Lese-Zugang zur Kasse vs. Info erst mit der PG-Prognoseansicht).
+Gefiltert wird auf `roster_plannable = true` (bzw. `!== false`) — genau an den Stellen, die heute `is_active` prüfen:
 
-## Schritt 1 — Mini-Migration `weather_code`
+1. `src/lib/roster/roster.functions.ts` → `getStaffForRoster` (Zeilen ~508–560): `staff(id, display_name, is_active)` wird zu `staff(id, display_name, is_active, roster_plannable)`; die zwei bestehenden Filterstellen bekommen die Zusatzbedingung. Diese Quelle versorgt Wochenplan (`admin/dienstplan.tsx`), `RosterGrid`, `RosterAreaBlock`, `RosterDayView`, `DayEditSheet` (Personen-Auswahl beim Zuweisen) und `PlanerRosterView` — damit sind alle Planer-/Zuweisungslisten in einem Zug erfasst.
+2. `src/lib/display/display-data.server.ts` (Zeile ~254/270, Zeilenbasis der Displays): gleiche Ergänzung. Wirkt auf Restaurant-Display, TRMNL-Dienstplan und TRMNL-Planungstafel (alle bauen auf `buildDisplayData`).
+3. `src/lib/roster/swap.functions.ts` (Peer-Kandidaten, ~Zeile 196): der `staff`-Query filtert bereits `is_active = true`; dort zusätzlich `roster_plannable = true`, damit eine Feste-Zeiten-Kraft keine neuen Schichten per Tausch erhält. *(Falls du das anders willst — sag es, dann bleibt Tausch unberührt.)*
 
-- Migrationsdatei via Migrations-Tool: `ALTER TABLE public.weather_days ADD COLUMN IF NOT EXISTS weather_code smallint;` (nullable, WMO-Code). Ausführung durch dich.
-- `weather-core.ts`: `weather_code` in `DAILY_FIELDS` (wirkt auf beide URL-Builder), in `OpenMeteoDaily`, in `WeatherDayRow` (`weatherCode: number | null`) und in `mapOpenMeteoDaily` (ganzzahlig oder null; ein Tag gilt weiter nur als leer, wenn auch die Messwerte fehlen).
-- `weather.functions.ts`: `insertPayload` schreibt `weather_code`. `mayOverwrite`, Sync-/Backfill-Fensterlogik unverändert — ein erneuter Backfill füllt die Spalte rückwirkend.
+**Nicht angetastet** (geprüft, dass sie andere Pfade nutzen): Zeiterfassung (`stempeln`, `zeit-uebersicht`, `schichten`), Lohn/Exporte, Verwaltungs-Personalliste (`staff.index.tsx`, `admin/staff.functions.ts` Listen-Query), Urlaubs-/Abwesenheitsplaner (`vacation-planner.functions.ts` — laut Auftrag ausdrücklich ausgenommen), Frei-Wünsche der Mitarbeiter (Selbstansicht), Dokumente, Statistik, `pap-2026/**`. Bestehende `roster_shifts` bleiben unverändert sichtbar — gefiltert werden nur Personenlisten.
 
-## Schritt 2 — WMO-Symbol-Mapping (rein, getestet)
+## Verwaltungs-UI
 
-Neue Datei `src/lib/weather/weather-symbol.ts`:
-`weatherSymbol(code: number | null): { icon: LucideIconName; label: string }`
-Gruppen: 0–1 klar (Sun) · 2 heiter (CloudSun) · 3 bedeckt (Cloud) · 45/48 Nebel (CloudFog) · 51–67 Regen (CloudDrizzle/CloudRain, leicht/mäßig) · 71–77/85–86 Schnee (CloudSnow) · 80–82 Schauer (CloudRainWind) · 95–99 Gewitter (CloudLightning) · null/unbekannt ⇒ `HelpCircle`, Label „—".
-Tests je Gruppe + null in `weather-symbol.test.ts`.
+In der Mitarbeiter-Detailseite (`staff.$staffId`, Stammdaten-Block) ein Schalter **„Im Dienstplan planbar"** (Default an), Hilfstext: „Aus: für Kräfte mit festen Arbeitszeiten — erscheinen nicht in der Planung; Zeiterfassung und Lohn laufen normal." Umsetzung exakt nach dem bestehenden Muster von `participates_in_pool`: neues Feld in `getStaffDetail` (Select + Rückgabe `rosterPlannable`), neue Server-Funktion `setStaffRosterPlannable` (admin-only, Audit-Log-Eintrag `staff.set_roster_plannable`), Mutation + Invalidierung in der UI.
 
-## Schritt 3 — Lese-Function `listWeatherRange`
+## Tests (blockierend)
 
-In `weather.functions.ts`: `listWeatherRange({ from, to })`, GET, `requireSupabaseAuth`, `loadAdminCaller(..., ["admin","manager","planer","staff","payroll"])` mit anschließendem Rollenfilter → nur admin/manager/planer erhalten Zeilen, sonst leere Liste (Muster von `listEventNoticesForToday`). Zod: zwei ISO-Daten, `from <= to`. Liest `business_date, temp_max_c, temp_min_c, precipitation_mm, weather_code, source` der Organisation.
+Neues pures Modul `src/lib/roster/roster-plannable.ts` mit `filterPlannable(rows)` (Signatur über eine minimale Row-Form `{ isActive, rosterPlannable }`), das die drei Fundstellen gemeinsam nutzen; dazu `roster-plannable.test.ts`:
+- `rosterPlannable: false` ⇒ nicht in der Planungsliste,
+- `true` / `undefined` (Bestand) ⇒ enthalten,
+- inaktive Person bleibt wie bisher ausgeschlossen,
+- allgemeine Staff-Liste (ungefilterter Pfad) enthält die Person weiterhin.
 
-## Schritt 4 — Kassen-Kopfzeile
+## Technische Details
 
-- `listEventNoticesForToday`: Rollenfilter um `planer` erweitern (staff bleibt leer).
-- `kasse.tsx`: `noticesEnabled` → `headerCardsEnabled` (admin/manager/planer). Statt der Vollbreiten-`EventNoticesBlock` eine zweispaltige Zeile (`grid gap-3 md:grid-cols-2`, mobil gestapelt), weiter nur bei bestehender Session. Ohne Notices entfällt die Event-Karte und das Wetter nimmt die volle Breite.
-- `EventNoticesBlock` kompakter + blau getönt: Hintergrund-Tint über bestehende Design-Tokens (`bg-primary/8`-Äquivalent aus `styles.css`, Rand eine Stufe kräftiger), engere Paddings/kleinere Schrift ⇒ ca. halbe Höhe. Inhalt unverändert (Name, Impact-Badge, „(Termin vorläufig)").
-- Neue `src/components/cash/WeatherWidget.tsx`: vier Mini-Spalten „Heute" + drei Wochentagskürzel; je Spalte Symbol, „28°/17°", Regen-mm nur bei > 0 („2,4 mm"); fehlender Tag ⇒ „—" mit Tooltip „kein Sync-Datenstand"; Fußzeile klein „Open-Meteo".
-
-Keine Änderung an Kassen-Rechenlogik, Finalize, Dienstplan, `eventNotices`, `mayOverwrite`, events-Schema, Statistik-PDF.
+- Migration (idempotent): `ALTER TABLE public.staff ADD COLUMN IF NOT EXISTS roster_plannable boolean NOT NULL DEFAULT true;` + `COMMENT ON COLUMN ...`. Kein Backfill.
+- Kein RLS-/Grant-Wechsel: die Spalte hängt an der bestehenden `staff`-Tabelle mit unveränderten Policies.
+- Kommentar-Hygiene: jede geänderte Stelle bekommt einen knappen `RS1`-Hinweis, der nur beschreibt, was tatsächlich passiert.
 
 ## Erfolgs-Gate
 
-`tsc --noEmit`, `eslint . --max-warnings=0`, `prettier --check .`, `vitest run` grün; `prettier --write` vor dem Commit; eine Runde = ein Commit.
+Vier Gates auf dem Liefer-SHA: `tsc --noEmit` 0 · `eslint . --max-warnings=0` 0 · `prettier --check .` clean · `vitest run` grün. `prettier --write` vor dem Commit, eine Runde = ein Commit. Fertigmeldung nennt die vollständige Fundliste und den SHA.

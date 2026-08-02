@@ -459,13 +459,14 @@ export async function generateStatistikPdf(
   doc.text(headLine, marginX + 90, cursorY);
   const tw = data.takeaway;
   const twRow = (r: (typeof tw)["rows"][number]): string[] => [
-    r.name,
+    pdfChannelLabel(r.name),
     ...r.perLocationCents.map((c) => fmtEurRounded(c)),
     fmtEurRounded(r.totalCents),
     fmtPctDe(r.sharePct),
     fmtDeltaPctDe(r.deltaPct),
   ];
   const twBody = [...tw.rows.map(twRow), twRow(tw.sum)];
+  const twDeltaCol = tw.locationNames.length + 3;
   autoTable(doc, {
     startY: cursorY + 5,
     margin: { left: marginX, right: marginX },
@@ -482,6 +483,10 @@ export async function generateStatistikPdf(
       }
       if (hook.section === "head" && hook.column.index === 0) {
         hook.cell.styles.halign = "left";
+      }
+      // STAT3e — nur die Δ-Spalte färben; „Anteil" ist ein Bestandswert.
+      if (hook.section === "body" && hook.column.index === twDeltaCol) {
+        hook.cell.styles.textColor = deltaTone(hook.cell.text.join(""));
       }
     },
     theme: "grid",

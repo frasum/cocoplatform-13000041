@@ -23,7 +23,7 @@ function topTick(ticks: ReadonlyArray<{ value: number }>): number {
 }
 
 describe("barChartGeometry", () => {
-  it("skaliert den Maximalwert auf die volle Höhe, andere linear", () => {
+  it("skaliert gegen die Skalen-Obergrenze, andere linear", () => {
     const g = barChartGeometry([100, 50, 0], area);
     expect(g.max).toBe(100);
     expect(g.bars[0]!.height).toBeCloseTo(60, 6);
@@ -70,6 +70,13 @@ describe("barChartGeometry", () => {
     expect(g.ticks.map((t) => t.value)).toEqual([0, 200, 400]);
     expect(g.ticks[2]!.y).toBeCloseTo(area.y, 6);
   });
+
+  // STAT3g — blockierend: oberster Tick schließt die Skala über dem Datenmaximum ab.
+  it("oberster Tick liegt über dem Datenmaximum, kein Balken verlässt die Fläche", () => {
+    const g = barChartGeometry([1_000, 1_171, 400], area, { tickCount: 4 });
+    expect(topTick(g.ticks)).toBeGreaterThanOrEqual(1_171);
+    for (const b of g.bars) expect(b.y).toBeGreaterThanOrEqual(area.y - 1e-9);
+  });
 });
 
 describe("lineChartGeometry", () => {
@@ -104,6 +111,18 @@ describe("lineChartGeometry", () => {
   it("einzelner Monat sitzt in der Flächenmitte", () => {
     const g = lineChartGeometry([{ name: "A", values: [100] }], area);
     expect(g.slotX).toEqual([area.x + area.width / 2]);
+  });
+
+  // STAT3g — blockierend: auch die geschnittene Linien-Achse schließt oben mit einem Tick ab.
+  it("oberster Tick liegt über dem Datenmaximum, kein Punkt verlässt die Fläche", () => {
+    const g = lineChartGeometry([{ name: "A", values: [131, 197, 183] }], area, {
+      tickCount: 4,
+      baseline: "nice",
+    });
+    expect(topTick(g.ticks)).toBeGreaterThanOrEqual(197);
+    // Untere Kappung bleibt unverändert (STAT3e).
+    expect(g.baseline).toBe(120);
+    for (const p of g.series[0]!.points) if (p) expect(p.y).toBeGreaterThanOrEqual(area.y - 1e-9);
   });
 });
 
@@ -172,10 +191,12 @@ describe("niceTicks", () => {
 
   it("Balken behalten die 0-Basis, nur die Ticks werden rund", () => {
     const g = barChartGeometry([1_400, 900], area, { tickCount: 4 });
-    expect(g.max).toBe(1_400);
-    expect(g.ticks.map((t) => t.value)).toEqual([0, 500, 1000]);
+    // STAT3g — die Skala läuft bis zum obersten Rasterwert (1.500), nicht bis 1.400.
+    expect(g.max).toBe(1_500);
+    expect(g.ticks.map((t) => t.value)).toEqual([0, 500, 1000, 1500]);
     // Grundlinie bleibt die 0-Linie.
     expect(g.ticks[0]!.y).toBeCloseTo(area.y + area.height, 6);
+    expect(g.bars[0]!.height).toBeCloseTo(area.height * (1_400 / 1_500), 6);
   });
 
   it("Linien mit baseline 'nice': Baseline sitzt auf der Grundlinie", () => {
@@ -186,8 +207,12 @@ describe("niceTicks", () => {
     expect(g.baseline).toBe(120);
     expect(g.ticks[0]!.value).toBe(120);
     expect(g.ticks[0]!.y).toBeCloseTo(area.y + area.height, 6);
-    // Datenmaximum füllt die Fläche, Lücken bleiben Lücken.
-    expect(g.series[0]!.points[1]!.y).toBeCloseTo(area.y, 6);
+    // STAT3g — die Fläche endet am obersten Tick (200), das Maximum liegt darunter.
+    expect(g.max).toBe(200);
+    expect(g.series[0]!.points[1]!.y).toBeCloseTo(
+      area.y + area.height - ((197 - 120) / (200 - 120)) * area.height,
+      6,
+    );
     expect(g.series[0]!.points[2]).toBeNull();
     for (const p of g.series[0]!.points) if (p) expect(Number.isNaN(p.y)).toBe(false);
   });

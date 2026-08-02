@@ -382,13 +382,6 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     expect(line).toContain(`Gesamt ${eur(4_000)} (4,0 %)`);
   });
 
-  it("freier Zeitraum: Δ-Spalten neutral, kein Monatsverlauf", async () => {
-    captured.length = 0;
-    texts.length = 0;
-    void 0;
-    await generateStatistikPdf(baseData({}));
-  });
-
   it("STAT3h: Modellzeile + Fußnote nur bei gesetztem preTaxModel", async () => {
     captured.length = 0;
     texts.length = 0;

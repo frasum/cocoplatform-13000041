@@ -215,6 +215,58 @@ describe("sumRows / findYoy / findPrevMonth", () => {
     expect(s.umsatzCents).toBe(300);
     expect(s.personalCents).toBe(100);
   });
+});
+
+describe("estimatedPreTaxResultCents (STAT3h)", () => {
+  const be = (o: Partial<BreakEven>): BreakEven => ({
+    v: 0.3,
+    db: 0.7,
+    factor: 1.163,
+    months: 12,
+    netMonthCents: 280_835_00,
+    netDayCents: 0,
+    grossMonthCents: 0,
+    grossDayCents: 0,
+    actualDayCents: 0,
+    marginOfSafety: 0,
+    ...o,
+  });
+
+  it("Handrechnung: db 0,7 · factor 1,163 · BE 280.835 € · Umsatz 344.774 € brutto", () => {
+    const gross = 344_774_00;
+    const expected = Math.round(0.7 * (gross / 1.163 - 280_835_00));
+    expect(estimatedPreTaxResultCents(gross, be({}))).toBe(expected);
+    expect(expected).toBeGreaterThan(0);
+  });
+
+  it("Monat exakt am Break-even ⇒ 0", () => {
+    const gross = Math.round(280_835_00 * 1.163);
+    const r = estimatedPreTaxResultCents(gross, be({}));
+    expect(r).not.toBeNull();
+    expect(Math.abs(r ?? 0)).toBeLessThanOrEqual(1);
+  });
+
+  it("Monat unter Break-even ⇒ negativ", () => {
+    expect(estimatedPreTaxResultCents(200_000_00, be({}))).toBeLessThan(0);
+  });
+
+  it("be = null ⇒ null", () => {
+    expect(estimatedPreTaxResultCents(300_000_00, null)).toBeNull();
+  });
+
+  it("Umsatz 0 ⇒ negatives Ergebnis = −db × BE (Fixkostenlast)", () => {
+    expect(estimatedPreTaxResultCents(0, be({}))).toBe(Math.round(-0.7 * 280_835_00));
+  });
+});
+
+describe("sumRows Zusatz", () => {
+  it("sumRows summiert alle Cent-Felder (Wiederholung entfällt)", () => {
+    const a = row({ umsatzCents: 100, personalCents: 40 });
+    const b = row({ umsatzCents: 200, personalCents: 60 });
+    const s = sumRows([a, b]);
+    expect(s.umsatzCents).toBe(300);
+    expect(s.personalCents).toBe(100);
+  });
 
   it("findYoy findet Vorjahresmonat", () => {
     const rows = [row({ month: "2025-04-01" }), row({ month: "2024-04-01" })];

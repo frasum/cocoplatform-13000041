@@ -189,6 +189,7 @@ const GROUPS: Group[] = [
     sub: [
       { to: "/admin/einstellungen", label: "Allgemein" },
       { to: "/admin/einstellungen/easyorder-verwaltung", label: "EasyOrder-Verwaltung" },
+      { to: "/admin/einstellungen/veranstaltungen", label: "Veranstaltungen" },
       { to: "/admin/locations", label: "Standorte" },
       { to: "/admin/migration", label: "System" },
     ],

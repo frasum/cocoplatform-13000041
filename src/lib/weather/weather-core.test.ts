@@ -173,7 +173,7 @@ describe("validateRange", () => {
 describe("shiftIsoDate", () => {
   it("verschiebt über Monats- und DST-Grenzen korrekt", () => {
     expect(shiftIsoDate("2026-08-02", -1)).toBe("2026-08-01");
-    expect(shiftIsoDate("2026-08-02", FORECAST_DAYS_AHEAD)).toBe("2026-08-18");
+    expect(shiftIsoDate("2026-08-02", FORECAST_DAYS_AHEAD)).toBe("2026-08-17");
     expect(shiftIsoDate("2026-03-01", -1)).toBe("2026-02-28");
     expect(shiftIsoDate("2026-03-30", -ARCHIVE_LOOKBACK_DAYS)).toBe("2026-03-20");
   });

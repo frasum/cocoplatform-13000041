@@ -698,7 +698,9 @@ export async function generateStatistikPdf(
     // STAT3k — Wochenend-/Feiertagsbänder ZUERST: sie liegen hinter Gitter und
     // Balken. Sie hängen am Kalendertag, gelten also für beide Scopes.
     const marked = markedCalendarDays(data.dailyRevenue.map((d) => d.businessDate));
-    doc.setFillColor(247, 247, 247);
+    // STAT3k-b — kräftigeres Grau (236): als ruhige Zone klar erkennbar, bleibt
+    // aber unter den Balkenfarben und im S/W-Druck dezent.
+    doc.setFillColor(236, 236, 236);
     for (const band of dayBands(marked, chartA)) {
       doc.rect(band.x, band.y, band.w, band.h, "F");
     }

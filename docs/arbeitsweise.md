@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§126: PDF-Feinschliff abgeschlossen (STAT3j/3k); EV1 Event-Hinweise beschlossen, PG-F8 revidiert)
+Stand: 02.08.2026 (§127: EV1 Event-Hinweise komplett — Tabelle, Import, Kassen-Hinweis)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -4816,3 +4816,19 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 **PG-Protokoll-Revision N3** (Bauherren-Entscheid): ① Konzerte wieder in Events-Tabelle **UND** Prognose — das Streich-Argument (manueller Pflegeaufwand) ist durch KI-kuratierte Quartals-Re-Importe entkräftet; OpenLigaDB-Prüfung für Sport bleibt. ② **Kein** Je-Standort-Flag — Events gelten global; bei Bedarf additiv nachrüstbar.
 
 **Offene Merkposten:** wie §125, PLUS: **EV1 bauen** (zwei Runden: ① Migration + Import + Verwaltungs-UI, ② Kassen-Hinweis; Zieltermin komfortabel vor Wiesn-Vortag 18.09.) · EV1-Einmal-Import der Bauherren-XLSX nach Runde 1.
+
+---
+
+## §127 — EV1 komplett: Events-Tabelle, XLSX-Import, Kassen-Hinweis (02.08., mittags)
+
+**Abnahme-Anker:** HEAD `80bfade5` — vier Gates grün (`tsc` 0 · `eslint` 0 · `prettier` clean · `vitest` 2300, 0 Skips; 2286 + 5 Parser-Klammer + 9 Notices).
+
+**EV1-R1 (`0427ad99`):** Tabelle `public.events` nach Beschlussprotokoll — UNIQUE (org, name, date_from) als Idempotenz-Schlüssel, `date_order`-CHECK, DENY-ALL-RLS (select org-scoped, write admin, kein anon), Index, `updated_at`-Trigger. Headless XLSX-Parser nach POS-Muster (`exceljs` nur im Browser), tolerantes Impact-Mapping **OHNE Raten** (unbekannt ⇒ Fehlerzeile), ehrliche created/updated-Zählung via Vorab-Existenzabfrage, Verwaltungs-UI unter Einstellungen → Veranstaltungen mit Vorschau-vor-Übernehmen (BWA-Muster). Prüfer-Ergänzung umgesetzt: Terminwechsel-Erkennung (gleicher Name, selbes Jahr, anderes Von-Datum ⇒ Vorschau-Hinweis mit bisherigem Datum, reine Anzeige). Migration in Produktion vollzogen und belegt (`pg_get_constraintdef`-CSV, 02.08.).
+
+**EV1-R1b (`921717b7`):** Erster Produktionskontakt bestätigte die Fehlerzeilen-Disziplin — vier Zeilen mit Impact-Klammerzusatz („Hoch (Mittag)/(spät)/(durchgehend)“) wurden benannt statt geraten. Fix: Grundstufe vor der Klammer wird gemappt, Klammerzusatz als „Zeitfenster: …“-Präfix in die Empfehlung gerettet (Info-Erhalt statt Wegdrücken). Vermerk: Der Präfix nutzt U+2014 — in DB/Web ok; sollte die Empfehlungs-Spalte je in ein jsPDF wandern, schlägt `assertWinAnsiSafe` planmäßig an.
+
+**Import-Vollzug (Weg B, Bauherren-Entscheid):** ein sauberer Gesamtimport nach dem R1b-Fix — 42 Events, drei 2027-Platzhalter (opti, f.re.e, INHORGENTA) als „vorläufig“. Status bei Doku-Erstellung: **ausstehend** (Bauherren-Bestätigung).
+
+**EV1-R2 (`80bfade5`):** `eventNotices` als reine Funktion (Kalendertag injiziert, kein `new Date()` im Kern; Starttag ⇒ **NUR** „running Tag 1/y“, kein Doppel-Hinweis; Sortierung Impact absteigend). Server-Function nutzt `businessDateOf` (Kassen-Datumskonvention — eine Wahrheit) und liefert für Rollen unterhalb manager/admin **LEER**; die UI schaltet die Query für staff zusätzlich ab (doppelte Verteidigung, F4). Einbau in `kasse.tsx` hinter `ovQ.data?.session` — sichtbar exakt nach Session-Start; permanent, nicht wegklickbar (F8); kompakt Name + Impact-Badge + ggf. „(Termin vorläufig)“ (F7). Dienstplan ausdrücklich unberührt.
+
+**Offene Merkposten:** wie §126, MINUS „EV1 bauen“ (komplett), MINUS „EV1-Einmal-Import“ (s. Vollzugsvermerk oben), PLUS: EV1-Sichtprüfung durch den Bauherrn (Testevent `date_from` = morgen: als admin sichtbar, als staff **NICHT** sichtbar; erster echter Hinweis fällt auf den 14.08. — Seiler-und-Speer-Vortag) · F7-Nachtrag-Kandidat (Empfehlungs-Spalte im Kassen-Hinweis) bleibt Praxisbeobachtung.

@@ -63,6 +63,8 @@ import {
 } from "@/components/ui/table";
 import { formatShortDate } from "@/lib/format-date";
 import { todayIso } from "@/lib/format";
+import { eventsCsvBlob, eventsXlsxBlob } from "@/lib/events/events-export";
+import { downloadBlob } from "@/lib/time/weekly-export";
 
 export const Route = createFileRoute("/_authenticated/admin/einstellungen/veranstaltungen")({
   head: () => ({ meta: [{ title: "Veranstaltungen · Einstellungen" }] }),
@@ -285,6 +287,24 @@ function VeranstaltungenPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            disabled={rows.length === 0}
+            onClick={() => downloadBlob(eventsCsvBlob(rows), `veranstaltungen_${todayIso()}.csv`)}
+          >
+            CSV
+          </Button>
+          <Button
+            variant="outline"
+            disabled={rows.length === 0}
+            onClick={() => {
+              void eventsXlsxBlob(rows).then((blob) =>
+                downloadBlob(blob, `veranstaltungen_${todayIso()}.xlsx`),
+              );
+            }}
+          >
+            Excel
+          </Button>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             XLSX-Import
           </Button>

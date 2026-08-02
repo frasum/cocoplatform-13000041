@@ -189,7 +189,7 @@ function VeranstaltungenPage() {
   const [previewErrors, setPreviewErrors] = useState<{ sheetRow: number; message: string }[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
 
-  const rows = eventsQ.data ?? [];
+  const rows = useMemo(() => eventsQ.data ?? [], [eventsQ.data]);
   const today = todayIso();
   const upcoming = useMemo(() => rows.filter((r) => r.dateTo >= today), [rows, today]);
   const past = useMemo(() => rows.filter((r) => r.dateTo < today), [rows, today]);

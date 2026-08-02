@@ -212,6 +212,7 @@ describe("estimatedPreTaxResultCents (STAT3h)", () => {
     v: 0.3,
     db: 0.7,
     factor: 1.163,
+    factorCurrent: 1.163,
     months: 12,
     netMonthCents: 280_835_00,
     netDayCents: 0,

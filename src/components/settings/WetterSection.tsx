@@ -14,7 +14,6 @@ import {
   syncWeather,
 } from "@/lib/weather/weather.functions";
 import { shiftIsoDate } from "@/lib/weather/weather-core";
-import { formatShortDate } from "@/lib/format-date";
 
 const BACKFILL_START = "2026-02-16";
 
@@ -87,7 +86,7 @@ export function WetterSection() {
         ) : status && status.dayCount > 0 ? (
           <span>
             <strong className="text-foreground">{status.dayCount}</strong> Tage gespeichert (
-            {formatShortDate(status.oldest ?? "")} – {formatShortDate(status.newest ?? "")}), davon{" "}
+            {status.oldest} – {status.newest}), davon{" "}
             <strong className="text-foreground">{status.forecastCount}</strong> als Vorhersage.
           </span>
         ) : (

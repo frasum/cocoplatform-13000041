@@ -823,6 +823,44 @@ export async function generateStatistikPdf(
     }
   }
 
+  // ── STAT3i — Wertezeilen ans Ende: erst die Grafiken, dann die Einzeiler ──
+  // Trinkgeld-Quoten kommen AUSSCHLIESSLICH aus `tipRatePct` (Trinkgeld ÷
+  // Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der Standort-Tabelle.
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Trinkgeld", marginX, cursorY);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  const tipLine = doc.splitTextToSize(
+    tipSummaryText(data.tips, data.revenue.houseCents),
+    usable - 90,
+  );
+  doc.text(tipLine, marginX + 90, cursorY);
+  cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
+
+  // ── STAT3h/3i — Ergebnis vor Steuern (Modell) ────────────────────────────
+  // Der Betrag ist ein Bewertungswert, deshalb dieselbe Färbung wie Deltas.
+  // Nach dem gefärbten Betrag werden Font UND Textfarbe explizit zurückgesetzt.
+  if (preTax) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(PRE_TAX_HEADING, marginX, cursorY);
+    const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
+    doc.setFontSize(7.5);
+    const amount = fmtEurRounded(preTax.resultCents);
+    const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(tone[0], tone[1], tone[2]);
+    const amountX = marginX + headingWidth + 10;
+    doc.text(amount, amountX, cursorY);
+    const amountWidth = doc.getTextWidth(amount);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(20);
+    const tailX = amountX + amountWidth + 6;
+    doc.text(preTaxTailText(preTax), tailX, cursorY);
+    cursorY += BLOCK_GAP;
+  }
+
   // ── Fußnoten ────────────────────────────────────────────────────────────
   doc.setFontSize(6.5);
   doc.setFont("helvetica", "italic");

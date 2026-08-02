@@ -10,6 +10,7 @@ import { runWithPermission, assertPermission } from "@/lib/admin/admin-call";
 import { makeAuditWriter } from "@/lib/admin/audit";
 import { loadStaffCaller } from "@/lib/time/time.functions";
 import { assertRealIdentity } from "@/lib/admin/impersonation";
+import { isPlannable } from "@/lib/roster/roster-plannable";
 import type { MyShiftRow } from "@/lib/roster/my-shifts";
 import { mergeAbsenceRanges, type AbsenceRange } from "@/lib/roster/vacation-planner";
 import { resolvePlanerScope } from "@/lib/roster/scope-util";

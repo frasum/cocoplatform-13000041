@@ -11,6 +11,7 @@ import { todayIso } from "@/lib/format";
 import { resolveCellKind } from "@/lib/display/cell";
 import { currentPeriodEnd, nextPeriodEnd, periodLabel } from "@/lib/display/period-split";
 import { computeCrossBookingFlags, type ShiftForFlag } from "@/lib/roster/cross-booking";
+import { isPlannable } from "@/lib/roster/roster-plannable";
 import {
   loadRosterShiftsRaw,
   loadRosterAbsencesRaw,

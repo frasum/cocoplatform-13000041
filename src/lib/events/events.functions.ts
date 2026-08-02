@@ -266,7 +266,6 @@ export const importEvents = createServerFn({ method: "POST" })
     await makeAuditWriter(caller)({
       action: "events.import",
       entity: "events",
-      entityId: null,
       meta: {
         created,
         updated,

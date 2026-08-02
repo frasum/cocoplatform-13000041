@@ -8,6 +8,7 @@ import {
   formatTsd,
   lineChartGeometry,
   monthWindow,
+  niceTicks,
   stackedBarChartGeometry,
   type ChartArea,
 } from "./statistik-pdf-charts";
@@ -123,6 +124,71 @@ describe("formatTsd", () => {
   it("rundet auf T€ mit deutschen Tausenderpunkten", () => {
     expect(formatTsd(1_234_567_00)).toBe("1.235 T€");
     expect(formatTsd(0)).toBe("0 T€");
+  });
+});
+
+// STAT3e — Achsenwerte auf rundem Raster; Baseline nur bei echtem Abstand zur 0.
+describe("niceTicks", () => {
+  it("0-basiert: nur runde Werte, kein krummer Zwischenwert", () => {
+    const t = niceTicks(0, 197_000_00);
+    expect(t.baseline).toBe(0);
+    expect(t.values).toEqual([0, 50_000_00, 100_000_00, 150_000_00, 200_000_00]);
+    for (const v of t.values) expect(v % 50_000_00).toBe(0);
+  });
+
+  it("geschnittene Achse: Baseline liegt rund und unter dem Minimum", () => {
+    const t = niceTicks(131_000_00, 197_000_00);
+    expect(t.baseline).toBeLessThanOrEqual(131_000_00);
+    expect(t.baseline).toBe(120_000_00);
+    expect(t.step).toBe(20_000_00);
+    expect(t.values[t.values.length - 1]).toBeGreaterThanOrEqual(197_000_00);
+  });
+
+  it("Minimum unter 20 % des Maximums ⇒ 0-Basis bleibt", () => {
+    expect(niceTicks(15, 100).baseline).toBe(0);
+    expect(niceTicks(30, 100).baseline).toBeGreaterThan(0);
+  });
+
+  it("min == max und kleine Spannen ergeben gültige Raster", () => {
+    const flat = niceTicks(100, 100);
+    expect(flat.baseline).toBeLessThanOrEqual(100);
+    expect(flat.values.length).toBeGreaterThanOrEqual(1);
+    const tiny = niceTicks(98, 100);
+    expect(tiny.baseline).toBeLessThanOrEqual(98);
+    expect(Number.isFinite(tiny.step)).toBe(true);
+  });
+
+  it("max <= 0 ergibt einen 0-Tick", () => {
+    expect(niceTicks(0, 0).values).toEqual([0]);
+    expect(niceTicks(-5, -1).values).toEqual([0]);
+  });
+
+  it("Balken behalten die 0-Basis, nur die Ticks werden rund", () => {
+    const g = barChartGeometry([1_400, 900], area, { tickCount: 4 });
+    expect(g.max).toBe(1_400);
+    expect(g.ticks.map((t) => t.value)).toEqual([0, 500, 1000]);
+    // Grundlinie bleibt die 0-Linie.
+    expect(g.ticks[0]!.y).toBeCloseTo(area.y + area.height, 6);
+  });
+
+  it("Linien mit baseline 'nice': Baseline sitzt auf der Grundlinie", () => {
+    const g = lineChartGeometry([{ name: "A", values: [131, 197, null] }], area, {
+      tickCount: 4,
+      baseline: "nice",
+    });
+    expect(g.baseline).toBe(120);
+    expect(g.ticks[0]!.value).toBe(120);
+    expect(g.ticks[0]!.y).toBeCloseTo(area.y + area.height, 6);
+    // Datenmaximum füllt die Fläche, Lücken bleiben Lücken.
+    expect(g.series[0]!.points[1]!.y).toBeCloseTo(area.y, 6);
+    expect(g.series[0]!.points[2]).toBeNull();
+    for (const p of g.series[0]!.points) if (p) expect(Number.isNaN(p.y)).toBe(false);
+  });
+
+  it("Linien ohne Option bleiben 0-basiert (Rückwärtskompatibilität)", () => {
+    const g = lineChartGeometry([{ name: "A", values: [100, 200] }], area);
+    expect(g.baseline).toBe(0);
+    expect(g.series[0]!.points[0]!.y).toBeCloseTo(area.y + area.height / 2, 6);
   });
 });
 

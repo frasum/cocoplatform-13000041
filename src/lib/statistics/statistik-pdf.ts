@@ -182,6 +182,34 @@ function fmtCount(n: number | null | undefined): string {
   return n === null || n === undefined ? "—" : n.toLocaleString("de-DE");
 }
 
+/**
+ * STAT3e — EINE Stelle entscheidet Vorzeichen ⇒ Farbe. Gedeckte, druckfeste
+ * Töne: die Zahl mit Vorzeichen trägt allein, die Farbe ist nur Blickführung.
+ * Neutrale Werte („—", „±0,0 %") behalten die Standardfarbe.
+ *
+ * Erkennt beide Minus-Varianten (ASCII "-" und typografisches U+2212), weil die
+ * PDF-Formatierer ASCII nutzen, die Bildschirm-Formatierer aber U+2212.
+ */
+const DELTA_UP: [number, number, number] = [35, 105, 65];
+const DELTA_DOWN: [number, number, number] = [150, 45, 45];
+const DELTA_NEUTRAL: [number, number, number] = [20, 20, 20];
+
+export function deltaTone(text: string | null | undefined): [number, number, number] {
+  const first = (text ?? "").trim().charAt(0);
+  if (first === "+") return DELTA_UP;
+  if (first === "-" || first === "\u2212") return DELTA_DOWN;
+  return DELTA_NEUTRAL;
+}
+
+/** STAT3e — Kanalnamen im PDF kürzen (Tabellenbreite); Datenmodell unberührt. */
+const PDF_CHANNEL_LABELS: Record<string, string> = {
+  "Takeaway direkt (Telefon/Abholung)": "Direkt (Tel./Abholung)",
+};
+
+export function pdfChannelLabel(name: string): string {
+  return PDF_CHANNEL_LABELS[name] ?? name;
+}
+
 /** Delta gegen eine Basis; ohne Basis oder außerhalb des Monatsmodus „—". */
 function deltaLabel(
   currentCents: number,
@@ -275,11 +303,17 @@ export async function generateStatistikPdf(
     doc.setFont("helvetica", "bold");
     doc.text(k.value, x + 6, boxY + 30);
     doc.setFontSize(13);
+    // STAT3e — Kachel-Deltas dezent einfärben (Bestandswerte bleiben neutral).
+    const leadTone = deltaTone(k.lead);
+    doc.setTextColor(leadTone[0], leadTone[1], leadTone[2]);
     doc.text(k.lead, x + 6, boxY + 49);
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(90);
     doc.text(k.leadLabel, x + 6, boxY + 59);
+    const footDelta = k.foot.split(":")[1];
+    const footTone = deltaTone(footDelta);
+    doc.setTextColor(footTone[0], footTone[1], footTone[2]);
     doc.text(k.foot, x + 6, boxY + 68);
     doc.setTextColor(20);
   });
@@ -353,7 +387,7 @@ export async function generateStatistikPdf(
           "vs. Vormonat",
           "Trinkgeld ges.",
           "TG-Quote",
-          "Quote",
+          "Pers.-Quote",
           "Netto-Std.",
           "€ / Gast",
           "€ / Std.",
@@ -366,6 +400,10 @@ export async function generateStatistikPdf(
         }
         if (hook.section === "head" && hook.column.index === 0) {
           hook.cell.styles.halign = "left";
+        }
+        // STAT3e — nur Veränderungsspalten färben (2 = vs. Vorjahr, 3 = vs. Vormonat).
+        if (hook.section === "body" && (hook.column.index === 2 || hook.column.index === 3)) {
+          hook.cell.styles.textColor = deltaTone(hook.cell.text.join(""));
         }
       },
       theme: "grid",
@@ -421,13 +459,14 @@ export async function generateStatistikPdf(
   doc.text(headLine, marginX + 90, cursorY);
   const tw = data.takeaway;
   const twRow = (r: (typeof tw)["rows"][number]): string[] => [
-    r.name,
+    pdfChannelLabel(r.name),
     ...r.perLocationCents.map((c) => fmtEurRounded(c)),
     fmtEurRounded(r.totalCents),
     fmtPctDe(r.sharePct),
     fmtDeltaPctDe(r.deltaPct),
   ];
   const twBody = [...tw.rows.map(twRow), twRow(tw.sum)];
+  const twDeltaCol = tw.locationNames.length + 3;
   autoTable(doc, {
     startY: cursorY + 5,
     margin: { left: marginX, right: marginX },
@@ -444,6 +483,10 @@ export async function generateStatistikPdf(
       }
       if (hook.section === "head" && hook.column.index === 0) {
         hook.cell.styles.halign = "left";
+      }
+      // STAT3e — nur die Δ-Spalte färben; „Anteil" ist ein Bestandswert.
+      if (hook.section === "body" && hook.column.index === twDeltaCol) {
+        hook.cell.styles.textColor = deltaTone(hook.cell.text.join(""));
       }
     },
     theme: "grid",
@@ -479,20 +522,35 @@ export async function generateStatistikPdf(
   const colorOf = (name: string): [number, number, number] =>
     SERIES_PALETTE[(seriesColorIndex.get(name) ?? 0) % SERIES_PALETTE.length]!;
   const stacked = stackNames.length > 0;
-  if (stacked) {
-    // Kleine Legende in der Titelzeile (wie beim 13-Monats-Verlauf).
+  /**
+   * STAT3e — Legende rechtsbündig auf der Titelzeile: erst Breite messen, dann
+   * am rechten Rand beginnen. So klebt sie nie an der Abschnittsüberschrift.
+   */
+  const drawLegend = (
+    names: string[],
+    y: number,
+    marker: (x: number, y: number, color: [number, number, number]) => void,
+  ) => {
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
-    let legendX = marginX + 62;
-    for (const name of stackNames) {
+    const widths = names.map((n) => doc.getTextWidth(n));
+    let total = 0;
+    for (const w of widths) total += w + 16;
+    let x = marginX + usable - total + 4;
+    names.forEach((name, i) => {
       const c = colorOf(name);
-      doc.setFillColor(c[0], c[1], c[2]);
-      doc.rect(legendX, cursorY - 5, 4, 4, "F");
+      marker(x, y, c);
       doc.setTextColor(60);
-      doc.text(name, legendX + 6, cursorY - 2);
-      legendX += 16 + doc.getTextWidth(name);
-    }
+      doc.text(name, x + 6, y + 3);
+      x += 16 + (widths[i] ?? 0);
+    });
     doc.setTextColor(20);
+  };
+  if (stacked) {
+    drawLegend(stackNames, cursorY - 5, (x, y, c) => {
+      doc.setFillColor(c[0], c[1], c[2]);
+      doc.rect(x, y, 4, 4, "F");
+    });
   }
   cursorY += 6;
   const axisW = 42;
@@ -517,7 +575,7 @@ export async function generateStatistikPdf(
             ),
           })),
           chartA,
-          { gapRatio: 0.25, tickCount: 3 },
+          { gapRatio: 0.25, tickCount: 4 },
         )
       : null;
     const flatGeo = stackedGeo
@@ -525,7 +583,7 @@ export async function generateStatistikPdf(
       : barChartGeometry(
           data.dailyRevenue.map((d) => d.totalCents),
           chartA,
-          { gapRatio: 0.25, tickCount: 3 },
+          { gapRatio: 0.25, tickCount: 4 },
         );
     const ticks = stackedGeo ? stackedGeo.ticks : flatGeo!.ticks;
     const slots = stackedGeo
@@ -583,9 +641,10 @@ export async function generateStatistikPdf(
       x: marginX + axisW,
       y: cursorY,
       width: usable - axisW,
-      height: 100,
+      // STAT3e — geschnittene Achse bringt mehr Auflösung als Höhe.
+      height: 80,
     };
-    const geo = lineChartGeometry(mv.series, chartB, { tickCount: 3 });
+    const geo = lineChartGeometry(mv.series, chartB, { tickCount: 4, baseline: "nice" });
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     for (const t of geo.ticks) {
@@ -612,18 +671,15 @@ export async function generateStatistikPdf(
       }
       doc.setLineWidth(0.5);
     });
-    // Legende in der Titelzeile (Punkt + Name), damit sie die Fläche nicht überdeckt.
-    doc.setFontSize(6.5);
-    let legendX = marginX + 90;
-    geo.series.forEach((s) => {
-      const color = colorOf(s.name);
-      doc.setFillColor(color[0], color[1], color[2]);
-      doc.circle(legendX, chartB.y - 8, 1.8, "F");
-      doc.setTextColor(60);
-      doc.text(s.name, legendX + 4, chartB.y - 6);
-      legendX += 12 + doc.getTextWidth(s.name);
-    });
-    doc.setTextColor(20);
+    // Legende rechtsbündig in der Titelzeile (siehe drawLegend).
+    drawLegend(
+      geo.series.map((s) => s.name),
+      chartB.y - 9,
+      (x, y, color) => {
+        doc.setFillColor(color[0], color[1], color[2]);
+        doc.circle(x + 2, y + 2, 1.8, "F");
+      },
+    );
     doc.setDrawColor(200);
     doc.setFontSize(5.5);
     doc.setTextColor(90);

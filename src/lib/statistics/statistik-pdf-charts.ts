@@ -55,15 +55,75 @@ function maxOf(values: readonly (number | null | undefined)[]): number {
   return max;
 }
 
-function ticksFor(max: number, area: ChartArea, tickCount: number): AxisTick[] {
-  if (max <= 0) return [{ value: 0, y: area.y + area.height }];
-  const n = Math.max(2, Math.trunc(tickCount));
-  const ticks: AxisTick[] = [];
-  for (let i = 0; i < n; i++) {
-    const frac = i / (n - 1);
-    ticks.push({ value: max * frac, y: area.y + area.height - area.height * frac });
+function minOf(values: readonly (number | null | undefined)[]): number {
+  let min: number | null = null;
+  for (const v of values) {
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) continue;
+    if (min === null || v < min) min = v;
   }
-  return ticks;
+  return min ?? 0;
+}
+
+/** Schrittweite im 1/2/5×10^n-Raster, mindestens so groß wie `raw`. */
+function niceStep(raw: number): number {
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  const exp = Math.floor(Math.log10(raw));
+  const pow = 10 ** exp;
+  const f = raw / pow;
+  const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  return m * pow;
+}
+
+export type NiceTicks = {
+  /** Größter Rasterwert ≤ min, nie negativ (0 bei flachem Datenminimum). */
+  baseline: number;
+  /** Kleinster Rasterwert ≥ max. */
+  top: number;
+  step: number;
+  /** Aufsteigend von `baseline` bis `top`. */
+  values: number[];
+};
+
+/**
+ * STAT3e — Achsenwerte auf runden Zahlen (1/2/5×10^n-Raster).
+ *
+ * Rein rechnerisch, ohne Zeichenfläche. `baseline` ist der größte Rasterwert
+ * unter dem Datenminimum — ausgenommen der flache Fall: liegt das Minimum unter
+ * 20 % des Maximums, bleibt die 0-Basis (kein Schnitt für nichts).
+ */
+export function niceTicks(min: number, max: number, targetCount = 4): NiceTicks {
+  const hi = Number.isFinite(max) && max > 0 ? max : 0;
+  if (hi <= 0) return { baseline: 0, top: 0, step: 1, values: [0] };
+  let lo = Number.isFinite(min) && min > 0 ? Math.min(min, hi) : 0;
+  // Flaches Minimum ⇒ 0-Basis: ein Schnitt würde hier nur Fläche verschenken.
+  if (lo < hi * 0.2) lo = 0;
+  const n = Math.max(2, Math.trunc(targetCount));
+  const span = hi - lo > 0 ? hi - lo : hi;
+  const step = niceStep(span / n);
+  const baseline = Math.max(0, Math.floor(lo / step) * step);
+  const top = Math.ceil(hi / step) * step;
+  const values: number[] = [];
+  // Ganzzahlige Schrittzähler statt fortlaufender Addition: keine Float-Drift.
+  const count = Math.round((top - baseline) / step);
+  for (let i = 0; i <= count; i++) values.push(baseline + i * step);
+  return { baseline, top, step, values };
+}
+
+/**
+ * Achsenbeschriftung für eine Fläche, die von `baseline` bis `max` skaliert.
+ * Rasterwerte oberhalb des Datenmaximums werden weggelassen, damit keine Linie
+ * über den Rahmen läuft (die Balken-/Punkt-Skala bleibt unverändert).
+ */
+function ticksFor(max: number, area: ChartArea, tickCount: number, baseline = 0): AxisTick[] {
+  if (max <= 0) return [{ value: 0, y: area.y + area.height }];
+  const nice = niceTicks(baseline, max, tickCount);
+  const span = max - nice.baseline;
+  const kept = nice.values.filter((v) => v >= nice.baseline - 1e-9 && v <= max + 1e-9);
+  const list = kept.length > 0 ? kept : [nice.baseline];
+  return list.map((value) => ({
+    value,
+    y: area.y + area.height - (span > 0 ? ((value - nice.baseline) / span) * area.height : 0),
+  }));
 }
 
 /**
@@ -199,6 +259,8 @@ export type LineSeriesGeometry = {
 export type LineGeometry = {
   series: LineSeriesGeometry[];
   max: number;
+  /** Untere Skalengrenze (0 = ungeschnittene Achse). */
+  baseline: number;
   ticks: AxisTick[];
   /** x-Positionen der Rasterpunkte (für Monatskürzel). */
   slotX: number[];
@@ -207,14 +269,24 @@ export type LineGeometry = {
 /**
  * Punktgeometrie für eine oder mehrere Reihen über dieselbe Zeitachse. Die
  * Skala ist reihenübergreifend (Standorte bleiben vergleichbar).
+ *
+ * STAT3e — `baseline: "nice"` schneidet die Achse am größten runden Wert unter
+ * dem Datenminimum (siehe `niceTicks`). Nur für LINIEN erlaubt; Balken bleiben
+ * grundsätzlich 0-basiert, weil dort die Fläche den Wert trägt.
  */
 export function lineChartGeometry(
   series: ReadonlyArray<{ name: string; values: ReadonlyArray<number | null> }>,
   area: ChartArea,
-  opts?: { tickCount?: number },
+  opts?: { tickCount?: number; baseline?: "nice" | 0 },
 ): LineGeometry {
   const count = series.reduce((acc, s) => Math.max(acc, s.values.length), 0);
   const max = maxOf(series.flatMap((s) => [...s.values]));
+  const tickCount = opts?.tickCount ?? 3;
+  const baseline =
+    opts?.baseline === "nice"
+      ? niceTicks(minOf(series.flatMap((s) => [...s.values])), max, tickCount).baseline
+      : 0;
+  const span = max - baseline;
   const slotX: number[] = [];
   for (let i = 0; i < count; i++) {
     slotX.push(count === 1 ? area.x + area.width / 2 : area.x + (i * area.width) / (count - 1));
@@ -226,12 +298,12 @@ export function lineChartGeometry(
       const raw = s.values[index];
       if (raw === null || raw === undefined || !Number.isFinite(raw)) return null;
       const value = safeValue(raw);
-      const height = max > 0 ? (value / max) * area.height : 0;
+      const height = span > 0 ? (Math.max(0, value - baseline) / span) * area.height : 0;
       return { index, value, x: slotX[index] ?? area.x, y: area.y + area.height - height };
     }),
   }));
 
-  return { series: out, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3), slotX };
+  return { series: out, max, baseline, ticks: ticksFor(max, area, tickCount, baseline), slotX };
 }
 
 export type MonthSlot = { year: number; month: number; key: string; label: string };

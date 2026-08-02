@@ -61,6 +61,12 @@ import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
 import { ytdByYear } from "@/lib/statistics/ytd-compare";
+import { listBwaMonths } from "@/lib/bwa/bwa.functions";
+import {
+  aggregateGroup,
+  computeBreakEven,
+  estimatedPreTaxResultCents,
+} from "@/lib/bwa/bwa-analytics";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
 import { fillDailyGaps } from "@/lib/statistics/chart-fill";
 import { fmtCents } from "@/lib/format";

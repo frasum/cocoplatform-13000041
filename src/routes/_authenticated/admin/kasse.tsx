@@ -606,10 +606,17 @@ function KassePage() {
           {headerCardsEnabled && (
             <div
               className={
-                (eventNoticesQ.data?.length ?? 0) > 0 ? "grid gap-3 md:grid-cols-2" : "grid gap-3"
+                (eventNoticesQ.data?.events.length ?? 0) +
+                  (eventNoticesQ.data?.schoolHolidays.length ?? 0) >
+                0
+                  ? "grid gap-3 md:grid-cols-2"
+                  : "grid gap-3"
               }
             >
-              <EventNoticesBlock notices={eventNoticesQ.data ?? []} />
+              <EventNoticesBlock
+                notices={eventNoticesQ.data?.events ?? []}
+                schoolHolidays={eventNoticesQ.data?.schoolHolidays ?? []}
+              />
               <WeatherWidget today={businessDate} rows={weatherQ.data ?? []} />
             </div>
           )}

@@ -303,10 +303,7 @@ export function estimatedPreTaxResultCents(
  *  (bewusst brutto: kassennah und konservativ; das Label im Banner macht den
  *  Bezug eindeutig). Rundung passiert erst im Format, hier bleibt der rohe
  *  Prozentwert. `null` bei Bruttoumsatz <= 0. */
-export function preTaxMarginPct(
-  resultCents: number,
-  grossRevenueCents: number,
-): number | null {
+export function preTaxMarginPct(resultCents: number, grossRevenueCents: number): number | null {
   if (!(grossRevenueCents > 0)) return null;
   return (resultCents / grossRevenueCents) * 100;
 }

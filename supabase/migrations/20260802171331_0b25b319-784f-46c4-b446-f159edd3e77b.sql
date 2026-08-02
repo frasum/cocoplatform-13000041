@@ -1,0 +1,15 @@
+-- Kommentar-Richtigstellung zu 20260802165312_ea3fffb5-4eb0-430c-b8cd-743ca8aa6445.sql (ZT1-b):
+-- Der Kommentar der genannten Migration behauptete, COCO nutze keine Realtime-Kanaele.
+-- Das ist falsch. Richtig ist:
+--   * COCO nutzt Realtime ausschliesslich fuer postgres_changes (Dienstplan
+--     roster_shifts, Aufgaben). Diese autorisieren ueber die RLS der
+--     Quelltabellen und sind von der gedroppten Policy UNBERUEHRT.
+--   * Die Policy "realtime_authenticated_only" betraf nur Broadcast/Presence auf
+--     realtime.messages und erlaubte mit USING (true) jedem angemeldeten Konto
+--     mandantenuebergreifendes Mitlesen/Senden. Broadcast/Presence sind ungenutzt,
+--     daher der Drop (Deny-by-default).
+--   * Fuer kuenftige Broadcast-Nutzung: neue Policy mit realtime.topic()-Pruefung
+--     gegen current_organization_id().
+-- SQL unveraendert und idempotent (IF EXISTS), damit die Richtigstellung in der
+-- Migrationskette direkt neben dem Sachverhalt steht.
+DROP POLICY IF EXISTS "realtime_authenticated_only" ON realtime.messages;

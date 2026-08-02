@@ -333,6 +333,10 @@ function LocationsPage() {
               setMsg(null);
               setConfirmActive({ loc: activeLoc, next });
             }}
+            onToggleCashEnabled={(next) => {
+              setMsg(null);
+              setCashEnabledMut.mutate({ id: activeLoc.id, cashEnabled: next });
+            }}
             onGeoChanged={refresh}
           />
         </>

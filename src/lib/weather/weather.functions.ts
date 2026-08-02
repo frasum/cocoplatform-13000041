@@ -38,7 +38,19 @@ type WeatherInsert = Database["public"]["Tables"]["weather_days"]["Insert"];
 async function fetchDaily(url: string): Promise<OpenMeteoDaily> {
   const res = await fetch(url, { headers: { accept: "application/json" } });
   if (!res.ok) {
-    throw new Error(`Open-Meteo antwortete mit HTTP ${res.status}.`);
+    // Open-Meteo liefert den Grund im Body ("reason") — ohne ihn ist ein 400
+    // nicht diagnostizierbar (z. B. end_date außerhalb des erlaubten Fensters).
+    const body = await res.text().catch(() => "");
+    let reason = "";
+    try {
+      const parsed = JSON.parse(body) as { reason?: unknown };
+      if (typeof parsed.reason === "string") reason = parsed.reason;
+    } catch {
+      reason = body.slice(0, 200);
+    }
+    throw new Error(
+      `Open-Meteo antwortete mit HTTP ${res.status}.${reason ? ` Grund: ${reason}` : ""}`,
+    );
   }
   return (await res.json()) as OpenMeteoDaily;
 }

@@ -148,6 +148,10 @@ export function shiftIsoDate(iso: string, days: number): string {
   return `${next.getUTCFullYear()}-${pad(next.getUTCMonth() + 1)}-${pad(next.getUTCDate())}`;
 }
 
-/** Fenster-Konstanten dieser Runde (Kommentar in der Spec: 16 Tage / 10 Tage). */
-export const FORECAST_DAYS_AHEAD = 16;
+/**
+ * Fenster-Konstanten dieser Runde: 16 Tage Vorhersage INKLUSIVE heute
+ * (Open-Meteo erlaubt end_date maximal heute + 15 Tage — heute + 16 → HTTP 400),
+ * 10 Tage Archiv-Rückblick.
+ */
+export const FORECAST_DAYS_AHEAD = 15;
 export const ARCHIVE_LOOKBACK_DAYS = 10;

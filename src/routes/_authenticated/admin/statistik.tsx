@@ -483,6 +483,29 @@ function StatistikPage() {
           )
         : undefined;
 
+    // STAT3h — Modell-Ergebnis vor Steuern: rollierender Break-even der
+    // eindeutigen Entität (alle Kostenstellen zur „Gruppe" verdichtet) auf den
+    // Kassen-Bruttoumsatz des Monats angewandt. Fehlt die BWA oder ist der
+    // Deckungsbeitrag unbrauchbar, entfällt die Zeile ersatzlos.
+    const bwaRows = preTaxEligible ? (bwaQ.data ?? null) : null;
+    const be = bwaRows
+      ? computeBreakEven(
+          aggregateGroup(bwaRows.filter((r) => r.entity === PRETAX_ENTITY)).filter(
+            (r) => r.month < `${month}-01`,
+          ),
+        )
+      : null;
+    const resultCents = estimatedPreTaxResultCents(rev.summary.totalCents, be);
+    const preTaxModel =
+      be && resultCents !== null
+        ? {
+            resultCents,
+            netRevenueCents: Math.round(rev.summary.totalCents / be.factor),
+            breakEvenMonthCents: be.netMonthCents,
+            dbPct: be.db * 100,
+          }
+        : undefined;
+
     const data: StatistikPdfData = {
       monthLabel,
       scopeLabel,

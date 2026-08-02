@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseEventsSheet, parseSheetDate, type SheetRow } from "./parse-events-xlsx";
+import {
+  parseEventsSheet,
+  parseSheetDate,
+  splitImpactCell,
+  type SheetRow,
+} from "./parse-events-xlsx";
 
 const HEADER: SheetRow = [
   null,
@@ -131,5 +136,81 @@ describe("parseEventsSheet", () => {
     ]);
     expect(res.errors).toEqual([]);
     expect(res.rows[0]).toMatchObject({ name: "Fest Q", impact: "mittel_hoch", sheetRow: 4 });
+  });
+
+  it("liest Impact mit Klammerzusatz und stellt das Zeitfenster der Empfehlung voran", () => {
+    const res = parseEventsSheet(
+      sheet([
+        null,
+        "2026-07-01",
+        "2026-07-01",
+        "Fest M",
+        "Volksfest",
+        "Ort",
+        "",
+        "Hoch (Mittag)",
+        "Service verstärken",
+      ]),
+    );
+    expect(res.errors).toEqual([]);
+    expect(res.rows[0]).toMatchObject({
+      impact: "hoch",
+      recommendation: "Zeitfenster: Mittag — Service verstärken",
+    });
+  });
+
+  it("setzt den Klammerzusatz auch bei leerer Empfehlung", () => {
+    const res = parseEventsSheet(
+      sheet([null, "2026-07-02", "2026-07-02", "Fest N", "Konzert", "Ort", "", "Hoch (spät)", ""]),
+    );
+    expect(res.errors).toEqual([]);
+    expect(res.rows[0]).toMatchObject({ impact: "hoch", recommendation: "Zeitfenster: spät" });
+  });
+
+  it("lässt Impact ohne Klammer unverändert", () => {
+    const res = parseEventsSheet(
+      sheet([
+        null,
+        "2026-07-03",
+        "2026-07-03",
+        "Fest O",
+        "Volksfest",
+        "Ort",
+        "",
+        "SEHR HOCH",
+        "Max",
+      ]),
+    );
+    expect(res.errors).toEqual([]);
+    expect(res.rows[0]).toMatchObject({ impact: "sehr_hoch", recommendation: "Max" });
+  });
+
+  it("bleibt Fehlerzeile bei unbekannter Grundstufe mit Klammerzusatz", () => {
+    const res = parseEventsSheet(
+      sheet([
+        null,
+        "2026-07-04",
+        "2026-07-04",
+        "Fest P",
+        "Volksfest",
+        "Ort",
+        "",
+        "Quatsch (Mittag)",
+      ]),
+    );
+    expect(res.rows).toEqual([]);
+    expect(res.errors).toHaveLength(1);
+    expect(res.errors[0]?.message).toContain("Quatsch (Mittag)");
+  });
+});
+
+describe("splitImpactCell", () => {
+  it("trennt Grundstufe und Zusatz", () => {
+    expect(splitImpactCell("Hoch (durchgehend)")).toEqual({
+      base: "Hoch",
+      qualifier: "durchgehend",
+    });
+    expect(splitImpactCell("Mittel")).toEqual({ base: "Mittel", qualifier: null });
+    expect(splitImpactCell("Hoch ()")).toEqual({ base: "Hoch", qualifier: null });
   });
 });

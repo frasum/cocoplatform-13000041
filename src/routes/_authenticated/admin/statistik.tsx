@@ -60,6 +60,7 @@ import { takeawayMatrix, takeawaySharePctOfTotal } from "@/lib/statistics/takeaw
 import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
+import { ytdByYear } from "@/lib/statistics/ytd-compare";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
 import { fillDailyGaps } from "@/lib/statistics/chart-fill";
 import { fmtCents } from "@/lib/format";

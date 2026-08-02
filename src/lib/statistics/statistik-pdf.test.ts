@@ -108,7 +108,7 @@ function baseData(over: Partial<StatistikPdfData> = {}): StatistikPdfData {
       previous: null,
     }),
     takeawaySharePct: null,
-    tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perLocation: [] },
+    tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0 },
     personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
     dailyRevenue: [],
     comparison: [],

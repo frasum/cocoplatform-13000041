@@ -50,7 +50,7 @@ export const listLocations = createServerFn({ method: "GET" })
     let query = supabaseAdmin
       .from("locations")
       .select(
-        "id, name, timezone, street, postal_code, city, delivery_notes, phone, contact_name, contact_phone, latitude, longitude, geofence_radius_m, geocoded_at, geocoded_address, cash_balance_target_cents, is_active, enabled_service_periods, tip_service_pool_enabled, kitchen_tip_rate_override, tip_pool_min_hours_override, kitchen_manual_only_override, tip_distribution_mode_override, tip_distribution_mode_from_override",
+        "id, name, timezone, street, postal_code, city, delivery_notes, phone, contact_name, contact_phone, latitude, longitude, geofence_radius_m, geocoded_at, geocoded_address, cash_balance_target_cents, is_active, cash_enabled, enabled_service_periods, tip_service_pool_enabled, kitchen_tip_rate_override, tip_pool_min_hours_override, kitchen_manual_only_override, tip_distribution_mode_override, tip_distribution_mode_from_override",
       )
       .eq("organization_id", caller.organizationId)
       .order("name");
@@ -79,6 +79,8 @@ export const listLocations = createServerFn({ method: "GET" })
       return {
         ...row,
         isActive: row.is_active !== false,
+        // LS1: false = reiner Planungs-Standort (Dienstplan/Zeit ohne Kasse).
+        cashEnabled: row.cash_enabled !== false,
         cashBalanceTargetCents: raw,
         cashBalanceTargetResolvedCents: raw ?? orgTarget,
       };

@@ -60,6 +60,7 @@ import { takeawayMatrix, takeawaySharePctOfTotal } from "@/lib/statistics/takeaw
 import { monthWindow } from "@/lib/statistics/statistik-pdf-charts";
 import { getMonthlyRevenueMatrix, ALL_LOCATIONS } from "@/lib/statistics/monthly-revenue.functions";
 import { findCell } from "@/lib/statistics/monthly-core";
+import { ytdByYear } from "@/lib/statistics/ytd-compare";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
 import { fillDailyGaps } from "@/lib/statistics/chart-fill";
 import { fmtCents } from "@/lib/format";
@@ -451,6 +452,22 @@ function StatistikPage() {
           }
         : undefined;
 
+    // STAT3f — kumulierter 5-Jahres-Vergleich (Jan…M) aus DERSELBEN MB1-Matrix;
+    // die Klemmung auf M−1 im laufenden Monat übernimmt `ytdByYear`.
+    const ytdCompare =
+      calendarMonth && matrix
+        ? ytdByYear(
+            monthlySeriesIds.flatMap((id) => {
+              const series = matrix.series.find((s) => s.locationId === id);
+              return series ? [{ name: series.locationName, cells: series.cells }] : [];
+            }),
+            focusYear,
+            focusMonthNo,
+            format(new Date(), "yyyy-MM"),
+            5,
+          )
+        : undefined;
+
     const data: StatistikPdfData = {
       monthLabel,
       scopeLabel,
@@ -470,28 +487,6 @@ function StatistikPage() {
         serviceCents: tip.totals.serviceCents,
         kitchenCents: tip.totals.kitchenCents,
         totalCents: tip.totals.totalCents,
-        // STAT3 — 3×n-Matrix statt Klarnamen-Liste (Bank-/Gesellschafter-PDF).
-        perLocation: locations
-          .map((loc, i) => {
-            const t = tipQueries[i]?.data;
-            if (!t) return null;
-            return {
-              locationName: loc.name,
-              serviceCents: t.totals.serviceCents,
-              kitchenCents: t.totals.kitchenCents,
-              totalCents: t.totals.totalCents,
-            };
-          })
-          .filter(
-            (
-              t,
-            ): t is {
-              locationName: string;
-              serviceCents: number;
-              kitchenCents: number;
-              totalCents: number;
-            } => t !== null,
-          ),
       },
       personnel: {
         netHours: per.totals.netHours,
@@ -522,6 +517,7 @@ function StatistikPage() {
         revenuePerWorkHourCents: pdfKpis.revenuePerWorkHourCents,
       },
       ...(monthly ? { monthly } : {}),
+      ...(ytdCompare ? { ytdCompare } : {}),
       comparison,
     };
 

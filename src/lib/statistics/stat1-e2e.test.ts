@@ -148,7 +148,7 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
         previous: null,
       }),
       takeawaySharePct: takeawaySharePctOfTotal(summary.takeawayCents, summary.totalCents),
-      tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0, perLocation: [] },
+      tips: { serviceCents: 0, kitchenCents: 0, totalCents: 0 },
       personnel: { netHours: 0, laborCostCents: 0, ratioPct: null, staffWithoutRateNames: [] },
       dailyRevenue: daily.map((d) => ({
         businessDate: d.businessDate,

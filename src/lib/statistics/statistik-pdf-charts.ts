@@ -256,6 +256,78 @@ export type LineSeriesGeometry = {
   points: (LinePoint | null)[];
 };
 
+export type GroupedBar = {
+  seriesIndex: number;
+  name: string;
+  /** null = Lücke (kein Balken zeichnen), nie als 0 dargestellt. */
+  value: number | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type BarGroup = {
+  index: number;
+  label: string;
+  /** Linke Kante der Gruppe und ihre Gesamtbreite (für Achsenlabels). */
+  x: number;
+  width: number;
+  bars: GroupedBar[];
+};
+
+export type GroupedBarGeometry = {
+  groups: BarGroup[];
+  max: number;
+  ticks: AxisTick[];
+};
+
+/**
+ * STAT3f — gruppierte Balken (Jahre × Standorte). Die Skala ist ZWINGEND
+ * 0-basiert: bei Balken trägt die Fläche den Wert, ein Achsenschnitt würde
+ * lügen (bewusster Kontrast zur geschnittenen Linien-Achse aus STAT3e).
+ *
+ * `null` bleibt Lücke — kein 0-Balken, damit fehlende Historie nicht wie ein
+ * Umsatz von null aussieht.
+ */
+export function groupedBarChartGeometry(
+  groups: ReadonlyArray<{ label: string; values: ReadonlyArray<number | null> }>,
+  area: ChartArea,
+  opts?: { gapRatio?: number; tickCount?: number; seriesNames?: readonly string[] },
+): GroupedBarGeometry {
+  const gapRatio = clamp(opts?.gapRatio ?? 0.25, 0, 0.8);
+  const groupCount = groups.length;
+  const seriesCount = groups.reduce((acc, g) => Math.max(acc, g.values.length), 0);
+  const max = maxOf(groups.flatMap((g) => [...g.values]));
+  const slot = groupCount > 0 ? area.width / groupCount : 0;
+  const groupWidth = slot * (1 - gapRatio);
+  const offset = (slot - groupWidth) / 2;
+  const barWidth = seriesCount > 0 ? groupWidth / seriesCount : 0;
+  const baseY = area.y + area.height;
+
+  const out: BarGroup[] = groups.map((g, index) => {
+    const gx = area.x + index * slot + offset;
+    const bars: GroupedBar[] = Array.from({ length: seriesCount }, (_, seriesIndex) => {
+      const raw = g.values[seriesIndex];
+      const missing = raw === null || raw === undefined || !Number.isFinite(raw);
+      const value = missing ? null : safeValue(raw);
+      const height = value !== null && max > 0 ? (value / max) * area.height : 0;
+      return {
+        seriesIndex,
+        name: opts?.seriesNames?.[seriesIndex] ?? String(seriesIndex),
+        value,
+        x: gx + seriesIndex * barWidth,
+        y: baseY - height,
+        width: barWidth,
+        height,
+      };
+    });
+    return { index, label: g.label, x: gx, width: groupWidth, bars };
+  });
+
+  return { groups: out, max, ticks: ticksFor(max, area, opts?.tickCount ?? 3) };
+}
+
 export type LineGeometry = {
   series: LineSeriesGeometry[];
   max: number;

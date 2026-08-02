@@ -32,7 +32,12 @@ describe("schoolHolidayNotices", () => {
 
   it("Einzeltag Buß- und Bettag: Tag 1/1", () => {
     expect(schoolHolidayNotices("2026-11-18")).toEqual([
-      { kind: "holiday_running", name: "Buß- und Bettag (unterrichtsfrei)", dayIndex: 1, dayCount: 1 },
+      {
+        kind: "holiday_running",
+        name: "Buß- und Bettag (unterrichtsfrei)",
+        dayIndex: 1,
+        dayCount: 1,
+      },
     ]);
   });
 

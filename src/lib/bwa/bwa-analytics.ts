@@ -23,6 +23,26 @@ export const OPEN_DAYS_PER_MONTH = 30;
 export const VAT_STANDARD = 0.19;
 export const VAT_REDUCED = 0.07;
 
+/** Ab diesem Monat gilt der ermäßigte Satz (7 %) auch für Speisen IM Haus
+ *  (bundesgesetzliche dauerhafte Senkung ab 01.01.2026; Getränke bleiben 19 %).
+ *  Bauherren-Bestätigung + BWA-Beleg 02.08.2026. */
+export const INHOUSE_FOOD_REDUCED_FROM = "2026-01";
+
+/** True, wenn für den ISO-Monat (YYYY-MM-01 oder YYYY-MM) Haus-Speisen mit
+ *  7 % zu bewerten sind. */
+function inhouseFoodReduced(month: string): boolean {
+  return month.slice(0, 7) >= INHOUSE_FOOD_REDUCED_FROM;
+}
+
+/** USt-Betrag einer einzelnen Monatszeile nach dem im Monat gültigen Recht. */
+function monthVatCents(r: BwaRow): number {
+  const reduced = inhouseFoodReduced(r.month);
+  const rev19 =
+    r.getraenkeCents + r.sonstigeErloeseCents + (reduced ? 0 : r.speisenHausCents);
+  const rev7 = r.speisenAusserHausCents + (reduced ? r.speisenHausCents : 0);
+  return rev19 * VAT_STANDARD + rev7 * VAT_REDUCED;
+}
+
 const CENT_KEYS = [
   "umsatzCents",
   "getraenkeCents",

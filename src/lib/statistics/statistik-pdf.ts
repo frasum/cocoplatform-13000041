@@ -155,6 +155,22 @@ const SERIES_PALETTE: Array<[number, number, number]> = [
   [90, 140, 100],
 ];
 
+/** STAT3f — Monatsnamen für die Überschrift „Jan–Juli kumuliert …". */
+const MONTH_NAMES_LONG = [
+  "Januar",
+  "Februar",
+  "März",
+  "April",
+  "Mai",
+  "Juni",
+  "Juli",
+  "August",
+  "September",
+  "Oktober",
+  "November",
+  "Dezember",
+];
+
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
   return cents === null || cents === undefined ? "—" : fmtEurRounded(cents);

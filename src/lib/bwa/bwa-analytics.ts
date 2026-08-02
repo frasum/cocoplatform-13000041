@@ -243,6 +243,24 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
 }
 
 /** Findet zu einem ISO-Monat (YYYY-MM-01) den Vorjahresmonat im Bestand. */
+/** STAT3h — Modell-Ergebnis vor Steuern für einen Monat:
+ *  `db × (grossRevenueCents / factor − netMonthCents)`.
+ *
+ *  `grossRevenueCents` ist der Kassenumsatz brutto des Monats; die Umrechnung
+ *  auf netto läuft über den USt-Mix-Faktor des übergebenen Break-even. Oberhalb
+ *  des Break-even trägt jeder Euro nur seinen Deckungsbeitrag, deshalb ist es
+ *  NICHT die nackte Differenz Umsatz − BE. Negative Ergebnisse (Monat unter dem
+ *  Break-even) werden bewusst zurückgegeben. `null` bei fehlendem BE. */
+export function estimatedPreTaxResultCents(
+  grossRevenueCents: number,
+  be: BreakEven | null,
+): number | null {
+  if (be === null) return null;
+  if (be.factor <= 0) return null;
+  const netRevenue = grossRevenueCents / be.factor;
+  return Math.round(be.db * (netRevenue - be.netMonthCents));
+}
+
 export function findYoy<T extends { month: string }>(rows: T[], month: string): T | undefined {
   const y = Number(month.slice(0, 4));
   const prevMonth = `${y - 1}${month.slice(4)}`;

@@ -17,12 +17,14 @@ import {
 } from "./revenue-core";
 import { takeawayMatrix, takeawaySharePctOfTotal } from "./takeaway-channels";
 import {
+  deltaTone,
   fmtDeltaPctDe,
   fmtEurRounded,
   fmtHoursDe,
   fmtHoursRoundedDe,
   fmtPctDe,
   generateStatistikPdf,
+  pdfChannelLabel,
   type StatistikPdfData,
 } from "./statistik-pdf";
 

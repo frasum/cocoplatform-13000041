@@ -169,7 +169,17 @@ describe("parseEventsSheet", () => {
 
   it("lässt Impact ohne Klammer unverändert", () => {
     const res = parseEventsSheet(
-      sheet([null, "2026-07-03", "2026-07-03", "Fest O", "Volksfest", "Ort", "", "SEHR HOCH", "Max"]),
+      sheet([
+        null,
+        "2026-07-03",
+        "2026-07-03",
+        "Fest O",
+        "Volksfest",
+        "Ort",
+        "",
+        "SEHR HOCH",
+        "Max",
+      ]),
     );
     expect(res.errors).toEqual([]);
     expect(res.rows[0]).toMatchObject({ impact: "sehr_hoch", recommendation: "Max" });
@@ -177,7 +187,16 @@ describe("parseEventsSheet", () => {
 
   it("bleibt Fehlerzeile bei unbekannter Grundstufe mit Klammerzusatz", () => {
     const res = parseEventsSheet(
-      sheet([null, "2026-07-04", "2026-07-04", "Fest P", "Volksfest", "Ort", "", "Quatsch (Mittag)"]),
+      sheet([
+        null,
+        "2026-07-04",
+        "2026-07-04",
+        "Fest P",
+        "Volksfest",
+        "Ort",
+        "",
+        "Quatsch (Mittag)",
+      ]),
     );
     expect(res.rows).toEqual([]);
     expect(res.errors).toHaveLength(1);

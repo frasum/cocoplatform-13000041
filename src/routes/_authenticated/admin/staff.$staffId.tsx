@@ -67,6 +67,8 @@ function StaffDetailPage() {
   const [tab, setTab] = useState<Tab>("basics");
   const { identity } = useRouteContext({ from: "/_authenticated/admin" });
   const showPersonal = identity.role === "admin" || identity.role === "payroll";
+  // ZT1 — Stammdaten (Basics) nur admin & payroll.
+  const canSeeStammdaten = identity.role === "admin" || identity.role === "payroll";
   const canEditPersonal = identity.role === "admin";
   const canEditVacation = identity.role === "admin" || identity.role === "payroll";
   const isAdmin = identity.role === "admin";
@@ -120,7 +122,10 @@ function StaffDetailPage() {
       >
         {(
           [
-            ["basics", "Stammdaten"],
+            // ZT1 — Stammdaten defensiv auch in der Komponente auf admin &
+            // payroll begrenzt (der SD1-Routen-Guard lässt ohnehin nur diese
+            // Rollen herein; das Gate hier macht den Schutz sichtbar).
+            ...(canSeeStammdaten ? ([["basics", "Stammdaten"]] as [Tab, string][]) : []),
             ...(showPersonal ? ([["personal", "Personaldaten"]] as [Tab, string][]) : []),
             ...(!isPayroll ? ([["pin", "PIN"]] as [Tab, string][]) : []),
             ...(isAdmin ? ([["account", "Login"]] as [Tab, string][]) : []),
@@ -136,7 +141,7 @@ function StaffDetailPage() {
         ))}
       </div>
 
-      {tab === "basics" && (
+      {tab === "basics" && canSeeStammdaten && (
         <div className="space-y-4">
           {isAdmin && <SofortmeldungBanner staffId={s.id} />}
           <BasicsTab

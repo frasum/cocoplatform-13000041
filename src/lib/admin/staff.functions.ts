@@ -326,16 +326,12 @@ export const getStaff = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ staffId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    // SD1-Erweiterung (18.07.2026, Entscheidung Frank): getStaff lesend auch für
-    // manager/planer, INKL. email/phone (Kontaktdaten für Führung/Planung).
-    // Schreibende Personalverwaltung bleibt admin/payroll-only.
-    // listStaff bleibt bewusst OHNE email/phone (Listenansicht braucht sie nicht).
-    const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "admin",
-      "manager",
-      "planer",
-      "payroll",
-    ]);
+    // ZT1 (02.08.2026): Verengung auf admin/payroll — ERSETZT die
+    // SD1-Erweiterung vom 18.07.2026 (getStaff lesend auch für manager/planer).
+    // Einziger Aufrufer ist die Mitarbeiter-Detailseite, die durch den
+    // SD1-Routen-Guard ohnehin nur admin/payroll erreichen.
+    // listStaff bleibt bewusst breiter (Dienstplan/Planung), OHNE email/phone.
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const staff = expectMaybe<{
       id: string;

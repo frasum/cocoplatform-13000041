@@ -121,8 +121,12 @@ function ZeitUebersichtPage() {
   const { identity } = useAuth();
   const isAdmin = identity?.role === "admin";
   const isPayroll = identity?.role === "payroll";
-  const isPlaner = identity?.role === "planer";
   const canOpenStaff = isAdmin || isPayroll;
+  // ZT1 — Lohn-/Abrechnungs-Tabs (Zusammenfassung, Buchhaltung, Perioden,
+  // Brutto/Netto, Provision) nur für admin & payroll. manager/planer sehen
+  // ausschliesslich den Wochenplan; dessen Lese- und Schreibpfade bleiben
+  // unverändert manager-offen.
+  const canSeePayrollTabs = isAdmin || isPayroll;
   const currentHref = useRouterState({ select: (s) => s.location.href });
   const fetchLocations = useServerFn(listLocations);
   const fetchStaffAll = useServerFn(listStaff);
@@ -206,6 +210,9 @@ function ZeitUebersichtPage() {
   const [deptFilter, setDeptFilter] = useState<Department | "all">("all");
   const skillFilter = "all";
   const [activeTab, setActiveTab] = useState<string>("weekly");
+  // Fallback: ohne Recht rendert niemals ein gesperrter Tab (auch nicht, wenn
+  // die Identität erst nachträglich lädt).
+  const effectiveTab = canSeePayrollTabs ? activeTab : "weekly";
   // Summen-Skope für die rechte Kennzahlen-Spalte im Wochenplan:
   // "week" = aktuelle Woche (Grid-Daten), "period" = Abrechnungsperiode (Overview-Daten).
   const [totalsScope, setTotalsScope] = useState<"week" | "period">("week");
@@ -416,7 +423,7 @@ function ZeitUebersichtPage() {
       fetchNotes({
         data: { locationId: effectiveLocationId, periodStart: fromDate, periodEnd: toDate },
       }),
-    enabled: Boolean(effectiveLocationId) && !isAllLocations,
+    enabled: canSeePayrollTabs && Boolean(effectiveLocationId) && !isAllLocations,
   });
   // Bei "Alle Standorte": Notes in einem Batch-Request laden.
   const notesBatchQ = useQuery({
@@ -425,29 +432,41 @@ function ZeitUebersichtPage() {
       fetchNotesBatch({
         data: { locationIds: allLocationIds, periodStart: fromDate, periodEnd: toDate },
       }),
-    enabled: isAllLocations && allLocationIds.length > 0 && Boolean(fromDate) && Boolean(toDate),
+    enabled:
+      canSeePayrollTabs &&
+      isAllLocations &&
+      allLocationIds.length > 0 &&
+      Boolean(fromDate) &&
+      Boolean(toDate),
   });
 
   const advancesQ = useQuery({
     queryKey: ["payroll-advances", fromDate, toDate],
     queryFn: () => fetchAdvances({ data: { periodStart: fromDate, periodEnd: toDate } }),
+    enabled: canSeePayrollTabs,
   });
 
   const absencesQ = useQuery({
     queryKey: ["payroll-absences", fromDate, toDate],
     queryFn: () => fetchAbsences({ data: { periodStart: fromDate, periodEnd: toDate } }),
+    enabled: canSeePayrollTabs,
   });
 
   const sfnQ = useQuery({
     queryKey: ["payroll-sfn", effectiveLocationId, fromDate, toDate],
     queryFn: () => fetchSfn({ data: { locationId: effectiveLocationId, fromDate, toDate } }),
-    enabled: Boolean(effectiveLocationId) && !isAllLocations,
+    enabled: canSeePayrollTabs && Boolean(effectiveLocationId) && !isAllLocations,
   });
   // Bei "Alle Standorte": SFN in einem Batch-Request laden.
   const sfnBatchQ = useQuery({
     queryKey: ["payroll-sfn", "batch", allLocationsKey, fromDate, toDate],
     queryFn: () => fetchSfnBatch({ data: { locationIds: allLocationIds, fromDate, toDate } }),
-    enabled: isAllLocations && allLocationIds.length > 0 && Boolean(fromDate) && Boolean(toDate),
+    enabled:
+      canSeePayrollTabs &&
+      isAllLocations &&
+      allLocationIds.length > 0 &&
+      Boolean(fromDate) &&
+      Boolean(toDate),
   });
 
   const weekCols = useMemo(() => buildWeekColumns(fromDate, toDate), [fromDate, toDate]);
@@ -744,7 +763,7 @@ function ZeitUebersichtPage() {
       fetchRecurring({
         data: { locationId: isAllLocations ? null : effectiveLocationId || null },
       }),
-    enabled: isAllLocations || Boolean(effectiveLocationId),
+    enabled: canSeePayrollTabs && (isAllLocations || Boolean(effectiveLocationId)),
   });
   const invalidateRecurring = () => {
     void qc.invalidateQueries({ queryKey: ["payroll-recurring"] });
@@ -1347,33 +1366,39 @@ function ZeitUebersichtPage() {
         </p>
       </div>
 
-      <Tabs value={isPlaner ? "weekly" : activeTab} onValueChange={setActiveTab}>
+      <Tabs value={effectiveTab} onValueChange={setActiveTab}>
         <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
-          <TabButton
-            active={isPlaner || activeTab === "weekly"}
-            onClick={() => setActiveTab("weekly")}
-          >
+          <TabButton active={effectiveTab === "weekly"} onClick={() => setActiveTab("weekly")}>
             Wochenplan
           </TabButton>
-          {!isPlaner && (
+          {canSeePayrollTabs && (
             <>
-              <TabButton active={activeTab === "summary"} onClick={() => setActiveTab("summary")}>
+              <TabButton
+                active={effectiveTab === "summary"}
+                onClick={() => setActiveTab("summary")}
+              >
                 Zusammenfassung
               </TabButton>
-              <TabButton active={activeTab === "payroll"} onClick={() => setActiveTab("payroll")}>
+              <TabButton
+                active={effectiveTab === "payroll"}
+                onClick={() => setActiveTab("payroll")}
+              >
                 Buchhaltung
               </TabButton>
-              <TabButton active={activeTab === "periods"} onClick={() => setActiveTab("periods")}>
+              <TabButton
+                active={effectiveTab === "periods"}
+                onClick={() => setActiveTab("periods")}
+              >
                 Perioden
               </TabButton>
               <TabButton
-                active={activeTab === "lohnrechner"}
+                active={effectiveTab === "lohnrechner"}
                 onClick={() => setActiveTab("lohnrechner")}
               >
                 Brutto/Netto
               </TabButton>
               <TabButton
-                active={activeTab === "provision"}
+                active={effectiveTab === "provision"}
                 onClick={() => setActiveTab("provision")}
               >
                 Provision
@@ -1382,7 +1407,9 @@ function ZeitUebersichtPage() {
           )}
         </div>
 
-        {(activeTab === "summary" || activeTab === "payroll" || activeTab === "provision") && (
+        {(effectiveTab === "summary" ||
+          effectiveTab === "payroll" ||
+          effectiveTab === "provision") && (
           <Card className="my-3 p-3">
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
@@ -1420,7 +1447,9 @@ function ZeitUebersichtPage() {
         {/* WZ1: Lücken-Banner in Standort-Sicht (nicht bei "Alle Standorte").
             unlocated = Einträge ohne location_id, open = laufende Schichten
             im Zeitraum an DIESEM Standort. Rein informativ, keine Aktion. */}
-        {(activeTab === "summary" || activeTab === "payroll" || activeTab === "provision") &&
+        {(effectiveTab === "summary" ||
+          effectiveTab === "payroll" ||
+          effectiveTab === "provision") &&
           !isAllLocations &&
           overviewQ.data?.gaps &&
           (overviewQ.data.gaps.unlocatedShifts > 0 || overviewQ.data.gaps.openShifts > 0) && (
@@ -2008,7 +2037,7 @@ function ZeitUebersichtPage() {
       </Tabs>
 
       {isAdmin &&
-        activeTab === "payroll" &&
+        effectiveTab === "payroll" &&
         !isAllLocations &&
         effectiveLocationId &&
         fromDate &&

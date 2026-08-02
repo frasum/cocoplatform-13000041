@@ -497,7 +497,7 @@ export const getSfnOverview = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);
@@ -570,7 +570,7 @@ export const listPayrollNotes = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);
@@ -604,7 +604,7 @@ export const listAdvancesByStaff = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);
@@ -637,7 +637,7 @@ export const listAbsencesByStaff = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);
@@ -697,7 +697,7 @@ export const upsertPayrollNote = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]); // ZT1
     return runWithPermission(
       context.supabase,
       "time.payroll_note.edit",
@@ -752,7 +752,7 @@ export const listRecurringNotes = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);
@@ -795,7 +795,7 @@ export const createRecurringNote = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]); // ZT1
     if (data.kind === "rate" && data.periodsTotal == null) {
       throw new Error("periodsTotal ist bei kind='rate' Pflicht.");
     }
@@ -844,7 +844,7 @@ export const cancelRecurringNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    const caller = await loadAdminCaller(context.supabase, context.userId, ["admin", "payroll"]); // ZT1
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing, error: readErr } = await supabaseAdmin
       .from("payroll_recurring_notes")
@@ -1250,7 +1250,7 @@ export const getSfnOverviewBatch = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);
@@ -1344,7 +1344,7 @@ export const listPayrollNotesBatch = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, [
-      "manager",
+      // ZT1 — Lohn-/Abrechnungsdaten: nur admin & payroll (manager entfernt).
       "admin",
       "payroll",
     ]);

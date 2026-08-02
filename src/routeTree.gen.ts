@@ -70,6 +70,7 @@ import { Route as AuthenticatedAdminBestellungLieferantenRouteImport } from './r
 import { Route as AuthenticatedAdminBestellungUnzugeordnetRouteImport } from './routes/_authenticated/admin/bestellung.unzugeordnet'
 import { Route as AuthenticatedAdminEinstellungenIndexRouteImport } from './routes/_authenticated/admin/einstellungen.index'
 import { Route as AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport } from './routes/_authenticated/admin/einstellungen.easyorder-verwaltung'
+import { Route as AuthenticatedAdminEinstellungenVeranstaltungenRouteImport } from './routes/_authenticated/admin/einstellungen.veranstaltungen'
 import { Route as AuthenticatedAdminStaffIndexRouteImport } from './routes/_authenticated/admin/staff.index'
 import { Route as AuthenticatedAdminStaffStaffIdRouteImport } from './routes/_authenticated/admin/staff.$staffId'
 import { Route as AuthenticatedAdminStaffNewRouteImport } from './routes/_authenticated/admin/staff.new'
@@ -429,6 +430,12 @@ const AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute =
     path: '/easyorder-verwaltung',
     getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
   } as any)
+const AuthenticatedAdminEinstellungenVeranstaltungenRoute =
+  AuthenticatedAdminEinstellungenVeranstaltungenRouteImport.update({
+    id: '/veranstaltungen',
+    path: '/veranstaltungen',
+    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
+  } as any)
 const AuthenticatedAdminStaffIndexRoute =
   AuthenticatedAdminStaffIndexRouteImport.update({
     id: '/',
@@ -560,6 +567,7 @@ export interface FileRoutesByFullPath {
   '/admin/bestellung/lieferanten': typeof AuthenticatedAdminBestellungLieferantenRoute
   '/admin/bestellung/unzugeordnet': typeof AuthenticatedAdminBestellungUnzugeordnetRoute
   '/admin/einstellungen/easyorder-verwaltung': typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute
+  '/admin/einstellungen/veranstaltungen': typeof AuthenticatedAdminEinstellungenVeranstaltungenRoute
   '/admin/staff/$staffId': typeof AuthenticatedAdminStaffStaffIdRoute
   '/admin/staff/new': typeof AuthenticatedAdminStaffNewRoute
   '/api/public/bank/sync-spicery': typeof ApiPublicBankSyncSpiceryRoute
@@ -630,6 +638,7 @@ export interface FileRoutesByTo {
   '/admin/bestellung/lieferanten': typeof AuthenticatedAdminBestellungLieferantenRoute
   '/admin/bestellung/unzugeordnet': typeof AuthenticatedAdminBestellungUnzugeordnetRoute
   '/admin/einstellungen/easyorder-verwaltung': typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute
+  '/admin/einstellungen/veranstaltungen': typeof AuthenticatedAdminEinstellungenVeranstaltungenRoute
   '/admin/staff/$staffId': typeof AuthenticatedAdminStaffStaffIdRoute
   '/admin/staff/new': typeof AuthenticatedAdminStaffNewRoute
   '/api/public/bank/sync-spicery': typeof ApiPublicBankSyncSpiceryRoute
@@ -706,6 +715,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/bestellung/lieferanten': typeof AuthenticatedAdminBestellungLieferantenRoute
   '/_authenticated/admin/bestellung/unzugeordnet': typeof AuthenticatedAdminBestellungUnzugeordnetRoute
   '/_authenticated/admin/einstellungen/easyorder-verwaltung': typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute
+  '/_authenticated/admin/einstellungen/veranstaltungen': typeof AuthenticatedAdminEinstellungenVeranstaltungenRoute
   '/_authenticated/admin/staff/$staffId': typeof AuthenticatedAdminStaffStaffIdRoute
   '/_authenticated/admin/staff/new': typeof AuthenticatedAdminStaffNewRoute
   '/api/public/bank/sync-spicery': typeof ApiPublicBankSyncSpiceryRoute
@@ -782,6 +792,7 @@ export interface FileRouteTypes {
     | '/admin/bestellung/lieferanten'
     | '/admin/bestellung/unzugeordnet'
     | '/admin/einstellungen/easyorder-verwaltung'
+    | '/admin/einstellungen/veranstaltungen'
     | '/admin/staff/$staffId'
     | '/admin/staff/new'
     | '/api/public/bank/sync-spicery'
@@ -852,6 +863,7 @@ export interface FileRouteTypes {
     | '/admin/bestellung/lieferanten'
     | '/admin/bestellung/unzugeordnet'
     | '/admin/einstellungen/easyorder-verwaltung'
+    | '/admin/einstellungen/veranstaltungen'
     | '/admin/staff/$staffId'
     | '/admin/staff/new'
     | '/api/public/bank/sync-spicery'
@@ -927,6 +939,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/bestellung/lieferanten'
     | '/_authenticated/admin/bestellung/unzugeordnet'
     | '/_authenticated/admin/einstellungen/easyorder-verwaltung'
+    | '/_authenticated/admin/einstellungen/veranstaltungen'
     | '/_authenticated/admin/staff/$staffId'
     | '/_authenticated/admin/staff/new'
     | '/api/public/bank/sync-spicery'
@@ -1390,6 +1403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport
       parentRoute: typeof AuthenticatedAdminEinstellungenRoute
     }
+    '/_authenticated/admin/einstellungen/veranstaltungen': {
+      id: '/_authenticated/admin/einstellungen/veranstaltungen'
+      path: '/veranstaltungen'
+      fullPath: '/admin/einstellungen/veranstaltungen'
+      preLoaderRoute: typeof AuthenticatedAdminEinstellungenVeranstaltungenRouteImport
+      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
+    }
     '/_authenticated/admin/staff/': {
       id: '/_authenticated/admin/staff/'
       path: '/'
@@ -1506,6 +1526,7 @@ const AuthenticatedAdminBestellungRouteWithChildren =
 
 interface AuthenticatedAdminEinstellungenRouteChildren {
   AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute: typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute
+  AuthenticatedAdminEinstellungenVeranstaltungenRoute: typeof AuthenticatedAdminEinstellungenVeranstaltungenRoute
   AuthenticatedAdminEinstellungenIndexRoute: typeof AuthenticatedAdminEinstellungenIndexRoute
 }
 
@@ -1513,6 +1534,8 @@ const AuthenticatedAdminEinstellungenRouteChildren: AuthenticatedAdminEinstellun
   {
     AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute:
       AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute,
+    AuthenticatedAdminEinstellungenVeranstaltungenRoute:
+      AuthenticatedAdminEinstellungenVeranstaltungenRoute,
     AuthenticatedAdminEinstellungenIndexRoute:
       AuthenticatedAdminEinstellungenIndexRoute,
   }

@@ -451,6 +451,22 @@ function StatistikPage() {
           }
         : undefined;
 
+    // STAT3f — kumulierter 5-Jahres-Vergleich (Jan…M) aus DERSELBEN MB1-Matrix;
+    // die Klemmung auf M−1 im laufenden Monat übernimmt `ytdByYear`.
+    const ytdCompare =
+      calendarMonth && matrix
+        ? ytdByYear(
+            monthlySeriesIds.flatMap((id) => {
+              const series = matrix.series.find((s) => s.locationId === id);
+              return series ? [{ name: series.locationName, cells: series.cells }] : [];
+            }),
+            focusYear,
+            focusMonthNo,
+            format(new Date(), "yyyy-MM"),
+            5,
+          )
+        : undefined;
+
     const data: StatistikPdfData = {
       monthLabel,
       scopeLabel,

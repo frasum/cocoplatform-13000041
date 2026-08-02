@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { weatherSymbol, type LucideIconName } from "@/lib/weather/weather-symbol";
 import { shiftIsoDate } from "@/lib/weather/weather-core";
+import { firstColumnLabel, weekdayShort } from "@/lib/weather/weather-labels";
 import type { WeatherRangeRow } from "@/lib/weather/weather.functions";
 
 const ICONS: Record<LucideIconName, LucideIcon> = {
@@ -33,22 +34,6 @@ const ICONS: Record<LucideIconName, LucideIcon> = {
   CloudLightning,
   HelpCircle,
 };
-
-const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
-
-function weekdayShort(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const idx = new Date(Date.UTC(y ?? 1970, (m ?? 1) - 1, d ?? 1, 12, 0, 0)).getUTCDay();
-  return WEEKDAYS[idx] ?? "—";
-}
-
-/**
- * EV1-R4: „Heute" nur, wenn der gewählte Geschäftstag der echte aktuelle ist;
- * sonst das Wochentagskürzel wie in den übrigen Spalten.
- */
-export function firstColumnLabel(selectedIso: string, actualTodayIso: string): string {
-  return selectedIso === actualTodayIso ? "Heute" : weekdayShort(selectedIso);
-}
 
 function temps(row: WeatherRangeRow): string {
   if (row.tempMaxC === null && row.tempMinC === null) return "—";

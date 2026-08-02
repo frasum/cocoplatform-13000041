@@ -371,11 +371,12 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     const at = (part: string) => texts.findIndex((t) => t.includes(part));
     const order = [
       at("Standort-Vergleich"),
-      at("Trinkgeld"),
       at("Take-Away-Kanäle"),
       at("Tagesumsatz"),
       at("13-Monats-Verlauf"),
       at("kumuliert im"),
+      // STAT3i — Wertezeilen stehen hinter der letzten Grafik.
+      at("Trinkgeld"),
     ];
     for (const i of order) expect(i).toBeGreaterThanOrEqual(0);
     expect([...order].sort((a, b) => a - b)).toEqual(order);

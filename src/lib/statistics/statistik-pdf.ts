@@ -479,127 +479,32 @@ export async function generateStatistikPdf(
       },
       theme: "grid",
     });
-    cursorY = lastY(doc) + 12;
+    cursorY = lastY(doc) + BLOCK_GAP;
   }
 
-  // STAT3c/3f — EINE Farbzuordnung und EINE Legenden-Funktion für alle Grafiken:
-  // erst die Monatsreihen (Grafik B), dann die Standorte der Tagesbalken.
-  // Gleicher Standort ⇒ gleiche Farbe in jeder Grafik.
-  const seriesColorIndex = new Map<string, number>();
-  const registerSeries = (name: string) => {
-    if (!seriesColorIndex.has(name)) seriesColorIndex.set(name, seriesColorIndex.size);
-  };
-  (data.monthly?.series ?? []).forEach((s) => registerSeries(s.name));
-  // Standortnamen der Tagesbalken in Reihenfolge des ersten Auftretens.
-  const stackNames: string[] = [];
-  for (const day of data.dailyRevenue) {
-    for (const entry of day.byLocation ?? []) {
-      if (!stackNames.includes(entry.name)) stackNames.push(entry.name);
-    }
-  }
-  stackNames.forEach(registerSeries);
-  (data.ytdCompare?.series ?? []).forEach((s) => registerSeries(s.name));
-  const colorOf = (name: string): [number, number, number] =>
-    SERIES_PALETTE[(seriesColorIndex.get(name) ?? 0) % SERIES_PALETTE.length]!;
-  /**
-   * STAT3e — Legende rechtsbündig auf der Titelzeile: erst Breite messen, dann
-   * am rechten Rand beginnen. So klebt sie nie an der Abschnittsüberschrift.
-   */
-  const drawLegend = (
-    names: string[],
-    y: number,
-    marker: (x: number, y: number, color: [number, number, number]) => void,
-  ) => {
-    doc.setFontSize(6.5);
-    doc.setFont("helvetica", "normal");
-    const widths = names.map((n) => doc.getTextWidth(n));
-    let total = 0;
-    for (const w of widths) total += w + 16;
-    let x = marginX + usable - total + 4;
-    names.forEach((name, i) => {
-      const c = colorOf(name);
-      marker(x, y, c);
-      doc.setTextColor(60);
-      doc.text(name, x + 6, y + 3);
-      x += 16 + (widths[i] ?? 0);
-    });
-    doc.setTextColor(20);
-  };
-
-  // ── STAT3f — Jan–M kumuliert im 5-Jahres-Vergleich (ersetzt die TG-Matrix) ─
-  const ytd = data.ytdCompare;
-  const ytdIncomplete: number[] = ytd?.incompleteYears ?? [];
-  if (ytd) {
-    const heading =
-      ytd.throughMonth > 0
-        ? `Jan–${MONTH_NAMES_LONG[ytd.throughMonth - 1]} kumuliert im ${ytd.years.length}-Jahres-Vergleich`
-        : "Kumulierter Jahresvergleich";
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(heading, marginX, cursorY);
-    if (ytd.throughMonth === 0 || ytd.series.length === 0) {
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
-      doc.text(
-        "Entfällt: im laufenden Januar liegt noch kein abgeschlossener Monat vor.",
-        marginX,
-        cursorY + 13,
-      );
-      cursorY += 24;
-    } else {
-      drawLegend(
-        ytd.series.map((s) => s.name),
-        cursorY - 5,
-        (x, y, c) => {
-          doc.setFillColor(c[0], c[1], c[2]);
-          doc.rect(x, y, 4, 4, "F");
-        },
-      );
-      cursorY += 6;
-      const chartC: ChartArea = {
-        x: marginX + 42,
-        y: cursorY,
-        width: usable - 42,
-        height: 70,
-      };
-      const geoC = groupedBarChartGeometry(
-        ytd.years.map((year, i) => ({
-          label: String(year),
-          values: ytd.series.map((s) => s.values[i] ?? null),
-        })),
-        chartC,
-        { gapRatio: 0.3, tickCount: 4, seriesNames: ytd.series.map((s) => s.name) },
-      );
-      doc.setFontSize(6.5);
-      doc.setFont("helvetica", "normal");
-      for (const t of geoC.ticks) {
-        doc.setDrawColor(225);
-        doc.line(chartC.x, t.y, chartC.x + chartC.width, t.y);
-        doc.setTextColor(120);
-        doc.text(formatTsd(t.value), chartC.x - 4, t.y + 2, { align: "right" });
-      }
-      doc.setTextColor(20);
-      for (const group of geoC.groups) {
-        for (const bar of group.bars) {
-          if (bar.value === null) continue;
-          const c = colorOf(bar.name);
-          doc.setFillColor(c[0], c[1], c[2]);
-          if (bar.height > 0) doc.rect(bar.x, bar.y, bar.width, bar.height, "F");
-          // Wertelabel in T€ über dem Balken: die Entwicklung soll ablesbar sein.
-          doc.setFontSize(5.5);
-          doc.setTextColor(90);
-          doc.text(formatTsd(bar.value), bar.x + bar.width / 2, bar.y - 2, { align: "center" });
-          doc.setTextColor(20);
-        }
-        // Jahreszahl steht auch bei Lücken-Jahren unter der Achse.
-        doc.setFontSize(6.5);
-        doc.text(group.label, group.x + group.width / 2, chartC.y + chartC.height + 9, {
-          align: "center",
-        });
-      }
-      cursorY = chartC.y + chartC.height + 20;
-    }
-  }
+  // ── STAT3g — Trinkgeld-Zeile (ersetzt informell die entfernte TG-Matrix) ──
+  // Kopfzeilen-Stil wie bei den Take-Away-Kanälen: fette Blocküberschrift,
+  // daneben eine Wertezeile. Quoten kommen AUSSCHLIESSLICH aus `tipRatePct`
+  // (Trinkgeld ÷ Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der
+  // Standort-Tabelle, damit die Gesamt-Quote dort exakt wiederkehrt.
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Trinkgeld", marginX, cursorY);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  const houseForTips = data.revenue.houseCents;
+  const tipLine = doc.splitTextToSize(
+    `Service ${fmtEurRounded(data.tips.serviceCents)} (${fmtPctDe(
+      tipRatePct(data.tips.serviceCents, houseForTips),
+    )} vom Haus) · Küche ${fmtEurRounded(data.tips.kitchenCents)} (${fmtPctDe(
+      tipRatePct(data.tips.kitchenCents, houseForTips),
+    )}) · Gesamt ${fmtEurRounded(data.tips.totalCents)} (${fmtPctDe(
+      tipRatePct(data.tips.totalCents, houseForTips),
+    )})`,
+    usable - 90,
+  );
+  doc.text(tipLine, marginX + 90, cursorY);
+  cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
 
   // ── STAT3b — Take-Away-Kanäle (je Standort, Gesamt, Δ Vorperiode) ───────
   doc.setFontSize(10);

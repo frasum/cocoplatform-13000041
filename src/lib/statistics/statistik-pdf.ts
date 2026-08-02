@@ -537,58 +537,7 @@ export async function generateStatistikPdf(
     cursorY = lastY(doc) + BLOCK_GAP;
   }
 
-  // ── STAT3g — Trinkgeld-Zeile (ersetzt informell die entfernte TG-Matrix) ──
-  // Kopfzeilen-Stil wie bei den Take-Away-Kanälen: fette Blocküberschrift,
-  // daneben eine Wertezeile. Quoten kommen AUSSCHLIESSLICH aus `tipRatePct`
-  // (Trinkgeld ÷ Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der
-  // Standort-Tabelle, damit die Gesamt-Quote dort exakt wiederkehrt.
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld", marginX, cursorY);
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "normal");
-  const houseForTips = data.revenue.houseCents;
-  const tipLine = doc.splitTextToSize(
-    `Service ${fmtEurRounded(data.tips.serviceCents)} (${fmtPctDe(
-      tipRatePct(data.tips.serviceCents, houseForTips),
-    )} vom Haus) · Küche ${fmtEurRounded(data.tips.kitchenCents)} (${fmtPctDe(
-      tipRatePct(data.tips.kitchenCents, houseForTips),
-    )}) · Gesamt ${fmtEurRounded(data.tips.totalCents)} (${fmtPctDe(
-      tipRatePct(data.tips.totalCents, houseForTips),
-    )})`,
-    usable - 90,
-  );
-  doc.text(tipLine, marginX + 90, cursorY);
-  cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
-
-  // ── STAT3h — Ergebnis vor Steuern (Modell) ───────────────────────────────
-  // Einzeiler im Stil der Trinkgeld-Zeile. Der Betrag ist ein Bewertungswert,
-  // deshalb dieselbe Färbung wie Deltas (positiv grün, negativ rot).
   const preTax = data.preTaxModel;
-  if (preTax) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Ergebnis vor Steuern (Modell)", marginX, cursorY);
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
-    const amount = fmtEurRounded(preTax.resultCents);
-    const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
-    doc.setTextColor(tone[0], tone[1], tone[2]);
-    doc.setFont("helvetica", "bold");
-    doc.text(amount, marginX + 150, cursorY);
-    const amountWidth = doc.getTextWidth(amount);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(20);
-    const preTaxLine = doc.splitTextToSize(
-      `· Umsatz netto ${fmtEurRounded(preTax.netRevenueCents)} − Break-even ${fmtEurRounded(
-        preTax.breakEvenMonthCents,
-      )} netto, davon ${fmtPctDe(preTax.dbPct)} Deckungsbeitrag`,
-      usable - 150 - amountWidth - 8,
-    );
-    doc.text(preTaxLine, marginX + 150 + amountWidth + 8, cursorY);
-    cursorY += BLOCK_GAP + 8 * ((Array.isArray(preTaxLine) ? preTaxLine.length : 1) - 1);
-  }
-
   // ── STAT3b — Take-Away-Kanäle (je Standort, Gesamt, Δ Vorperiode) ───────
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");

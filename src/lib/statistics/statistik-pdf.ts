@@ -191,6 +191,43 @@ const MONTH_NAMES_LONG = [
   "Dezember",
 ];
 
+/**
+ * STAT3i — Nutzbreite einer A4-Seite in Punkt (595 − 2 × 36 Rand). Als Konstante
+ * exportiert, damit Tests die Breite einzeiliger Wertezeilen dagegen messen
+ * können, ohne jsPDF zu instanziieren.
+ */
+export const PDF_USABLE_WIDTH = 523;
+
+/** STAT3i — Überschrift der Modell-Ergebniszeile (Test- und Zeichen-Quelle). */
+export const PRE_TAX_HEADING = "Ergebnis vor Steuern (Modell)";
+
+/**
+ * STAT3i — Trinkgeld-Einzeiler als reiner Text (nur Formatierung, keine Logik).
+ * Quoten kommen ausschließlich aus `tipRatePct`.
+ */
+export function tipSummaryText(tips: StatistikPdfData["tips"], houseCents: number): string {
+  return `Service ${fmtEurRounded(tips.serviceCents)} (${fmtPctDe(
+    tipRatePct(tips.serviceCents, houseCents),
+  )} vom Haus) · Küche ${fmtEurRounded(tips.kitchenCents)} (${fmtPctDe(
+    tipRatePct(tips.kitchenCents, houseCents),
+  )}) · Gesamt ${fmtEurRounded(tips.totalCents)} (${fmtPctDe(
+    tipRatePct(tips.totalCents, houseCents),
+  )})`;
+}
+
+/**
+ * STAT3i — Text NACH dem gefärbten Betrag der Modell-Ergebniszeile.
+ *
+ * Bewusst nur WinAnsi-Zeichen: das typografische Minus (U+2212) hat jsPDF in
+ * einen Ersatzzeichen-/Sperrsatz-Modus gezwungen (siehe assertWinAnsiSafe im
+ * Test). Trenner ist derselbe Mittelpunkt wie in der Trinkgeld-Zeile.
+ */
+export function preTaxTailText(preTax: NonNullable<StatistikPdfData["preTaxModel"]>): string {
+  return `· netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
+    preTax.breakEvenMonthCents,
+  )} · DB-Quote ${fmtPctDe(preTax.dbPct)}`;
+}
+
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
 function fmtEurOrDash(cents: number | null | undefined): string {
   return cents === null || cents === undefined ? "—" : fmtEurRounded(cents);
@@ -495,58 +532,7 @@ export async function generateStatistikPdf(
     cursorY = lastY(doc) + BLOCK_GAP;
   }
 
-  // ── STAT3g — Trinkgeld-Zeile (ersetzt informell die entfernte TG-Matrix) ──
-  // Kopfzeilen-Stil wie bei den Take-Away-Kanälen: fette Blocküberschrift,
-  // daneben eine Wertezeile. Quoten kommen AUSSCHLIESSLICH aus `tipRatePct`
-  // (Trinkgeld ÷ Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der
-  // Standort-Tabelle, damit die Gesamt-Quote dort exakt wiederkehrt.
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld", marginX, cursorY);
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "normal");
-  const houseForTips = data.revenue.houseCents;
-  const tipLine = doc.splitTextToSize(
-    `Service ${fmtEurRounded(data.tips.serviceCents)} (${fmtPctDe(
-      tipRatePct(data.tips.serviceCents, houseForTips),
-    )} vom Haus) · Küche ${fmtEurRounded(data.tips.kitchenCents)} (${fmtPctDe(
-      tipRatePct(data.tips.kitchenCents, houseForTips),
-    )}) · Gesamt ${fmtEurRounded(data.tips.totalCents)} (${fmtPctDe(
-      tipRatePct(data.tips.totalCents, houseForTips),
-    )})`,
-    usable - 90,
-  );
-  doc.text(tipLine, marginX + 90, cursorY);
-  cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
-
-  // ── STAT3h — Ergebnis vor Steuern (Modell) ───────────────────────────────
-  // Einzeiler im Stil der Trinkgeld-Zeile. Der Betrag ist ein Bewertungswert,
-  // deshalb dieselbe Färbung wie Deltas (positiv grün, negativ rot).
   const preTax = data.preTaxModel;
-  if (preTax) {
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Ergebnis vor Steuern (Modell)", marginX, cursorY);
-    doc.setFontSize(7.5);
-    doc.setFont("helvetica", "normal");
-    const amount = fmtEurRounded(preTax.resultCents);
-    const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
-    doc.setTextColor(tone[0], tone[1], tone[2]);
-    doc.setFont("helvetica", "bold");
-    doc.text(amount, marginX + 150, cursorY);
-    const amountWidth = doc.getTextWidth(amount);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(20);
-    const preTaxLine = doc.splitTextToSize(
-      `· Umsatz netto ${fmtEurRounded(preTax.netRevenueCents)} − Break-even ${fmtEurRounded(
-        preTax.breakEvenMonthCents,
-      )} netto, davon ${fmtPctDe(preTax.dbPct)} Deckungsbeitrag`,
-      usable - 150 - amountWidth - 8,
-    );
-    doc.text(preTaxLine, marginX + 150 + amountWidth + 8, cursorY);
-    cursorY += BLOCK_GAP + 8 * ((Array.isArray(preTaxLine) ? preTaxLine.length : 1) - 1);
-  }
-
   // ── STAT3b — Take-Away-Kanäle (je Standort, Gesamt, Δ Vorperiode) ───────
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
@@ -733,15 +719,8 @@ export async function generateStatistikPdf(
       }
       doc.setLineWidth(0.5);
     });
-    // Legende rechtsbündig in der Titelzeile (siehe drawLegend).
-    drawLegend(
-      geo.series.map((s) => s.name),
-      chartB.y - 9,
-      (x, y, color) => {
-        doc.setFillColor(color[0], color[1], color[2]);
-        doc.circle(x + 2, y + 2, 1.8, "F");
-      },
-    );
+    // STAT3i — keine zweite Legende: die Farbzuordnung steht EINMAL am
+    // Tagesumsatz und gilt (gleicher Standort ⇒ gleiche Farbe) für alle Grafiken.
     doc.setDrawColor(200);
     doc.setFontSize(5.5);
     doc.setTextColor(90);
@@ -776,14 +755,7 @@ export async function generateStatistikPdf(
       );
       cursorY += 8 + BLOCK_GAP;
     } else {
-      drawLegend(
-        ytd.series.map((s) => s.name),
-        cursorY - 5,
-        (x, y, c) => {
-          doc.setFillColor(c[0], c[1], c[2]);
-          doc.rect(x, y, 4, 4, "F");
-        },
-      );
+      // STAT3i — Legende nur am Tagesumsatz (siehe Grafik A).
       cursorY += 6;
       const chartC: ChartArea = {
         x: marginX + axisW,
@@ -797,7 +769,9 @@ export async function generateStatistikPdf(
           values: ytd.series.map((s) => s.values[i] ?? null),
         })),
         chartC,
-        { gapRatio: 0.3, tickCount: 4, seriesNames: ytd.series.map((s) => s.name) },
+        // STAT3i — dichteres Tick-Ziel: der oberste Rasterwert liegt damit
+        // näher über dem Datenmaximum (weniger Luft über den Balken).
+        { gapRatio: 0.3, tickCount: 5, seriesNames: ytd.series.map((s) => s.name) },
       );
       doc.setFontSize(6.5);
       doc.setFont("helvetica", "normal");
@@ -830,6 +804,44 @@ export async function generateStatistikPdf(
       }
       cursorY = chartC.y + chartC.height + 4 + BLOCK_GAP;
     }
+  }
+
+  // ── STAT3i — Wertezeilen ans Ende: erst die Grafiken, dann die Einzeiler ──
+  // Trinkgeld-Quoten kommen AUSSCHLIESSLICH aus `tipRatePct` (Trinkgeld ÷
+  // Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der Standort-Tabelle.
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Trinkgeld", marginX, cursorY);
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  const tipLine = doc.splitTextToSize(
+    tipSummaryText(data.tips, data.revenue.houseCents),
+    usable - 90,
+  );
+  doc.text(tipLine, marginX + 90, cursorY);
+  cursorY += BLOCK_GAP + 8 * ((Array.isArray(tipLine) ? tipLine.length : 1) - 1);
+
+  // ── STAT3h/3i — Ergebnis vor Steuern (Modell) ────────────────────────────
+  // Der Betrag ist ein Bewertungswert, deshalb dieselbe Färbung wie Deltas.
+  // Nach dem gefärbten Betrag werden Font UND Textfarbe explizit zurückgesetzt.
+  if (preTax) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(PRE_TAX_HEADING, marginX, cursorY);
+    const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
+    doc.setFontSize(7.5);
+    const amount = fmtEurRounded(preTax.resultCents);
+    const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(tone[0], tone[1], tone[2]);
+    const amountX = marginX + headingWidth + 10;
+    doc.text(amount, amountX, cursorY);
+    const amountWidth = doc.getTextWidth(amount);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(20);
+    const tailX = amountX + amountWidth + 6;
+    doc.text(preTaxTailText(preTax), tailX, cursorY);
+    cursorY += BLOCK_GAP;
   }
 
   // ── Fußnoten ────────────────────────────────────────────────────────────

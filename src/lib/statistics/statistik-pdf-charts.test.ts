@@ -151,6 +151,12 @@ describe("formatTsd", () => {
     expect(formatTsd(1_234_567_00)).toBe("1.235 T€");
     expect(formatTsd(0)).toBe("0 T€");
   });
+
+  // STAT3g — Balkenlabels tragen keine Einheit, die Achse tut es.
+  it("formatTsdPlain liefert denselben Wert ohne Einheit", () => {
+    expect(formatTsdPlain(1_234_567_00)).toBe("1.235");
+    expect(formatTsdPlain(0)).toBe("0");
+  });
 });
 
 // STAT3e — Achsenwerte auf rundem Raster; Baseline nur bei echtem Abstand zur 0.
@@ -375,5 +381,20 @@ describe("groupedBarChartGeometry", () => {
     const g = groupedBarChartGeometry([], area);
     expect(g.groups).toEqual([]);
     expect(g.max).toBe(0);
+  });
+
+  // STAT3g — blockierend: kein Balken ragt über den obersten Tick hinaus.
+  it("oberster Tick liegt über dem Datenmaximum", () => {
+    const g = groupedBarChartGeometry(
+      [
+        { label: "a", values: [1_171] },
+        { label: "b", values: [640] },
+      ],
+      area,
+      { tickCount: 4 },
+    );
+    expect(topTick(g.ticks)).toBeGreaterThanOrEqual(1_171);
+    for (const grp of g.groups)
+      for (const b of grp.bars) expect(b.y).toBeGreaterThanOrEqual(area.y - 1e-9);
   });
 });

@@ -534,7 +534,8 @@ export async function generateStatistikPdf(
     doc.setFontSize(6.5);
     doc.setFont("helvetica", "normal");
     const widths = names.map((n) => doc.getTextWidth(n));
-    const total = widths.reduce((a, w) => a + w + 16, 0);
+    let total = 0;
+    for (const w of widths) total += w + 16;
     let x = marginX + usable - total + 4;
     names.forEach((name, i) => {
       const c = colorOf(name);

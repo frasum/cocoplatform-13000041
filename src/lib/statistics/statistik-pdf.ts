@@ -16,6 +16,7 @@ import { tipRatePct } from "./revenue-core";
 import {
   barChartGeometry,
   formatTsd,
+  formatTsdPlain,
   groupedBarChartGeometry,
   lineChartGeometry,
   stackedBarChartGeometry,

@@ -13,7 +13,7 @@ import { Lock, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { todayIso } from "@/lib/format";
+import { defaultCashBusinessDate } from "@/lib/cash/cash-today";
 import { KassePageSkeleton } from "@/components/ui/page-skeletons";
 import {
   Dialog,
@@ -140,7 +140,10 @@ function KassePage() {
   const isAdmin = identity.role === "admin";
   const qc = useQueryClient();
 
-  const [businessDate, setBusinessDate] = useState<string>(search.businessDate ?? todayIso());
+  // Geschäftstag mit 3-Uhr-Cut — nach Mitternacht gehört der Abend noch zum Vortag.
+  const [businessDate, setBusinessDate] = useState<string>(
+    search.businessDate ?? defaultCashBusinessDate(new Date()),
+  );
   const [locationId, setLocationId] = useState<string>(search.locationId ?? "");
 
   const fetchOverview = useServerFn(getCashOverview);

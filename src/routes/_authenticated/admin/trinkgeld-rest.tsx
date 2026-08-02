@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getTipRemainderByPeriod } from "@/lib/cash/cash.functions";
+import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { listLocations } from "@/lib/admin/locations.functions";
 import { LocationPills } from "@/components/shared/LocationPills";
 import { formatShortDate } from "@/lib/format-date";
@@ -98,7 +99,8 @@ function TipRemainderPage() {
   const fetchLocations = useServerFn(listLocations);
   const fetchRemainder = useServerFn(getTipRemainderByPeriod);
 
-  const now = useMemo(() => new Date(), []);
+  // Monatsnavigation folgt dem Geschäftstag (3-Uhr-Cut), nicht dem Kalendertag.
+  const now = useMemo(() => cashBusinessMonthAnchor(new Date()), []);
   const months = useMemo(() => buildMonthOptions(now), [now]);
   const [monthKey, setMonthKey] = useState<string>(months[0].key);
   const [locationId, setLocationId] = useState<string | null>(null);

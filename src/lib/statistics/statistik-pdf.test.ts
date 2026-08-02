@@ -9,6 +9,7 @@
 
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
+import { assertWinAnsiSafe, estimateHelveticaWidth } from "@/test/win-ansi";
 import {
   aggregateByBusinessDate,
   summarize,
@@ -25,6 +26,10 @@ import {
   fmtPctDe,
   generateStatistikPdf,
   pdfChannelLabel,
+  preTaxTailText,
+  tipSummaryText,
+  PDF_USABLE_WIDTH,
+  PRE_TAX_HEADING,
   type StatistikPdfData,
 } from "./statistik-pdf";
 
@@ -403,8 +408,35 @@ describe("statistik-pdf — Standort-Vergleich (STAT3)", () => {
     );
     expect(texts.some((t) => t.includes("Ergebnis vor Steuern (Modell)"))).toBe(true);
     expect(texts.some((t) => t === fmtEurRounded(1_093_210))).toBe(true);
-    expect(texts.some((t) => t.includes("davon 70,0 % Deckungsbeitrag"))).toBe(true);
+    expect(texts.some((t) => t.includes("DB-Quote 70,0 %"))).toBe(true);
     expect(texts.some((t) => t.includes("Modellrechnung"))).toBe(true);
+  });
+
+  it("STAT3i: beide Einzeiler sind WinAnsi-fähig und passen in die Nutzbreite", () => {
+    // Große, realistische Werte: die Zeile muss AUCH dann einzeilig passen.
+    const preTax = {
+      resultCents: 109_321_000,
+      netRevenueCents: 296_455_000,
+      breakEvenMonthCents: 280_835_000,
+      dbPct: 70,
+    };
+    const tail = preTaxTailText(preTax);
+    const tip = tipSummaryText(
+      { serviceCents: 3_000_00, kitchenCents: 1_000_00, totalCents: 4_000_00 },
+      100_000_00,
+    );
+    assertWinAnsiSafe(tail, "Ergebnis-Zeile");
+    assertWinAnsiSafe(tip, "Trinkgeld-Zeile");
+    assertWinAnsiSafe(PRE_TAX_HEADING, "Ergebnis-Überschrift");
+
+    // Breite der Ergebnis-Zeile: Überschrift (10 pt) + Betrag + Rest (7,5 pt).
+    const width =
+      estimateHelveticaWidth(PRE_TAX_HEADING, 10) +
+      10 +
+      estimateHelveticaWidth(fmtEurRounded(preTax.resultCents), 7.5) +
+      6 +
+      estimateHelveticaWidth(tail, 7.5);
+    expect(width).toBeLessThanOrEqual(PDF_USABLE_WIDTH);
   });
 
   it("freier Zeitraum: Δ-Spalten neutral, kein Monatsverlauf", async () => {

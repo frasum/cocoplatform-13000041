@@ -14,7 +14,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { makeAuditWriter } from "@/lib/admin/audit";
 import { businessDateOf } from "@/lib/business-date";
-import { eventNotices, shiftIsoDay, type EventNotice } from "./event-notices";
+import { eventNotices, shiftIsoDay } from "./event-notices";
+import { schoolHolidayNotices, type TodayNotices } from "./school-holiday-notices";
 import {
   EVENT_IMPACTS,
   detectTermChanges,

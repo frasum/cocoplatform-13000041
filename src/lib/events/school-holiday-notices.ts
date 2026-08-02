@@ -6,12 +6,18 @@
 //   - beginnt morgen ⇒ "holiday_tomorrow"
 // Ferien haben KEINE Lohn-/SFN-Wirkung; sie sind Dauerkontext, keine Impact-Stufe.
 
-import { shiftIsoDay } from "./event-notices";
+import { shiftIsoDay, type EventNotice } from "./event-notices";
 import {
   schoolHolidayOn,
   type SchoolHolidayPeriod,
   type SchoolHolidayRegion,
 } from "@/lib/time/school-holidays";
+
+/** Eine Antwort für die Kassen-Kopfzeile: Events zuerst, Ferien als Dauerkontext. */
+export type TodayNotices = {
+  events: EventNotice[];
+  schoolHolidays: SchoolHolidayNotice[];
+};
 
 export type SchoolHolidayNotice =
   | { kind: "holiday_tomorrow"; name: string }

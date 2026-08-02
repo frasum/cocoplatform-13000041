@@ -451,3 +451,50 @@ describe("statistik-pdf — gerundete Beträge (STAT3d)", () => {
     expect(row.some((c) => /\d,\d{2}\s*€/.test(c))).toBe(false);
   });
 });
+
+// STAT3e — Vorzeichen ⇒ Farbe an EINER Stelle; Bestandswerte bleiben neutral.
+describe("statistik-pdf — Delta-Färbung und Labels (STAT3e)", () => {
+  const NEUTRAL: [number, number, number] = [20, 20, 20];
+
+  it("färbt anhand der echten Ausgabe der PDF-Formatierer", () => {
+    const up = deltaTone(fmtDeltaPctDe(12.05));
+    const down = deltaTone(fmtDeltaPctDe(-12.05));
+    expect(up).not.toEqual(NEUTRAL);
+    expect(down).not.toEqual(NEUTRAL);
+    expect(up).not.toEqual(down);
+    // Gedeckte, druckfeste Töne (kein Signalgrün/-rot).
+    expect(Math.max(...up)).toBeLessThan(160);
+    expect(Math.max(...down)).toBeLessThan(180);
+  });
+
+  it("erkennt das typografische Minus der Bildschirm-Formatierer", () => {
+    // ppTrendLabel & Co. setzen U+2212 statt ASCII — beide müssen rot werden.
+    expect(deltaTone(`\u2212${fmtPctDe(12.1)}`)).toEqual(deltaTone(fmtDeltaPctDe(-12.1)));
+  });
+
+  it("neutrale Werte behalten die Standardfarbe", () => {
+    expect(deltaTone(fmtDeltaPctDe(0))).toEqual(NEUTRAL);
+    expect(deltaTone(fmtDeltaPctDe(null))).toEqual(NEUTRAL);
+    // Bestandswerte (Quoten, Beträge) werden nie eingefärbt.
+    expect(deltaTone(fmtPctDe(8.9))).toEqual(NEUTRAL);
+    expect(deltaTone(fmtEurRounded(34_477_418))).toEqual(NEUTRAL);
+    expect(deltaTone(undefined)).toEqual(NEUTRAL);
+  });
+
+  it("Kanalname wird nur im PDF gekürzt", () => {
+    expect(pdfChannelLabel("Takeaway direkt (Telefon/Abholung)")).toBe("Direkt (Tel./Abholung)");
+    expect(pdfChannelLabel("Wolt")).toBe("Wolt");
+  });
+
+  it("Spaltenkopf der Personalquote ist eindeutig benannt", async () => {
+    captured.length = 0;
+    texts.length = 0;
+    await generateStatistikPdf(baseData({}));
+    const heads = captured.flatMap((t) =>
+      (t.head ?? []).map((r) => r.map((c) => (typeof c === "string" ? c : c.content))),
+    );
+    const locationHead = heads.find((h) => h[0] === "Standort");
+    expect(locationHead).toContain("Pers.-Quote");
+    expect(locationHead).not.toContain("Quote");
+  });
+});

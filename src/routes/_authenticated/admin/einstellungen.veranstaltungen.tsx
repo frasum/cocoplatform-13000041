@@ -290,9 +290,7 @@ function VeranstaltungenPage() {
           <Button
             variant="outline"
             disabled={rows.length === 0}
-            onClick={() =>
-              downloadBlob(eventsCsvBlob(rows), `veranstaltungen_${todayIso()}.csv`)
-            }
+            onClick={() => downloadBlob(eventsCsvBlob(rows), `veranstaltungen_${todayIso()}.csv`)}
           >
             CSV
           </Button>

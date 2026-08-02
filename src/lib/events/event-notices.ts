@@ -33,7 +33,8 @@ function dayValue(iso: string): number {
   return Date.UTC(y, (m ?? 1) - 1, d ?? 1, 12, 0, 0);
 }
 
-function addDays(iso: string, days: number): string {
+/** Verschiebt einen ISO-Tag um `days` Tage (rein, DST-neutral). */
+export function shiftIsoDay(iso: string, days: number): string {
   const shifted = new Date(dayValue(iso) + days * DAY_MS);
   const pad = (n: number) => (n < 10 ? `0${n}` : String(n));
   return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
@@ -44,7 +45,7 @@ function diffDays(fromIso: string, toIso: string): number {
 }
 
 export function eventNotices(events: readonly EventRow[], todayISO: string): EventNotice[] {
-  const tomorrow = addDays(todayISO, 1);
+  const tomorrow = shiftIsoDay(todayISO, 1);
   const notices: { notice: EventNotice; dateFrom: string }[] = [];
 
   for (const ev of events) {

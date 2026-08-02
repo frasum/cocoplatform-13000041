@@ -85,7 +85,9 @@ export function WeatherWidget({
                 {i === 0 ? "Heute" : weekdayShort(iso)}
               </span>
               <Icon className="h-4 w-4 text-foreground" aria-label={sym.label} />
-              <span className="text-xs leading-tight text-foreground">{row ? temps(row) : "—"}</span>
+              <span className="text-xs leading-tight text-foreground">
+                {row ? temps(row) : "—"}
+              </span>
               {mm && <span className="text-[10px] leading-tight text-muted-foreground">{mm}</span>}
             </div>
           );

@@ -299,6 +299,15 @@ export function estimatedPreTaxResultCents(
   return Math.round(be.db * (netRevenue - be.netMonthCents));
 }
 
+/** STAT3l — Modell-Ergebnis als Quote vom BRUTTO-Gesamtumsatz des Monats
+ *  (bewusst brutto: kassennah und konservativ; das Label im Banner macht den
+ *  Bezug eindeutig). Rundung passiert erst im Format, hier bleibt der rohe
+ *  Prozentwert. `null` bei Bruttoumsatz <= 0. */
+export function preTaxMarginPct(resultCents: number, grossRevenueCents: number): number | null {
+  if (!(grossRevenueCents > 0)) return null;
+  return (resultCents / grossRevenueCents) * 100;
+}
+
 /** Findet zu einem ISO-Monat (YYYY-MM-01) den Vorjahresmonat im Bestand. */
 export function findYoy<T extends { month: string }>(rows: T[], month: string): T | undefined {
   const y = Number(month.slice(0, 4));

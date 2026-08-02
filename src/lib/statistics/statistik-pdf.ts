@@ -11,6 +11,7 @@
 
 import type jsPDF from "jspdf";
 import { fmtCents, parseIso } from "@/lib/format";
+import { preTaxMarginPct } from "@/lib/bwa/bwa-analytics";
 import { growthPct } from "./monthly-core";
 import { tipRatePct } from "./revenue-core";
 import {
@@ -261,6 +262,20 @@ export function preTaxChainText(preTax: NonNullable<StatistikPdfData["preTaxMode
   return `netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
     preTax.breakEvenMonthCents,
   )} · DB-Quote ${fmtPctDe(preTax.dbPct)}`;
+}
+
+/**
+ * STAT3l — Klammerteil hinter dem Betrag der Banner-Zeile 1: Marge des
+ * Modell-Ergebnisses am BRUTTO-Gesamtumsatz des Berichtsmonats.
+ *
+ * Vorzeichen bewusst als ASCII-Bindestrich (WinAnsi-Falle, siehe
+ * `src/test/win-ansi.ts`). `null` (Bruttoumsatz <= 0) ⇒ leerer String, der
+ * Klammerteil entfällt dann ersatzlos.
+ */
+export function preTaxMarginText(pct: number | null): string {
+  if (pct === null || !Number.isFinite(pct)) return "";
+  const sign = pct < 0 ? "-" : "";
+  return `(${sign}${fmtPctDe(Math.abs(pct))} vom Bruttoumsatz)`;
 }
 
 /** Nenner 0 ⇒ „—" (kein 0-Fake im PDF). */
@@ -908,13 +923,20 @@ export async function generateStatistikPdf(
 
     const amount = fmtEurRounded(preTax.resultCents);
     const tone = deltaTone(preTax.resultCents < 0 ? `-${amount}` : `+${amount}`);
+    // STAT3l — Marge am Bruttoumsatz: gleiche Bewertung wie der Betrag, deshalb
+    // dieselbe `tone`-Färbung, nur kleiner gesetzt.
+    const marginText = preTaxMarginText(
+      preTaxMarginPct(preTax.resultCents, data.revenue.totalCents),
+    );
     // Zeile 1 mittig: Überschrift + deutlich größerer, gefärbter Betrag.
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     const headingWidth = doc.getTextWidth(PRE_TAX_HEADING);
     doc.setFontSize(13.5);
     const amountWidth = doc.getTextWidth(amount);
-    const lineWidth = headingWidth + 10 + amountWidth;
+    doc.setFontSize(8);
+    const marginWidth = marginText === "" ? 0 : 6 + doc.getTextWidth(marginText);
+    const lineWidth = headingWidth + 10 + amountWidth + marginWidth;
     const startX = centerX - lineWidth / 2;
     const baseline1 = cursorY + 18;
     doc.setFontSize(8);
@@ -923,6 +945,10 @@ export async function generateStatistikPdf(
     doc.setFontSize(13.5);
     doc.setTextColor(tone[0], tone[1], tone[2]);
     doc.text(amount, startX + headingWidth + 10, baseline1);
+    if (marginText !== "") {
+      doc.setFontSize(8);
+      doc.text(marginText, startX + headingWidth + 10 + amountWidth + 6, baseline1);
+    }
     doc.setFont("helvetica", "normal");
     doc.setTextColor(20);
 

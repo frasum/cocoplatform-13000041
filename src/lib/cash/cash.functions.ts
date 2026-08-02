@@ -1244,6 +1244,8 @@ export async function getOrCreateOpenSessionCore(
   return runGuarded(caller.role, "manager", makeAuditWriter(caller), async () => {
     const businessDate = data.businessDate ?? (await getCurrentBusinessDate());
     await assertLocationInOrg(caller.organizationId, data.locationId);
+    // LS1: keine Kassen-Session an reinen Planungs-Standorten.
+    await assertLocationCashEnabled(caller.organizationId, data.locationId);
     const outcome = await ensureOpenSessionRaw({
       organizationId: caller.organizationId,
       locationId: data.locationId,

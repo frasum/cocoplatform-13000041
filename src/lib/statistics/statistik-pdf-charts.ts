@@ -67,13 +67,23 @@ function minOf(values: readonly (number | null | undefined)[]): number {
   return min ?? 0;
 }
 
-/** Schrittweite im 1/2/5×10^n-Raster, mindestens so groß wie `raw`. */
-function niceStep(raw: number): number {
+/**
+ * Schrittweite im Rasterset ×10^n, mindestens so groß wie `raw`.
+ *
+ * Standard ist 1/2/5 (klassisches Achsenraster). STAT3j erlaubt zusätzlich
+ * 1/2/2.5/5 (`fine`): dadurch existiert überhaupt ein 250er-Raster, das bei
+ * Maximum 1.171 T€ mit 1.250 abschließt statt mit 1.500 (500er-Raster).
+ */
+const COARSE_MANTISSAS = [1, 2, 5, 10] as const;
+const FINE_MANTISSAS = [1, 2, 2.5, 5, 10] as const;
+
+function niceStep(raw: number, fine = false): number {
   if (!Number.isFinite(raw) || raw <= 0) return 1;
   const exp = Math.floor(Math.log10(raw));
   const pow = 10 ** exp;
   const f = raw / pow;
-  const m = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+  const mantissas = fine ? FINE_MANTISSAS : COARSE_MANTISSAS;
+  const m = mantissas.find((c) => f <= c) ?? 10;
   return m * pow;
 }
 
@@ -94,7 +104,12 @@ export type NiceTicks = {
  * unter dem Datenminimum — ausgenommen der flache Fall: liegt das Minimum unter
  * 20 % des Maximums, bleibt die 0-Basis (kein Schnitt für nichts).
  */
-export function niceTicks(min: number, max: number, targetCount = 4): NiceTicks {
+export function niceTicks(
+  min: number,
+  max: number,
+  targetCount = 4,
+  opts?: { fineSteps?: boolean },
+): NiceTicks {
   const hi = Number.isFinite(max) && max > 0 ? max : 0;
   if (hi <= 0) return { baseline: 0, top: 0, step: 1, values: [0] };
   let lo = Number.isFinite(min) && min > 0 ? Math.min(min, hi) : 0;
@@ -102,7 +117,7 @@ export function niceTicks(min: number, max: number, targetCount = 4): NiceTicks 
   if (lo < hi * 0.2) lo = 0;
   const n = Math.max(2, Math.trunc(targetCount));
   const span = hi - lo > 0 ? hi - lo : hi;
-  const step = niceStep(span / n);
+  const step = niceStep(span / n, opts?.fineSteps === true);
   const baseline = Math.max(0, Math.floor(lo / step) * step);
   const top = Math.ceil(hi / step) * step;
   const values: number[] = [];

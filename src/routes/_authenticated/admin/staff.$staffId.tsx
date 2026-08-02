@@ -7,6 +7,7 @@ import {
   setStaffActive,
   setStaffParticipatesInPool,
   setStaffPersoNr,
+  setStaffRosterPlannable,
   updateStaffBasics,
 } from "@/lib/admin/staff.functions";
 import { clearPin, setPin } from "@/lib/admin/pin.functions";
@@ -138,7 +139,12 @@ function StaffDetailPage() {
       {tab === "basics" && (
         <div className="space-y-4">
           {isAdmin && <SofortmeldungBanner staffId={s.id} />}
-          <BasicsTab staff={s} showPool={!isPayroll} canEditPersoNr={isAdmin || isPayroll} />
+          <BasicsTab
+            staff={s}
+            showPool={!isPayroll}
+            canEditPersoNr={isAdmin || isPayroll}
+            canEditPlannable={isAdmin}
+          />
         </div>
       )}
       {tab === "personal" && showPersonal && (
@@ -162,6 +168,7 @@ function BasicsTab({
   staff,
   showPool,
   canEditPersoNr,
+  canEditPlannable,
 }: {
   staff: {
     id: string;
@@ -172,14 +179,17 @@ function BasicsTab({
     phone: string | null;
     persoNr: number | null;
     participatesInPool: boolean;
+    rosterPlannable: boolean;
   };
   showPool: boolean;
   canEditPersoNr: boolean;
+  canEditPlannable: boolean;
 }) {
   const queryClient = useQueryClient();
   const callUpdate = useServerFn(updateStaffBasics);
   const callSetPool = useServerFn(setStaffParticipatesInPool);
   const callSetPersoNr = useServerFn(setStaffPersoNr);
+  const callSetPlannable = useServerFn(setStaffRosterPlannable);
   const [form, setForm] = useState({
     firstName: staff.firstName,
     lastName: staff.lastName,
@@ -193,6 +203,7 @@ function BasicsTab({
   const [persoNrMsg, setPersoNrMsg] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [poolMsg, setPoolMsg] = useState<string | null>(null);
+  const [plannableMsg, setPlannableMsg] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -231,6 +242,18 @@ function BasicsTab({
       await queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
     },
     onError: (e: unknown) => setPersoNrMsg(e instanceof Error ? e.message : "Fehler."),
+  });
+
+  // RS1 — Merkmal „im Dienstplan planbar".
+  const plannableMutation = useMutation({
+    mutationFn: (plannable: boolean) =>
+      callSetPlannable({ data: { staffId: staff.id, plannable } }),
+    onSuccess: async () => {
+      setPlannableMsg("Gespeichert.");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "staff"] });
+      await queryClient.invalidateQueries({ queryKey: ["roster"] });
+    },
+    onError: (e: unknown) => setPlannableMsg(e instanceof Error ? e.message : "Fehler."),
   });
 
   return (
@@ -348,6 +371,30 @@ function BasicsTab({
             </span>
           </label>
           {poolMsg && <p className="text-xs text-muted-foreground">{poolMsg}</p>}
+        </div>
+      )}
+      {canEditPlannable && (
+        <div className="mt-4 space-y-2 border-t border-border pt-4">
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={staff.rosterPlannable}
+              disabled={plannableMutation.isPending}
+              onChange={(e) => {
+                setPlannableMsg(null);
+                plannableMutation.mutate(e.target.checked);
+              }}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="text-foreground">Im Dienstplan planbar</span>
+              <span className="block text-xs text-muted-foreground">
+                Aus: für Kräfte mit festen Arbeitszeiten — erscheinen nicht in der Planung;
+                Zeiterfassung und Lohn laufen normal.
+              </span>
+            </span>
+          </label>
+          {plannableMsg && <p className="text-xs text-muted-foreground">{plannableMsg}</p>}
         </div>
       )}
     </form>

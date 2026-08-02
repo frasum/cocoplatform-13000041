@@ -207,16 +207,6 @@ describe("computeBreakEven", () => {
   });
 });
 
-describe("sumRows / findYoy / findPrevMonth", () => {
-  it("sumRows summiert alle Cent-Felder", () => {
-    const a = row({ umsatzCents: 100, personalCents: 40 });
-    const b = row({ umsatzCents: 200, personalCents: 60 });
-    const s = sumRows([a, b]);
-    expect(s.umsatzCents).toBe(300);
-    expect(s.personalCents).toBe(100);
-  });
-});
-
 describe("estimatedPreTaxResultCents (STAT3h)", () => {
   const be = (o: Partial<BreakEven>): BreakEven => ({
     v: 0.3,
@@ -259,8 +249,8 @@ describe("estimatedPreTaxResultCents (STAT3h)", () => {
   });
 });
 
-describe("sumRows Zusatz", () => {
-  it("sumRows summiert alle Cent-Felder (Wiederholung entfällt)", () => {
+describe("sumRows / findYoy / findPrevMonth", () => {
+  it("sumRows summiert alle Cent-Felder", () => {
     const a = row({ umsatzCents: 100, personalCents: 40 });
     const b = row({ umsatzCents: 200, personalCents: 60 });
     const s = sumRows([a, b]);

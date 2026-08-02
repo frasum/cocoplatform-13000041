@@ -155,6 +155,13 @@ const SERIES_PALETTE: Array<[number, number, number]> = [
   [90, 140, 100],
 ];
 
+/**
+ * STAT3g — EIN vertikaler Abstand zwischen Blockende und nächster Überschrift.
+ * Vorher standen hier gestreute Werte (10/12/18/20), wodurch einzelne
+ * Überschriften an der vorigen Tabelle klebten.
+ */
+const BLOCK_GAP = 16;
+
 /** STAT3f — Monatsnamen für die Überschrift „Jan–Juli kumuliert …". */
 const MONTH_NAMES_LONG = [
   "Januar",

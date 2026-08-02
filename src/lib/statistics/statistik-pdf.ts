@@ -202,6 +202,31 @@ export const PDF_USABLE_WIDTH = 523;
 export const PRE_TAX_HEADING = "Ergebnis vor Steuern (Modell)";
 
 /**
+ * STAT3j — Marker der drei PERMANENTEN, stellengebundenen Fußnoten.
+ *
+ * Der Fußnotenblock fährt bewusst ZWEI Konventionen, und das ist keine
+ * Inkonsistenz zum Aufräumen:
+ * - hochgestellte Ziffern (¹ ² ³) für die drei dauerhaft vorhandenen Hinweise,
+ *   die einer konkreten Stelle im Dokument zugeordnet sind (Lohnbasis,
+ *   Kanal-Vergleichsbasis, TG-Quoten-Basis),
+ * - `*` für KONDITIONALE Hinweise, die nur bei Datenlage erscheinen
+ *   (fehlender Stundenlohn u. Ä.) — eine Nummer dafür würde die Nummerierung
+ *   je Bericht verschieben.
+ *
+ * Bei ³ ist ZWINGEND Schluss: ¹ ² ³ sind U+00B9/U+00B2/U+00B3 und damit in
+ * WinAnsi enthalten, ⁴ wäre U+2074 — außerhalb WinAnsi. Genau solche Zeichen
+ * zwingen die jsPDF-Standardschrift in den Ersatzzeichen-/Sperrsatz-Modus
+ * (Fehlerbild: „U m s a t z …" hinter dem Zeichen, siehe STAT3i und
+ * `src/test/win-ansi.ts`). Wer hier eine vierte Ziffer ergänzt oder auf ein
+ * „einheitliches" System umstellt, läuft in dieselbe Falle.
+ */
+export const FOOTNOTE_MARKS = {
+  labor: "\u00b9",
+  channel: "\u00b2",
+  tipRate: "\u00b3",
+} as const;
+
+/**
  * STAT3i — Trinkgeld-Einzeiler als reiner Text (nur Formatierung, keine Logik).
  * Quoten kommen ausschließlich aus `tipRatePct`.
  */
@@ -223,7 +248,15 @@ export function tipSummaryText(tips: StatistikPdfData["tips"], houseCents: numbe
  * Test). Trenner ist derselbe Mittelpunkt wie in der Trinkgeld-Zeile.
  */
 export function preTaxTailText(preTax: NonNullable<StatistikPdfData["preTaxModel"]>): string {
-  return `· netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
+  return `· ${preTaxChainText(preTax)}`;
+}
+
+/**
+ * STAT3j — Rechenkette der Banner-Zeile 2 (ohne führenden Trenner, weil sie
+ * mittig unter der Überschrift steht). Gleiche Werte und Formate wie bisher.
+ */
+export function preTaxChainText(preTax: NonNullable<StatistikPdfData["preTaxModel"]>): string {
+  return `netto ${fmtEurRounded(preTax.netRevenueCents)} - BE ${fmtEurRounded(
     preTax.breakEvenMonthCents,
   )} · DB-Quote ${fmtPctDe(preTax.dbPct)}`;
 }

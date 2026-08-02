@@ -242,7 +242,6 @@ export function computeBreakEven(rows: BwaRow[]): BreakEven | null {
   };
 }
 
-/** Findet zu einem ISO-Monat (YYYY-MM-01) den Vorjahresmonat im Bestand. */
 /** STAT3h — Modell-Ergebnis vor Steuern für einen Monat:
  *  `db × (grossRevenueCents / factor − netMonthCents)`.
  *
@@ -261,6 +260,7 @@ export function estimatedPreTaxResultCents(
   return Math.round(be.db * (netRevenue - be.netMonthCents));
 }
 
+/** Findet zu einem ISO-Monat (YYYY-MM-01) den Vorjahresmonat im Bestand. */
 export function findYoy<T extends { month: string }>(rows: T[], month: string): T | undefined {
   const y = Number(month.slice(0, 4));
   const prevMonth = `${y - 1}${month.slice(4)}`;

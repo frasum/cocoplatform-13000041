@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§129: WX1-b Härtung; Backfill-Chunking; EV1-R3/WX2 Kassen-Kopfzeile mit Wetter-Widget)
+Stand: 02.08.2026 (§130: KA1 — Kassen-UI auf 3-Uhr-Geschäftstag; Tages-Schlussstand)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -4864,3 +4864,13 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 **Produktions-Vollzug R3/WX2:** `weather_code`-Migration **belegt**; Re-Backfill + Sync **ausstehend** (unbestätigt).
 
 **Offene Merkposten:** wie §128, MINUS WX1-Vollzug (erledigt/belegt), PLUS: R3/WX2-Vollzug bestätigen (Re-Backfill + Sync) · EV1-Sichtprüfung REST: staff-Gegenprobe + Testevent „Test Späte Veranstaltung“ löschen (admin-Sicht ist belegt, Screenshot 02.08. 14:06).
+
+## §130 — KA1: Kassen-UI folgt dem 3-Uhr-Geschäftstag (02.08., nachmittags)
+
+**Abnahme-Anker:** HEAD `55530025` — vier Gates grün (tsc 0 · eslint 0 · prettier clean · vitest 2338, 0 Skips; 2332 + 6).
+
+**Bauherren-Befund:** Session-Öffnung nach Mitternacht sprang auf den Folgetag. **Prüfer-Analyse:** Der 3-Uhr-Geschäftstag existierte bereits ÜBERALL serverseitig (SQL `current_business_date`, `businessDateOf`; die Zeiterfassung nutzte ihn korrekt — Nacht-Stempelungen waren nie falsch). Nur die Kassen-UI wählte ihr Vorauswahl-Datum über nacktes `todayIso()` (Kalendertag).
+
+**KA1 (`55530025`):** Neues Modul `cash-today.ts` — `defaultCashBusinessDate(now)` (Geschäftstag mit 3-Uhr-Cut) für die Vorauswahl der Tagesabrechnung und `cashBusinessMonthAnchor(now)` für die Monatsnavigation der Kassen-Listen (Randfall: am Monatsersten um 01:00 zeigt die Liste noch den Vormonat — dort liegt der laufende Geschäftstag). Umgestellt: `kasse.tsx`, `kasse-saldo.tsx`, `trinkgeld-rest.tsx`; das WeatherWidget-„Heute“ folgt dem `businessDate` der Seite. NICHT angefasst: `DateSelector`-Generik, Dienstplan-/Urlaubs-Defaults (Kalendertag dort richtig), SFN-/Lohnpfade (rechnen auf echte Uhrzeiten). Tests: 23:59 ⇒ heute · 00:30/02:59 ⇒ Vortag · 03:00 ⇒ heute · Monatsanker-Randfälle. Kellner-Abrechnungen nach Mitternacht hängen an der Session und folgen damit automatisch dem korrekten Geschäftstag.
+
+**Tages-Schlussstand 02.08.:** Anker-Kette des Tages `ac451209` → `a9e850a5` → `0427ad99` → `921717b7` → `80bfade5` → `5d5f118c` → `cd4ca486` → `55530025`. Geliefert: Statistik-PDF-Feinschliff komplett (inkl. BWA-USt-Fund), EV1 Event-Hinweise komplett, WX1/WX2 Wetterdaten + Kassen-Kopfzeile, KA1 Geschäftstags-Fix. Offene Rest-Handgriffe des Bauherrn: `weather_code`-Re-Backfill + Sync (Fragezeichen im Widget verschwinden dann) · Testevent „Test Späte Veranstaltung“ löschen · staff-Gegenprobe an der Kasse. Kritischer Pfad unverändert: **August-Export** (bis 25.08., mit Prüfer-Sichtkontrolle) → **CODE-AUDIT-1** → **PG-Serie**.

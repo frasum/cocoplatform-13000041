@@ -182,6 +182,34 @@ function fmtCount(n: number | null | undefined): string {
   return n === null || n === undefined ? "—" : n.toLocaleString("de-DE");
 }
 
+/**
+ * STAT3e — EINE Stelle entscheidet Vorzeichen ⇒ Farbe. Gedeckte, druckfeste
+ * Töne: die Zahl mit Vorzeichen trägt allein, die Farbe ist nur Blickführung.
+ * Neutrale Werte („—", „±0,0 %") behalten die Standardfarbe.
+ *
+ * Erkennt beide Minus-Varianten (ASCII "-" und typografisches U+2212), weil die
+ * PDF-Formatierer ASCII nutzen, die Bildschirm-Formatierer aber U+2212.
+ */
+const DELTA_UP: [number, number, number] = [35, 105, 65];
+const DELTA_DOWN: [number, number, number] = [150, 45, 45];
+const DELTA_NEUTRAL: [number, number, number] = [20, 20, 20];
+
+export function deltaTone(text: string | null | undefined): [number, number, number] {
+  const first = (text ?? "").trim().charAt(0);
+  if (first === "+") return DELTA_UP;
+  if (first === "-" || first === "\u2212") return DELTA_DOWN;
+  return DELTA_NEUTRAL;
+}
+
+/** STAT3e — Kanalnamen im PDF kürzen (Tabellenbreite); Datenmodell unberührt. */
+const PDF_CHANNEL_LABELS: Record<string, string> = {
+  "Takeaway direkt (Telefon/Abholung)": "Direkt (Tel./Abholung)",
+};
+
+export function pdfChannelLabel(name: string): string {
+  return PDF_CHANNEL_LABELS[name] ?? name;
+}
+
 /** Delta gegen eine Basis; ohne Basis oder außerhalb des Monatsmodus „—". */
 function deltaLabel(
   currentCents: number,

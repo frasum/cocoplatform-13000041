@@ -144,11 +144,17 @@ export type Axis = {
  * hinaus und wirkten abgeschnitten. Die untere Kappung (`baseline`, nur Linien)
  * bleibt unberührt.
  */
-function axisFor(dataMax: number, area: ChartArea, tickCount: number, baseline = 0): Axis {
+function axisFor(
+  dataMax: number,
+  area: ChartArea,
+  tickCount: number,
+  baseline = 0,
+  opts?: { fineSteps?: boolean },
+): Axis {
   if (dataMax <= 0) {
     return { baseline: 0, top: 0, ticks: [{ value: 0, y: area.y + area.height }] };
   }
-  const nice = niceTicks(baseline, dataMax, tickCount);
+  const nice = niceTicks(baseline, dataMax, tickCount, opts);
   const top = Math.max(nice.top, dataMax);
   const span = top - nice.baseline;
   const values = nice.values.length > 0 ? nice.values : [nice.baseline];

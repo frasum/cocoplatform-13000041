@@ -14,6 +14,7 @@ import {
   CloudSun,
   HelpCircle,
   Sun,
+  Cloudy,
   type LucideIcon,
 } from "lucide-react";
 import { weatherSymbol, type LucideIconName } from "@/lib/weather/weather-symbol";
@@ -62,12 +63,13 @@ export function WeatherWidget({
   const days = [0, 1, 2, 3].map((offset) => shiftIsoDate(today, offset));
   const byDate = new Map(rows.map((r) => [r.businessDate, r]));
   return (
-    <Card className="h-full space-y-1 p-2.5">
+    <Card className="h-full space-y-1 overflow-hidden rounded-l-none border-l-4 border-amber-200 border-l-amber-500 bg-amber-50/80 p-2.5 dark:border-amber-900 dark:border-l-amber-500 dark:bg-amber-950/30">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 dark:text-amber-100">
+          <Cloudy className="h-3 w-3" />
           Wetter
         </span>
-        <span className="text-[10px] text-muted-foreground">Open-Meteo</span>
+        <span className="text-[10px] text-amber-900/60 dark:text-amber-100/60">Open-Meteo</span>
       </div>
       <div className="grid grid-cols-4 gap-1">
         {days.map((iso, i) => {
@@ -81,14 +83,18 @@ export function WeatherWidget({
               className="flex flex-col items-center gap-0.5 text-center"
               title={row ? sym.label : "kein Sync-Datenstand"}
             >
-              <span className="text-[10px] font-medium text-muted-foreground">
+              <span className="text-[10px] font-medium text-amber-900/70 dark:text-amber-100/70">
                 {i === 0 ? "Heute" : weekdayShort(iso)}
               </span>
-              <Icon className="h-4 w-4 text-foreground" aria-label={sym.label} />
-              <span className="text-xs leading-tight text-foreground">
+              <Icon className="h-4 w-4 text-amber-900 dark:text-amber-100" aria-label={sym.label} />
+              <span className="text-xs leading-tight text-amber-950 dark:text-amber-50">
                 {row ? temps(row) : "—"}
               </span>
-              {mm && <span className="text-[10px] leading-tight text-muted-foreground">{mm}</span>}
+              {mm && (
+                <span className="text-[10px] leading-tight text-amber-900/70 dark:text-amber-100/70">
+                  {mm}
+                </span>
+              )}
             </div>
           );
         })}

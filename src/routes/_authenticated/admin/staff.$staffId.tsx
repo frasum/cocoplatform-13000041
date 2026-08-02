@@ -67,6 +67,8 @@ function StaffDetailPage() {
   const [tab, setTab] = useState<Tab>("basics");
   const { identity } = useRouteContext({ from: "/_authenticated/admin" });
   const showPersonal = identity.role === "admin" || identity.role === "payroll";
+  // ZT1 — Stammdaten (Basics) nur admin & payroll.
+  const canSeeStammdaten = identity.role === "admin" || identity.role === "payroll";
   const canEditPersonal = identity.role === "admin";
   const canEditVacation = identity.role === "admin" || identity.role === "payroll";
   const isAdmin = identity.role === "admin";

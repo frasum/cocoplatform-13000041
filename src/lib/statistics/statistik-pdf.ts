@@ -11,6 +11,7 @@
 
 import type jsPDF from "jspdf";
 import { fmtCents, parseIso } from "@/lib/format";
+import { preTaxMarginPct } from "@/lib/bwa/bwa-analytics";
 import { growthPct } from "./monthly-core";
 import { tipRatePct } from "./revenue-core";
 import {

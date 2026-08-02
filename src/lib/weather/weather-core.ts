@@ -5,6 +5,8 @@
 // Zweck dieser Runde: Daten SAMMELN. Keine Auswertung, kein Chart, keine
 // Prognose-Logik (das ist PG1/PG2).
 
+import { z } from "zod";
+
 /**
  * München Zentrum. SaaS-Erweiterungspunkt: analog holiday_region wird das
  * später je Organisation konfigurierbar (Spalte in organization_settings);
@@ -132,11 +134,49 @@ export function mayOverwrite(
 
 export type DateRangeCheck = { ok: true } | { ok: false; message: string };
 
+/**
+ * Untere Plausibilitätsgrenze für den Backfill. Das Open-Meteo-Archiv reicht
+ * bis 1940 zurück, für COCO gibt es vor 2000 aber keinen Anwendungsfall —
+ * die Grenze fängt Tippfehler im nativen Datepicker ab (zweistellige
+ * Jahreseingabe „25" ⇒ 0025-01-01). Bei N2-Bedarf hier anpassbar.
+ */
+export const WEATHER_BACKFILL_MIN = "2000-01-01";
+
 /** Bereichs-Validierung für backfillWeather: from <= to, to <= heute. */
 export function validateRange(from: string, to: string, today: string): DateRangeCheck {
   if (from > to) return { ok: false, message: "Von-Datum darf nicht nach dem Bis-Datum liegen." };
   if (to > today) return { ok: false, message: "Bis-Datum darf nicht in der Zukunft liegen." };
   return { ok: true };
+}
+
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum im Format YYYY-MM-DD erwartet");
+
+/**
+ * Eingabe-Schema des Backfills. Die Untergrenze steckt hier (nicht erst in der
+ * UI), damit der Server die letzte Instanz bleibt.
+ */
+export const backfillInputSchema = z.object({
+  from: isoDate.refine((v) => v >= WEATHER_BACKFILL_MIN, {
+    message: `Von-Datum muss am oder nach dem ${WEATHER_BACKFILL_MIN} liegen (Plausibilitätsgrenze).`,
+  }),
+  to: isoDate,
+});
+
+/**
+ * Technische Fehler des Wetterdienstes in einen verständlichen Satz übersetzen.
+ * Der Status bleibt als Detail sichtbar, führt die Meldung aber nicht mehr an.
+ */
+export function friendlyWeatherError(message: string): string {
+  const http = /HTTP (\d{3})/.exec(message);
+  if (!http) return message;
+  const status = http[1];
+  if (status === "400") {
+    return `Wetterdienst hat die Anfrage abgelehnt — bitte Datumsbereich prüfen (Details: HTTP 400).`;
+  }
+  if (status === "429") {
+    return "Wetterdienst ist derzeit überlastet — bitte später erneut versuchen (Details: HTTP 429).";
+  }
+  return `Wetterdienst ist nicht erreichbar — bitte später erneut versuchen (Details: HTTP ${status}).`;
 }
 
 /** Verschiebt ein ISO-Datum um `days` Tage (UTC-Mittag vermeidet DST-Sprünge). */

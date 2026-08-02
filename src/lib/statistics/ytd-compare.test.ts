@@ -18,10 +18,7 @@ function cells(year: number, months: number, cents: number, partial = false): Mo
 
 const spicery: YtdSeriesInput = {
   name: "spicery",
-  cells: [
-    ...cells(2025, 12, 100),
-    ...cells(2026, 8, 200),
-  ],
+  cells: [...cells(2025, 12, 100), ...cells(2026, 8, 200)],
 };
 
 describe("ytdByYear", () => {

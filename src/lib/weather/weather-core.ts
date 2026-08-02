@@ -24,6 +24,7 @@ const DAILY_FIELDS = [
   "temperature_2m_min",
   "precipitation_sum",
   "sunshine_duration",
+  "weather_code",
 ] as const;
 
 export type WeatherSource = "forecast" | "archive";
@@ -34,6 +35,8 @@ export type WeatherDayRow = {
   tempMinC: number | null;
   precipitationMm: number | null;
   sunshineHours: number | null;
+  /** WX2 — WMO-Code (Open-Meteo daily weather_code); null = kein Datenstand. */
+  weatherCode: number | null;
   source: WeatherSource;
 };
 
@@ -44,6 +47,7 @@ export type OpenMeteoDaily = {
     temperature_2m_min?: unknown;
     precipitation_sum?: unknown;
     sunshine_duration?: unknown;
+    weather_code?: unknown;
   };
 };
 
@@ -84,6 +88,12 @@ function at(arr: unknown, i: number): unknown {
   return Array.isArray(arr) ? arr[i] : undefined;
 }
 
+/** WMO-Code als Ganzzahl oder null (kein Raten bei fehlendem Wert). */
+function intOrNull(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.round(value);
+}
+
 /**
  * Open-Meteo-Antwort → weather_days-Zeilen.
  *
@@ -104,6 +114,7 @@ export function mapOpenMeteoDaily(json: OpenMeteoDaily, source: WeatherSource): 
       tempMinC: numOrNull(at(json.daily?.temperature_2m_min, i), 1),
       precipitationMm: numOrNull(at(json.daily?.precipitation_sum, i), 1),
       sunshineHours: sunshineSecondsToHours(at(json.daily?.sunshine_duration, i)),
+      weatherCode: intOrNull(at(json.daily?.weather_code, i)),
       source,
     };
     const empty =

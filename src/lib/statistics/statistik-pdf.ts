@@ -344,7 +344,7 @@ export async function generateStatistikPdf(
     doc.setTextColor(20);
   });
 
-  let cursorY = boxY + boxH + 18;
+  let cursorY = boxY + boxH + BLOCK_GAP;
 
   // STAT3c/3f/3g — EINE Farbzuordnung und EINE Legenden-Funktion für alle
   // Grafiken: erst die Monatsreihen (Grafik B), dann die Standorte der
@@ -401,7 +401,7 @@ export async function generateStatistikPdf(
     doc.setFont("helvetica", "italic");
     doc.setFontSize(8);
     doc.text("Keine Standorte vorhanden.", marginX, cursorY + 13);
-    cursorY += 24;
+    cursorY += 8 + BLOCK_GAP;
   } else {
     const body = data.comparison.map((c) => [
       c.locationName,
@@ -554,12 +554,11 @@ export async function generateStatistikPdf(
     },
     theme: "grid",
   });
-  cursorY = lastY(doc) + 10;
+  cursorY = lastY(doc) + BLOCK_GAP;
   if (tw.warning) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
-    doc.text(tw.warning, marginX, cursorY);
-    cursorY += 10;
+    doc.text(tw.warning, marginX, cursorY - BLOCK_GAP + 10);
   }
 
   // ── Grafik A — Tagesumsatz-Balken ───────────────────────────────────────
@@ -585,7 +584,7 @@ export async function generateStatistikPdf(
     doc.setFontSize(8);
     doc.setFont("helvetica", "italic");
     doc.text("Keine Umsätze im gewählten Zeitraum.", marginX, cursorY + 12);
-    cursorY += 24;
+    cursorY += 8 + BLOCK_GAP;
   } else {
     const stackedGeo = stacked
       ? stackedBarChartGeometry(

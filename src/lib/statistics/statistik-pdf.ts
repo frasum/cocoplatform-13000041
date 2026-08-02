@@ -383,7 +383,7 @@ export async function generateStatistikPdf(
       title: "Personalquote",
       value: fmtPctDe(data.personnel.ratioPct),
       lead: fmtEurRounded(data.personnel.laborCostCents),
-      leadLabel: "Basis-Lohnkosten",
+      leadLabel: `Basis-Lohnkosten${FOOTNOTE_MARKS.labor}`,
       // STAT3b: kein Umsatzwert in der Lohnkosten-Kachel (missverständlich).
       // Der Takeaway-Gesamtwert steht in der Kopfzeile des Takeaway-Blocks.
       foot: "Basis-Brutto ohne AG-SV/SFN",
@@ -540,8 +540,8 @@ export async function generateStatistikPdf(
           "vs. Vorjahr",
           "vs. Vormonat",
           "Trinkgeld ges.",
-          "TG-Quote",
-          "Pers.-Quote",
+          `TG-Quote${FOOTNOTE_MARKS.tipRate}`,
+          `Pers.-Quote${FOOTNOTE_MARKS.labor}`,
           "Netto-Std.",
           "€ / Gast",
           "€ / Std.",
@@ -597,7 +597,15 @@ export async function generateStatistikPdf(
     columnStyles: {
       0: { cellWidth: 116, halign: "left", fontStyle: "bold" },
     },
-    head: [["Kanal", ...tw.locationNames, "Gesamt", "Anteil", "vs. Vorperiode"]],
+    head: [
+      [
+        "Kanal",
+        ...tw.locationNames,
+        "Gesamt",
+        "Anteil",
+        `vs. Vorperiode${FOOTNOTE_MARKS.channel}`,
+      ],
+    ],
     body: twBody,
     didParseCell: (hook) => {
       if (hook.section === "body" && hook.row.index === twBody.length - 1) {
@@ -802,9 +810,15 @@ export async function generateStatistikPdf(
           values: ytd.series.map((s) => s.values[i] ?? null),
         })),
         chartC,
-        // STAT3i — dichteres Tick-Ziel: der oberste Rasterwert liegt damit
-        // näher über dem Datenmaximum (weniger Luft über den Balken).
-        { gapRatio: 0.3, tickCount: 5, seriesNames: ytd.series.map((s) => s.name) },
+        // STAT3j — dichteres Tick-Ziel PLUS feineres 1/2/2.5/5-Raster: der
+        // oberste Rasterwert liegt damit knapp über dem Datenmaximum
+        // (1.171 T€ ⇒ 1.250 statt 1.500), die Balken nutzen die Fläche.
+        {
+          gapRatio: 0.3,
+          tickCount: 5,
+          fineSteps: true,
+          seriesNames: ytd.series.map((s) => s.name),
+        },
       );
       doc.setFontSize(6.5);
       doc.setFont("helvetica", "normal");
@@ -844,7 +858,7 @@ export async function generateStatistikPdf(
   // Haus-Umsatz) — dieselbe Formel wie die TG-Quote-Spalte der Standort-Tabelle.
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("Trinkgeld", marginX, cursorY);
+  doc.text(`Trinkgeld${FOOTNOTE_MARKS.tipRate}`, marginX, cursorY);
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   const tipLine = doc.splitTextToSize(

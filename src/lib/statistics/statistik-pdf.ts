@@ -611,9 +611,9 @@ export async function generateStatistikPdf(
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
   const headLine = doc.splitTextToSize(
-    `Haus ${fmtEurRounded(data.revenue.houseCents)} · Takeaway ${fmtEurRounded(
-      data.revenue.takeawayCents,
-    )} (Anteil ${fmtPctDe(data.takeawaySharePct)})`,
+    `Takeaway ${fmtEurRounded(data.revenue.takeawayCents)} (${fmtPctDe(
+      data.takeawaySharePct,
+    )} vom Gesamtumsatz)`,
     usable - 90,
   );
   doc.text(headLine, marginX + 90, cursorY);

@@ -913,16 +913,20 @@ function EmptyChart() {
 
 type DailyRow = RevenueStats["daily"][number];
 
-function RevenueChart({ daily }: { daily: DailyRow[] }) {
-  const rows = fillDailyGaps(daily).map((d) => ({
-    day: d.businessDate.slice(8, 10),
-    fullDate: d.businessDate,
-    total: d.totalCents / 100,
-    card: (d.cardCents ?? 0) / 100,
-    takeaway: d.takeawayCents / 100,
-    totalCents: d.totalCents,
-    cardCents: d.cardCents ?? 0,
-    takeawayCents: d.takeawayCents,
+type ChartRange = { startDate: string; endDate: string };
+
+// STAT4a — Achse = volles Fenster, fehlende Tage sind LEER (null), damit die
+// Linien nach dem letzten echten Tag enden statt auf 0 zu stürzen.
+function RevenueChart({ daily, range }: { daily: DailyRow[]; range: ChartRange }) {
+  const rows = chartDaySlots(daily, range).map(({ day, businessDate, point }) => ({
+    day,
+    fullDate: businessDate,
+    total: point ? point.totalCents / 100 : null,
+    card: point ? (point.cardCents ?? 0) / 100 : null,
+    takeaway: point ? point.takeawayCents / 100 : null,
+    totalCents: point?.totalCents ?? null,
+    cardCents: point?.cardCents ?? null,
+    takeawayCents: point?.takeawayCents ?? null,
   }));
 
   return (
@@ -930,7 +934,7 @@ function RevenueChart({ daily }: { daily: DailyRow[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} interval={1} />
           <YAxis
             tickFormatter={(v: number) => `${Math.round(v).toLocaleString("de-DE")} €`}
             tickLine={false}
@@ -941,30 +945,34 @@ function RevenueChart({ daily }: { daily: DailyRow[] }) {
           <Tooltip content={<ChartTip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Area
-            type="monotone"
+            type="linear"
             dataKey="total"
             name="Tagesumsatz"
             fill="#2563eb"
             stroke="#2563eb"
             fillOpacity={0.18}
             strokeWidth={2}
+            dot={{ r: 2.5, strokeWidth: 0, fill: "#2563eb" }}
+            connectNulls={false}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="card"
             name="Kreditkarten"
             stroke="#f59e0b"
             strokeWidth={2}
             strokeDasharray="4 3"
-            dot={false}
+            dot={{ r: 2, strokeWidth: 0, fill: "#f59e0b" }}
+            connectNulls={false}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="takeaway"
             name="Takeaway"
             stroke="#16a34a"
             strokeWidth={2}
-            dot={false}
+            dot={{ r: 2, strokeWidth: 0, fill: "#16a34a" }}
+            connectNulls={false}
           />
         </ComposedChart>
       </ResponsiveContainer>

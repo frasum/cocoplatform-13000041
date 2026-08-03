@@ -247,7 +247,18 @@ function AdminLayout() {
   const systemGroups = visibleGroups.filter((g) => g.muted);
   const reviewCountsQ = useQuery({
     queryKey: ["admin", "review-pending-counts"],
-    queryFn: () => getReviewPendingCounts(),
+    // Badge-Zähler sind reine Deko: eine fehlende/abgelaufene Session (z. B.
+    // Hintergrund-Refetch nach Abmelden, „No authorization header provided")
+    // darf die Verwaltung nicht in den Error-Boundary kippen.
+    queryFn: async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session?.access_token) return null;
+      try {
+        return await getReviewPendingCounts();
+      } catch {
+        return null;
+      }
+    },
     // PL1 — planer/manager sehen die Badge-Zähler ebenfalls (server-seitig
     // auf ihren Scope gefiltert). staff-Antrags-/Dokumenten-Zähler bleiben
     // Admin-only (0 für andere Rollen).
@@ -255,6 +266,7 @@ function AdminLayout() {
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
     staleTime: 30_000,
+    retry: false,
   });
   const pendingReview =
     (reviewCountsQ.data?.pendingRequests ?? 0) + (reviewCountsQ.data?.pendingDocuments ?? 0);

@@ -1529,6 +1529,7 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
       area: Department | null;
       skill_id: string | null;
       shift_date: string;
+      status: string;
     };
     const rosterByLoc = new Map<string, RosterRow[]>();
     for (const lid of data.locationIds) rosterByLoc.set(lid, []);
@@ -1562,6 +1563,8 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
           startedAt: string;
           endedAt: string;
           breakMinutes: number;
+          notInPlan: boolean;
+          removable: boolean;
         }>;
         crossLocationDates: Record<string, string[]>;
         assignedStaff: Array<{
@@ -1579,6 +1582,36 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
       }
     > = {};
 
+    // ZS1 — Abrechnungsbezug je (staffId|businessDate) über alle Standorte
+    // der Batch-Abfrage; ein Query-Paar, kein N+1.
+    const settledKeys = new Set<string>();
+    {
+      const { data: sessionRows, error: sessErr } = await supabaseAdmin
+        .from("sessions")
+        .select("id, business_date")
+        .eq("organization_id", caller.organizationId)
+        .in("location_id", data.locationIds)
+        .gte("business_date", weekStart)
+        .lte("business_date", weekEnd);
+      if (sessErr) throw sessErr;
+      const dateBySession = new Map<string, string>(
+        (sessionRows ?? []).map((s) => [s.id as string, s.business_date as string]),
+      );
+      if (dateBySession.size > 0) {
+        const { data: setRows, error: setErr } = await supabaseAdmin
+          .from("waiter_settlements")
+          .select("staff_id, session_id")
+          .eq("organization_id", caller.organizationId)
+          .in("session_id", Array.from(dateBySession.keys()))
+          .neq("status", "superseded");
+        if (setErr) throw setErr;
+        for (const s of setRows ?? []) {
+          const iso = dateBySession.get(s.session_id as string);
+          if (iso) settledKeys.add(plannedKey(s.staff_id as string, iso));
+        }
+      }
+    }
+
     for (const lid of data.locationIds) {
       const locDeptRows = deptByLoc.get(lid) ?? [];
       const deptByStaff = buildPrimaryDeptMap(
@@ -1591,7 +1624,11 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
       const rosterByStaff: Record<string, { areas: Department[]; skillIds: string[] }> = {};
       const rosterAreaByStaffDate: Record<string, Record<string, Department>> = {};
       const rosterGlByStaffDate: Record<string, Record<string, boolean>> = {};
+      const plannedKeys = new Set<string>();
       for (const r of rosterByLoc.get(lid) ?? []) {
+        if (r.status === "planned" || r.status === "confirmed") {
+          plannedKeys.add(plannedKey(r.staff_id, r.shift_date));
+        }
         const bucket = rosterByStaff[r.staff_id] ?? { areas: [], skillIds: [] };
         if (r.area && !bucket.areas.includes(r.area)) bucket.areas.push(r.area);
         if (r.skill_id && !bucket.skillIds.includes(r.skill_id)) bucket.skillIds.push(r.skill_id);
@@ -1625,17 +1662,31 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
         })
         .filter((s) => s.isActive);
 
-      const entries = (entriesByLoc.get(lid) ?? []).map((r) => ({
-        id: r.id as string,
-        staffId: r.staff_id as string,
-        displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
-        department: deptByStaff.get(r.staff_id as string) ?? ("service" as const),
-        rawDepartment: (r.department as Department | null) ?? null,
-        businessDate: r.business_date as string,
-        startedAt: r.started_at as string,
-        endedAt: r.ended_at as string,
-        breakMinutes: Number((r as { break_minutes?: number | null }).break_minutes ?? 0),
-      }));
+      const entries = (entriesByLoc.get(lid) ?? []).map((r) => {
+        const staffId = r.staff_id as string;
+        const businessDate = r.business_date as string;
+        const key = plannedKey(staffId, businessDate);
+        const notInPlan = !plannedKeys.has(key);
+        return {
+          id: r.id as string,
+          staffId,
+          displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
+          department: deptByStaff.get(staffId) ?? ("service" as const),
+          rawDepartment: (r.department as Department | null) ?? null,
+          businessDate,
+          startedAt: r.started_at as string,
+          endedAt: r.ended_at as string,
+          breakMinutes: Number((r as { break_minutes?: number | null }).break_minutes ?? 0),
+          // ZS1 — gleiche Felder wie die Single-Location-Variante.
+          notInPlan,
+          removable:
+            notInPlan &&
+            isUntouched({
+              hasClockEntry: (r as { source?: string | null }).source === "clock",
+              hasSettlement: settledKeys.has(key),
+            }),
+        };
+      });
 
       // crossLocationDates wird im „Alle Standorte"-Mode client-seitig nicht
       // gemergt (nur die Single-Location-Variante braucht das für die

@@ -884,7 +884,7 @@ export async function computeSessionTipPoolCore(
   const servicePoolEnabled = settings.servicePoolEnabled ?? true;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-  const [settlementsRes, timeRes, manualRes] = await Promise.all([
+  const [settlementsRes, timeRes, manualRes, plannedRes] = await Promise.all([
     supabaseAdmin
       .from("waiter_settlements")
       .select(
@@ -895,20 +895,41 @@ export async function computeSessionTipPoolCore(
       .neq("status", "superseded"),
     supabaseAdmin
       .from("time_entries")
-      .select("staff_id, started_at, ended_at")
+      .select("staff_id, started_at, ended_at, source")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", session.location_id)
       .eq("business_date", session.business_date)
       .not("ended_at", "is", null),
     supabaseAdmin
       .from("session_tip_pool_entries")
-      .select("staff_id, department, hours_minutes, shift_start, shift_end, participates")
+      .select("staff_id, department, hours_minutes, shift_start, shift_end, participates, note")
       .eq("organization_id", caller.organizationId)
       .eq("session_id", session.id),
+    // ZS1 — Plan-Menge des Geschäftstags am Standort (planned/confirmed).
+    supabaseAdmin
+      .from("roster_shifts")
+      .select("staff_id")
+      .eq("organization_id", caller.organizationId)
+      .eq("location_id", session.location_id)
+      .eq("shift_date", session.business_date)
+      .in("status", ["planned", "confirmed"]),
   ]);
   if (settlementsRes.error) throw settlementsRes.error;
   if (timeRes.error) throw timeRes.error;
   if (manualRes.error) throw manualRes.error;
+  if (plannedRes.error) throw plannedRes.error;
+  const plannedStaffIds = new Set<string>(
+    (plannedRes.data ?? []).map((r) => r.staff_id as string),
+  );
+  // Gestempelte Ist-Zeit bzw. Abrechnungsbezug je Person (Unberührtheit).
+  const clockedStaffIds = new Set<string>(
+    (timeRes.data ?? [])
+      .filter((r) => (r as { source?: string | null }).source === "clock")
+      .map((r) => r.staff_id as string),
+  );
+  const settledStaffIds = new Set<string>(
+    (settlementsRes.data ?? []).map((r) => r.staff_id as string),
+  );
 
   const settlements = (settlementsRes.data ?? []).map((r) => ({
     staffId: r.staff_id,
@@ -927,6 +948,7 @@ export async function computeSessionTipPoolCore(
     shiftStart: r.shift_start as string | null,
     shiftEnd: r.shift_end as string | null,
     participates: (r as { participates: boolean | null }).participates ?? null,
+    note: (r as { note: string | null }).note ?? null,
   }));
   // GL-Zeilen NIE als „manuell" an die Verteilrechnung geben — die
   // Verteillogik schließt zwar gl bereits aus, aber `staffParticipates`

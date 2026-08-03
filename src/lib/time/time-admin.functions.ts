@@ -1993,6 +1993,85 @@ export const deleteTimeEntry = createServerFn({ method: "POST" })
     );
   });
 
+// ZS1 — Ein-Klick-Entfernen für Einträge, die NICHT MEHR im Dienstplan
+// stehen und UNBERÜHRT sind (kein Stempel, keine Abrechnung, keine Notiz).
+// Rollen- und Rechte-Anforderungen sind identisch zu deleteTimeEntry —
+// bewusst keinen Deut breiter. Die Anzeige entscheidet nicht: Plan-Abwesenheit
+// und Unberührtheit werden hier erneut geprüft.
+export const removeUnplannedTimeEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, [
+      "manager",
+      "admin",
+      "planer",
+    ]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: pre, error: preErr } = await supabaseAdmin
+      .from("time_entries")
+      .select("id, staff_id, location_id, business_date, source")
+      .eq("id", data.id)
+      .eq("organization_id", caller.organizationId)
+      .maybeSingle();
+    if (preErr) throw preErr;
+    if (!pre) throw new Error("Eintrag nicht gefunden.");
+    if (caller.role === "planer") {
+      if (!isInCurrentBillingCycle(pre.business_date, todayIso())) {
+        throw new Error("Planer dürfen nur Einträge der laufenden Abrechnungsperiode löschen.");
+      }
+    }
+    return runWithPermission(
+      context.supabase,
+      "time.entry.edit",
+      pre.location_id,
+      makeAuditWriter(caller),
+      async () => {
+        // 1. Plan-Abwesenheit serverseitig prüfen.
+        const { data: shifts, error: shiftErr } = await supabaseAdmin
+          .from("roster_shifts")
+          .select("staff_id, shift_date")
+          .eq("organization_id", caller.organizationId)
+          .eq("staff_id", pre.staff_id)
+          .eq("shift_date", pre.business_date)
+          .in("status", ["planned", "confirmed"]);
+        if (shiftErr) throw shiftErr;
+        const planned = new Set(
+          (shifts ?? []).map((s) => plannedKey(s.staff_id as string, s.shift_date as string)),
+        );
+        if (planned.has(plannedKey(pre.staff_id, pre.business_date))) {
+          throw new Error("Eintrag steht weiterhin im Dienstplan — kein Ein-Klick-Entfernen.");
+        }
+        // 2. Unberührtheit serverseitig prüfen.
+        const { data: settlements, error: setErr } = await supabaseAdmin
+          .from("waiter_settlements")
+          .select("id")
+          .eq("organization_id", caller.organizationId)
+          .eq("staff_id", pre.staff_id)
+          .eq("business_date", pre.business_date)
+          .neq("status", "superseded")
+          .limit(1);
+        if (setErr) throw setErr;
+        const untouched = isUntouched({
+          hasClockEntry: pre.source === "clock",
+          hasSettlement: (settlements ?? []).length > 0,
+        });
+        if (!untouched) {
+          throw new Error(
+            "Eintrag ist nicht unberührt (Stempel oder Abrechnung vorhanden) — bitte bewusst mit Begründung löschen.",
+          );
+        }
+        const { audit } = await _deleteTimeEntryCore(
+          supabaseAdmin,
+          caller.organizationId,
+          data.id,
+          "nicht mehr im Dienstplan (unberührt)",
+        );
+        return { result: { ok: true as const }, audit };
+      },
+    );
+  });
+
 // =========================================================================
 // B7 — Periodenverwaltung (26.–25.)
 // =========================================================================

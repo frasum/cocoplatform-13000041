@@ -195,6 +195,16 @@ function KassePage() {
     queryFn: () => fetchChannels({ data: { locationId } }),
     enabled: locationId !== "",
   });
+  // CH1: Mapping-Katalog — ORG-WEIT (alle Standorte, aktiv+inaktiv). Ohne
+  // Standort-Parameter gibt es kein Lade-Race mehr: ein Kanal eines anderen
+  // Standorts ist nie mehr „unbekannt". Nur für die kind-Auflösung; die
+  // ANZEIGE-Listen bleiben standortgefiltert (`channelsQ`).
+  const mappingChannelsQ = useQuery({
+    queryKey: ["cash", "channels", "mapping-all"],
+    queryFn: () => fetchChannels({ data: {} }),
+  });
+  const mappingChannels = mappingChannelsQ.data ?? [];
+  const mappingLoaded = mappingChannelsQ.data != null;
   const terminalsQ = useQuery({
     queryKey: ["cash", "terminals", locationId],
     queryFn: () => fetchTerminals({ data: { locationId } }),

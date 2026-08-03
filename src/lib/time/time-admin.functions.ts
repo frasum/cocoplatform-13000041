@@ -183,6 +183,7 @@ export type TimeEntryWeeklyRow = {
   ended_at: string;
   business_date: string;
   department: Department | null;
+  source: string;
   staff: { display_name: string } | null;
 };
 
@@ -197,7 +198,7 @@ export async function _loadTimeEntriesForWeeklyBatch(
     supabaseAdmin
       .from("time_entries")
       .select(
-        "id, location_id, staff_id, started_at, ended_at, business_date, department, staff(display_name)",
+        "id, location_id, staff_id, started_at, ended_at, business_date, department, source, staff(display_name)",
       )
       .eq("organization_id", organizationId)
       .in("location_id", locationIds)
@@ -214,6 +215,7 @@ type WeeklyRosterRow = {
   area: Department | null;
   skill_id: string | null;
   shift_date: string;
+  status: string;
 };
 
 export async function _loadRosterShiftsForWeeklyBatch(
@@ -226,7 +228,7 @@ export async function _loadRosterShiftsForWeeklyBatch(
   return selectAllPaged<WeeklyRosterRow>(() =>
     supabaseAdmin
       .from("roster_shifts")
-      .select("location_id, staff_id, area, skill_id, shift_date")
+      .select("location_id, staff_id, area, skill_id, shift_date, status")
       .eq("organization_id", organizationId)
       .in("location_id", locationIds)
       .gte("shift_date", weekStart)

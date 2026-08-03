@@ -1,77 +1,126 @@
 // Excel-Export für die tägliche Bargeldübersicht.
 // Spiegelt das Muster aus src/lib/time/weekly-export.ts (exceljs, bereits Dep).
+//
+// EX2 (03.08.) — Struktur folgt der Bankeinzahlungs-Vorlage
+// („bankeinzahlung 0726.xls"): EINE Arbeitsmappe, ein Blatt je Standort,
+// Zeile 1 Standortname, Zeile 2 Kopfzeilen, letzte Zeile „summe" mit echten
+// Excel-SUM-Formeln. Bewusste Abweichung von der Vorlage: „offene rechnungen"
+// statt des Vorlagen-Tippfehlers „offene rechnunge".
 
-import { formatShortDate } from "@/lib/format-date";
 import type { CashDailyRow } from "@/lib/cash/cash.functions";
 
-export async function buildBargeldXlsx(rows: CashDailyRow[], monthLabel: string): Promise<Blob> {
+export type BargeldSheet = { locationName: string; rows: CashDailyRow[] };
+
+const HEADERS = [
+  "datum",
+  "tagesumsatz",
+  "kreditkarten",
+  "SoUse",
+  "Wolt",
+  "gutscheine",
+  "FineDine",
+  "Gutscheine VK",
+  "einladung gäste",
+  "offene rechnungen",
+  "personal",
+  "barausgaben",
+  "bargeld",
+] as const;
+
+/**
+ * Formeltreue-Selbsttest (blockierend): die Bargeld-Spalte muss exakt der
+ * Vorlagen-Formel über die eigenen Zeilenspalten entsprechen. Keine neue
+ * Rechenlogik — nur Absicherung, dass Spaltenauswahl und Bargeld
+ * zusammenpassen.
+ */
+export function bargeldFromRowCents(r: CashDailyRow): number {
+  return (
+    r.tagesumsatzCents -
+    r.kreditkartenCents -
+    r.deliverySouseCents -
+    r.deliveryWoltCents -
+    r.vouchersRedeemedCents -
+    r.finedineCents +
+    r.vouchersSoldCents -
+    r.einladungCents -
+    r.openInvoicesCents -
+    r.vorschussCents -
+    r.expensesCents
+  );
+}
+
+export function assertBargeldFormula(rows: CashDailyRow[], sheetName: string): void {
+  for (const r of rows) {
+    const expected = bargeldFromRowCents(r);
+    if (expected !== r.bargeldCents) {
+      throw new Error(
+        `Formeltreue verletzt (${sheetName}, ${r.businessDate}): Spalten ergeben ${expected} Cent, ` +
+          `Bargeld ist ${r.bargeldCents} Cent.`,
+      );
+    }
+  }
+}
+
+function isoToDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+}
+
+export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.creator = "Coco";
-  const ws = wb.addWorksheet(monthLabel);
-
-  // EX2 — Spaltensatz/Reihenfolge/Labels folgen der Bankeinzahlungs-Vorlage
-  // („bankeinzahlung 0726.xls"). Bewusste Abweichung: „offene rechnungen"
-  // statt des Vorlagen-Tippfehlers „offene rechnunge".
-  ws.addRow([
-    "datum",
-    "tagesumsatz",
-    "kreditkarten",
-    "SoUse",
-    "Wolt",
-    "gutscheine",
-    "FineDine",
-    "Gutscheine VK",
-    "einladung gäste",
-    "offene rechnungen",
-    "personal",
-    "barausgaben",
-    "bargeld",
-  ]);
-  ws.getRow(1).font = { bold: true };
 
   const money = (c: number) => c / 100;
-  for (const r of rows) {
-    ws.addRow([
-      formatShortDate(r.businessDate),
-      money(r.tagesumsatzCents),
-      money(r.kreditkartenCents),
-      money(r.deliverySouseCents),
-      money(r.deliveryWoltCents),
-      money(r.vouchersRedeemedCents),
-      money(r.finedineCents),
-      money(r.vouchersSoldCents),
-      money(r.einladungCents),
-      money(r.openInvoicesCents),
-      money(r.vorschussCents),
-      money(r.expensesCents),
-      money(r.bargeldCents),
-    ]);
-  }
 
-  const sum = (sel: (r: CashDailyRow) => number) => money(rows.reduce((s, r) => s + sel(r), 0));
-  ws.addRow([
-    "Summe",
-    sum((r) => r.tagesumsatzCents),
-    sum((r) => r.kreditkartenCents),
-    sum((r) => r.deliverySouseCents),
-    sum((r) => r.deliveryWoltCents),
-    sum((r) => r.vouchersRedeemedCents),
-    sum((r) => r.finedineCents),
-    sum((r) => r.vouchersSoldCents),
-    sum((r) => r.einladungCents),
-    sum((r) => r.openInvoicesCents),
-    sum((r) => r.vorschussCents),
-    sum((r) => r.expensesCents),
-    sum((r) => r.bargeldCents),
-  ]);
-  ws.lastRow!.font = { bold: true };
+  for (const sheet of sheets) {
+    assertBargeldFormula(sheet.rows, sheet.locationName);
+    const ws = wb.addWorksheet(sheet.locationName.slice(0, 31) || "Standort");
 
-  for (let col = 2; col <= 13; col++) {
-    ws.getColumn(col).numFmt = '#,##0.00 "€"';
-    ws.getColumn(col).width = 13;
+    ws.addRow([sheet.locationName]);
+    ws.getRow(1).font = { bold: true };
+    ws.addRow([...HEADERS]);
+    ws.getRow(2).font = { bold: true };
+
+    const firstDataRow = 3;
+    for (const r of sheet.rows) {
+      ws.addRow([
+        isoToDate(r.businessDate),
+        money(r.tagesumsatzCents),
+        money(r.kreditkartenCents),
+        money(r.deliverySouseCents),
+        money(r.deliveryWoltCents),
+        money(r.vouchersRedeemedCents),
+        money(r.finedineCents),
+        money(r.vouchersSoldCents),
+        money(r.einladungCents),
+        money(r.openInvoicesCents),
+        money(r.vorschussCents),
+        money(r.expensesCents),
+        money(r.bargeldCents),
+      ]);
+    }
+    const lastDataRow = firstDataRow + sheet.rows.length - 1;
+
+    const sumRow = ws.addRow(["summe"]);
+    if (sheet.rows.length > 0) {
+      for (let col = 2; col <= HEADERS.length; col++) {
+        const letter = ws.getColumn(col).letter;
+        sumRow.getCell(col).value = {
+          formula: `SUM(${letter}${firstDataRow}:${letter}${lastDataRow})`,
+        };
+      }
+    }
+    sumRow.font = { bold: true };
+
+    for (let col = 2; col <= HEADERS.length; col++) {
+      ws.getColumn(col).numFmt = '#,##0.00 "€"';
+      ws.getColumn(col).width = 13;
+    }
+    // Wochentag über Zellformat, nicht als Text (Vorlagen-Verhalten).
+    ws.getColumn(1).numFmt = "ddd DD.MM.YYYY";
+    ws.getColumn(1).width = 18;
   }
-  ws.getColumn(1).width = 14;
 
   const buf = await wb.xlsx.writeBuffer();
   return new Blob([buf], {

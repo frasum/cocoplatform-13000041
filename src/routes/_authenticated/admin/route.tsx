@@ -252,7 +252,11 @@ function AdminLayout() {
     // darf die Verwaltung nicht in den Error-Boundary kippen.
     queryFn: async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session?.access_token) return null;
+      const session = data.session;
+      if (!session?.access_token) return null;
+      // Abgelaufene Sessions gar nicht erst senden — der Server würde
+      // ohnehin mit 401 antworten.
+      if (session.expires_at && session.expires_at * 1000 <= Date.now()) return null;
       try {
         return await getReviewPendingCounts();
       } catch {

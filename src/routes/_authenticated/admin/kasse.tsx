@@ -697,11 +697,13 @@ function KassePage() {
             }
           />
 
+          <CardErrorBoundary label="SessionFieldsCard">
           <SessionFieldsCard
             sessionId={sessionId!}
             overview={ovQ.data}
             channels={channelsQ.data ?? []}
-            channelsLoaded={channelsQ.data != null}
+            mappingChannels={mappingChannels}
+            channelsLoaded={mappingLoaded}
             terminals={terminalsQ.data ?? []}
             writable={writable}
             cashBalanceTargetCents={cashBalanceTargetResolvedCents}
@@ -715,13 +717,11 @@ function KassePage() {
               // KA1: Erst rechnen, wenn der Kanal-Katalog geladen ist —
               // sonst würde die Auflösung gegen eine leere Map laufen und
               // in `resolveChannelKind` werfen (Lade-Rennen).
-              const channelsLoaded = channelsQ.data != null;
+              const channelsLoaded = mappingLoaded;
               const vectronTotal = Number(sess.vectron_daily_total_cents ?? 0);
-              // KA1: Map aus dem ungefilterten Kanalbestand (inkl. inaktiver);
-              // Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
-              const channelKindById = new Map(
-                (channelsQ.data ?? []).map((c) => [c.id, c.kind] as const),
-              );
+              // CH1: Map org-weit, alle Standorte, aktiv+inaktiv
+              // (Standort-Race CH1); Lookup-Miss wirft weiterhin mit ID.
+              const channelKindById = buildChannelKindMap(mappingChannels);
               // N14b: gemeinsame Haus-Umsatz-Definition (Kasse-Modell) —
               // dieselbe Größe wie Inline (SessionFieldsCard), PDF und Druck.
               const inHouseCents = channelsLoaded
@@ -835,6 +835,7 @@ function KassePage() {
             previousDeficitCents={previousDeficitCents}
             previousDeficitSourceDate={previousDeficitSourceDate}
           />
+          </CardErrorBoundary>
 
           <TipPoolCard
             sessionId={sessionId!}

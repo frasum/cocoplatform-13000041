@@ -1,28 +1,58 @@
-## EV1-R4 — Notices folgen dem gewählten Geschäftstag
+# ZS1 — Überlappungs-Guard + „nicht mehr im Plan" sichtbar machen
 
-### Befund (belegt)
-- `listEventNoticesForToday` (src/lib/events/events.functions.ts:292 ff.) berechnet `const today = businessDateOf(new Date())` und nimmt keinen Parameter — die Karte zeigt also immer die Heute-Sicht.
-- `kasse.tsx` ruft sie ohne Argument, Query-Key `["events","notices-today"]` ohne Datum (Zeile 211-215), während `weatherQ` (Zeile 217-222) das Seiten-`businessDate` nutzt. Genau die gemeldete Diskrepanz.
-- `WeatherWidget` labelt Spalte 0 hart mit „Heute" (Zeile 89).
+Bestand: `origin/main` @ `225b58c8`.
 
-### Änderungen
+## Teil 1 — Überlappungs-Guard
 
-**1. Server — `src/lib/events/events.functions.ts`**
-- Umbenennen auf `listEventNotices` (alter Name lügt), Methode bleibt GET, Rollen-Gate (`admin/manager/staff/payroll/planer` laden, Inhalte nur admin/manager/planer) unverändert.
-- Neuer `inputValidator`: `z.object({ businessDate: isoDate.optional() }).optional()` → `const today = data?.businessDate ?? businessDateOf(new Date())`. Fenster (`shiftIsoDay(today, ±1)`), `eventNotices(rows, today)` und `schoolHolidayNotices(today)` rechnen mit diesem Tag.
-- Kernlogik in `event-notices.ts` / `school-holiday-notices.ts` bleibt unangetastet.
+Neues reines Modul `src/lib/time/overlap.ts`:
 
-**2. `src/routes/_authenticated/admin/kasse.tsx`**
-- Import/`useServerFn` auf `listEventNotices`; Aufruf `fetchEventNotices({ data: { businessDate } })`; Query-Key `["events", "notices", businessDate]`.
-- Kein weiterer Aufrufer vorhanden (wird vor dem Commit per Suche bestätigt).
+- `overlaps(a, b)` auf echten Zeitstempeln, halb-offene Intervalle: Ende == Anfang der Folgeschicht ⇒ KEINE Überlappung. Mitternachts-Schichten (23:00–02:00) fallen damit automatisch korrekt aus, weil nicht auf Uhrzeit-Strings gerechnet wird.
+- `findTimeConflict(existing[], candidate, excludeId?)` ⇒ `null | { kind: "identical" | "overlap", entry }`.
+- Sprechende Fehlertexte im selben Modul:
+  - identisch: „Für {Name} existiert an diesem Tag bereits ein Eintrag {HH:MM}–{HH:MM}."
+  - überlappend: „Für {Name} überlappt dieser Eintrag mit einem bestehenden Eintrag {HH:MM}–{HH:MM}. Getrennte Doppelschichten sind möglich, Überlappungen nicht."
 
-**3. `WeatherWidget` — Label Spalte 1**
-- Kleine pure Helferfunktion (in `src/lib/weather/weather-core.ts` oder neben dem Widget): `firstColumnLabel(selectedIso, actualTodayIso)` → `"Heute"` nur bei Gleichheit, sonst Wochentagskürzel.
-- Widget erhält den echten aktuellen Geschäftstag (`defaultCashBusinessDate(new Date())`) als Prop `actualToday` von `kasse.tsx`; Datenpfad und Layout unverändert.
+Verdrahtung in `src/lib/time/time-admin.functions.ts`, serverseitig, VOR Insert/Update und nach dem Sperr-Check:
 
-**4. Tests**
-- Notices-Durchreichung (Unit auf der Kombination, ohne DB): gewählter Tag `2026-08-01` ⇒ keine Ferien-Zeile; `2026-08-02` ⇒ `holiday_tomorrow` (Sommerferien ab 2026-08-03); `2026-08-03` ⇒ `holiday_running` 1/43.
-- Neue Label-Helferlogik: gewählt = heute ⇒ „Heute"; gewählt = Vortag (2026-08-01, Samstag) ⇒ „Sa".
+- Gemeinsamer Helper `assertNoTimeConflict(...)`: lädt die Einträge derselben Person für Geschäftstag ± 1 Tag (deckt Wrap-Schichten ab), holt den Anzeigenamen für die Meldung, wirft bei Konflikt.
+- Eingebaut in `createTimeEntryShift` und `setTimeEntryShift` (dort mit `excludeId` = eigene ID).
+- `runBatchTimes` bleibt unverändert: `resolveBatchDay` aktualisiert bei vorhandenem Eintrag statt neu anzulegen, erzeugt also keine Duplikate. Wird hier nur festgehalten, nicht „mit erledigt".
 
-### Gates
-tsc, eslint, prettier --write, vitest — eine Runde, ein Commit. `pap-2026/**`, `noticesTone`, Wetter-Datenpfad und Rollen-Gates bleiben unberührt.
+Tests `src/lib/time/overlap.test.ts`: Grenzfall Ende==Anfang, identisch, echte Überlappung, 23:00–02:00 gegen 15:00–23:00 und gegen 01:00–03:00, `excludeId`.
+
+## Teil 2 — „Nicht mehr im Plan" sichtbar machen (Variante b, konservativ)
+
+Neues reines Modul `src/lib/roster/not-in-plan.ts`:
+
+- `plannedKey(staffId, dateIso)` + `isNotInPlan(entry, plannedKeys)` ⇒ boolean.
+- `isUntouched(input)` ⇒ boolean: kein gestempelter Ist-Eintrag (`source = 'clock'`), kein Trinkgeld-/Abrechnungsbezug (keine `waiter_settlements`-Zeile der Person in der Session), keine manuelle Übersteuerung (`note`, `participates`). Nur der reine Plan-Snapshot gilt als unberührt.
+- `removalBlockedReason(...)` liefert den Tooltip-Text, wenn nicht unberührt.
+
+Daten kommen im bestehenden Roundtrip mit (kein N+1):
+
+- Kasse: `computeSessionTipPoolCore` (`src/lib/cash/cash.functions.ts`) lädt zusätzlich in EINEM Query die `roster_shifts` (Status `planned`/`confirmed`) für Standort + Geschäftstag; die vorhandenen Settlement-/Zeit-Reads werden weiterverwendet. Pro Pool-Eintrag kommen `notInPlan` und `removable` (+ `blockedReason`) mit.
+- Wochenplan: `getWeeklyTimeEntries` lädt die Roster-Zeilen bereits; ergänzt wird nur die Plan-Menge (Status-Filter) und pro Eintrag `notInPlan` + `removable`. `getWeeklyTimeEntriesBatch` bekommt dieselben Felder, damit „Alle Standorte" gleich aussieht.
+
+UI, dezent und ohne Auto-Löschen:
+
+- Kassen-Kellnerliste (`TipPoolCard`): kleines Badge „nicht mehr im Plan" mit Tooltip; daneben Ein-Klick-Entfernen, aktiv nur bei `removable`. Sonst erklärt der Tooltip, warum nur bewusst-manuell entfernt werden kann.
+- Wochenplan (`zeit-uebersicht.tsx` / Grid-Zelle): dasselbe Badge/Icon mit Tooltip und Ein-Klick-Entfernen bei unberührtem Eintrag.
+
+Server-Seite des Ein-Klick-Entfernens — die Anzeige entscheidet NICHT:
+
+- Kasse: neue Server-Function `removeUnplannedPoolEntry` — prüft Plan-Abwesenheit UND Unberührtheit erneut serverseitig, ruft dann `deleteSessionTipPoolEntryCore` (Sperren/Waterline/Audit unverändert).
+- Wochenplan: neue Server-Function `removeUnplannedTimeEntry` — gleiche Doppelprüfung, ruft dann `_deleteTimeEntryCore` mit fester Begründung „nicht mehr im Dienstplan (unberührt)"; Audit-Trail wie bisher.
+
+Tests `src/lib/roster/not-in-plan.test.ts`: Markierung, Unberührt-Matrix, Tooltip-Gründe.
+
+## Teil 3 — Kommentar-Nachzug
+
+Der Kopfkommentar in `src/lib/cash/roster-pool-sync.ts` verweist künftig auf die sichtbare Markierung „nicht mehr im Plan" samt Ein-Klick-Entfernen statt nur auf Laufkarte/manuelles Entfernen. Nur Kommentar, keine Logikänderung am additiven Nach-Sync.
+
+## Nicht angefasst
+
+Additiver Nach-Sync und seine Idempotenz, Pool-Defaults, SFN-/Lohnrechnung, gestempelte Ist-Zeiten, `pap-2026/**`.
+
+## Erfolgs-Gate
+
+`tsc --noEmit` 0 · `eslint . --max-warnings=0` 0 · `prettier --check .` clean · `vitest run` grün; `prettier --write` vor dem Commit; eine Runde = ein Commit.

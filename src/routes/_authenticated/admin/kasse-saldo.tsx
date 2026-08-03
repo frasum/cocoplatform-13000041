@@ -101,7 +101,6 @@ function KasseSaldoPage() {
 
   const selected = months.find((m) => m.key === monthKey) ?? months[0];
   const { fromDate, toDate } = monthRange(selected.year, selected.month);
-  const monthLabel = selected.label;
 
   const fetchLocations = useServerFn(listLocations);
   const locationsQ = useQuery({

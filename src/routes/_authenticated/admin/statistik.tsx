@@ -69,7 +69,7 @@ import {
   estimatedPreTaxResultCents,
 } from "@/lib/bwa/bwa-analytics";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
-import { fillDailyGaps } from "@/lib/statistics/chart-fill";
+import { chartDaySlots } from "@/lib/statistics/chart-days";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -856,7 +856,13 @@ function StatsView({ data }: { data: RevenueStats }) {
         <CardHeader>
           <CardTitle className="text-base">Umsatzverlauf</CardTitle>
         </CardHeader>
-        <CardContent>{hasDaily ? <RevenueChart daily={data.daily} /> : <EmptyChart />}</CardContent>
+        <CardContent>
+          {hasDaily ? (
+            <RevenueChart daily={data.daily} range={data.range} />
+          ) : (
+            <EmptyChart />
+          )}
+        </CardContent>
       </Card>
 
       <Card>
@@ -865,7 +871,7 @@ function StatsView({ data }: { data: RevenueStats }) {
         </CardHeader>
         <CardContent>
           {hasDaily ? (
-            <GuestHoursChart daily={data.daily} />
+            <GuestHoursChart daily={data.daily} range={data.range} />
           ) : (
             <div className="flex h-[280px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
               Keine Daten in diesem Zeitraum.

@@ -69,6 +69,11 @@ export interface PdfExportData {
    *  (Geschäftsleitung) am Standort eingeplant waren. */
   managerOnDutyNames?: string[];
   channels: PdfChannel[];
+  /**
+   * CH1 — org-weite Kanal-Landkarte (alle Standorte, aktiv+inaktiv), NUR für
+   * die kind-Auflösung. Ohne Angabe wird `channels` verwendet.
+   */
+  channelKinds?: { id: string; kind: string }[];
   channelAmounts: { channelId: string; amountCents: Cents }[];
   terminals: PdfTerminal[];
   terminalAmounts: { terminalId: string; amountCents: Cents }[];

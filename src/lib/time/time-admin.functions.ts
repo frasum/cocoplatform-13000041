@@ -25,6 +25,8 @@ import { isAbsenceWorkday } from "./urlaub-count";
 import type { SfnShiftRow } from "@/lib/lohn/sfn-geld/types";
 import { computeStaffSfn } from "@/lib/lohn/compute-staff-sfn";
 import { primaryDepartment, type Department } from "./primary-department";
+import { conflictMessage, findTimeConflict } from "./overlap";
+import { isUntouched, plannedKey } from "@/lib/roster/not-in-plan";
 import { sfnOverviewRateCents } from "./sfn-rate";
 import type { RateRow } from "@/lib/lohn/rate-resolution";
 import { selectAllPaged } from "@/lib/supabase/select-all";

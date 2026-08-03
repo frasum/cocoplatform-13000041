@@ -857,11 +857,7 @@ function StatsView({ data }: { data: RevenueStats }) {
           <CardTitle className="text-base">Umsatzverlauf</CardTitle>
         </CardHeader>
         <CardContent>
-          {hasDaily ? (
-            <RevenueChart daily={data.daily} range={data.range} />
-          ) : (
-            <EmptyChart />
-          )}
+          {hasDaily ? <RevenueChart daily={data.daily} range={data.range} /> : <EmptyChart />}
         </CardContent>
       </Card>
 
@@ -1007,7 +1003,14 @@ type GuestHoursRow = {
 function GuestHoursChart({ daily, range }: { daily: DailyRow[]; range: ChartRange }) {
   const rows: GuestHoursRow[] = chartDaySlots(daily, range).map(({ day, businessDate, point }) => {
     if (!point) {
-      return { day, fullDate: businessDate, guests: null, hours: null, perGuestCents: null, perHourCents: null };
+      return {
+        day,
+        fullDate: businessDate,
+        guests: null,
+        hours: null,
+        perGuestCents: null,
+        perHourCents: null,
+      };
     }
     const k = derivedKpis({
       houseCents: point.houseCents,

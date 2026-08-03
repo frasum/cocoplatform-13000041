@@ -585,6 +585,7 @@ function GlRow({
   entry,
   editable,
   onSave,
+  onRemove,
 }: {
   entry: {
     staffId: string;
@@ -592,11 +593,15 @@ function GlRow({
     shiftStart: string | null;
     shiftEnd: string | null;
     hoursMinutes: number;
+    notInPlan: boolean;
+    removable: boolean;
+    removalBlockedReason: string | null;
   };
   editable: boolean;
   onSave: (shiftStart: string, shiftEnd: string) => Promise<unknown>;
+  onRemove: () => void;
 }) {
-  return <GlRowInner entry={entry} editable={editable} onSave={onSave} />;
+  return <GlRowInner entry={entry} editable={editable} onSave={onSave} onRemove={onRemove} />;
 }
 
 type PoolRowData = {
@@ -751,6 +756,7 @@ function GlRowInner({
   entry,
   editable,
   onSave,
+  onRemove,
 }: {
   entry: {
     staffId: string;
@@ -758,9 +764,13 @@ function GlRowInner({
     shiftStart: string | null;
     shiftEnd: string | null;
     hoursMinutes: number;
+    notInPlan: boolean;
+    removable: boolean;
+    removalBlockedReason: string | null;
   };
   editable: boolean;
   onSave: (shiftStart: string, shiftEnd: string) => Promise<unknown>;
+  onRemove: () => void;
 }) {
   const [start, setStart] = useState(entry.shiftStart ?? "");
   const [end, setEnd] = useState(entry.shiftEnd ?? "");
@@ -778,7 +788,32 @@ function GlRowInner({
   }
   return (
     <TableRow>
-      <TableCell>{entry.displayName}</TableCell>
+      <TableCell>
+        {entry.displayName}
+        {entry.notInPlan && (
+          <span className="ml-2 inline-flex items-center gap-1 align-middle">
+            <Badge
+              variant="outline"
+              className="border-amber-500 text-amber-700"
+              title={entry.removalBlockedReason ?? "Keine Plan-Schicht mehr für diesen Tag."}
+            >
+              nicht mehr im Plan
+            </Badge>
+            {entry.removable && editable && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                title="Unberührten Eintrag entfernen"
+                aria-label="Unberührten Eintrag entfernen"
+                onClick={onRemove}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </span>
+        )}
+      </TableCell>
       <TableCell>
         <Input
           type="time"

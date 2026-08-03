@@ -50,6 +50,7 @@ export function WeeklyPlan({
   onCreateInline,
   onReassign,
   onDeleteEntry,
+  onRemoveUnplanned,
   staffDeptsByStaff,
   periodStart,
   periodEnd,

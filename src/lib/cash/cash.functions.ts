@@ -805,6 +805,36 @@ export const listOrgWaiters = createServerFn({ method: "GET" })
 // B4 — Trinkgeld-Pool Overview
 // ------------------------------------------------------------------------
 
+// ZS1 — Anzeigezeile des Pools inkl. Plan-Markierung. `notInPlan` = für
+// (Person, Geschäftstag) existiert keine planned/confirmed Roster-Schicht
+// mehr; `removable` = zusätzlich unberührt (kein Stempel, keine
+// Abrechnung, keine Notiz, keine Teilnahme-Übersteuerung). Das Entfernen
+// prüft serverseitig erneut — die Anzeige entscheidet nicht.
+export type TipPoolEntryView = {
+  staffId: string;
+  displayName: string;
+  department: "kitchen" | "service";
+  hoursMinutes: number;
+  shiftStart: string | null;
+  shiftEnd: string | null;
+  participates: boolean;
+  participatesOverride: boolean | null;
+  notInPlan: boolean;
+  removable: boolean;
+  removalBlockedReason: string | null;
+};
+
+export type TipPoolGlEntryView = {
+  staffId: string;
+  displayName: string;
+  shiftStart: string | null;
+  shiftEnd: string | null;
+  hoursMinutes: number;
+  notInPlan: boolean;
+  removable: boolean;
+  removalBlockedReason: string | null;
+};
+
 export const getTipPoolOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input ?? {}))

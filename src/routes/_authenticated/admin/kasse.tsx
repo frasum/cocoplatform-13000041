@@ -438,13 +438,15 @@ function KassePage() {
     // KA1: Kein Rechnen auf leerer Kanal-/Terminal-Map. Bricht bei
     // ungeladenem Katalog ab statt in `resolveChannelKind` zu werfen —
     // der Nutzer bekommt eine klare Meldung.
-    if (!channelsQ.data || !terminalsQ.data) {
+    if (!channelsQ.data || !terminalsQ.data || !mappingLoaded) {
       toast.error("Kanal-/Terminal-Katalog wird noch geladen — bitte kurz warten.");
       return null;
     }
     return buildDailySummaryData({
       overview: ov,
       channels: channelsQ.data.map((c) => ({ id: c.id, label: c.label, kind: c.kind })),
+      // CH1: kind-Auflösung org-weit (alle Standorte, aktiv+inaktiv).
+      channelKinds: mappingChannels.map((c) => ({ id: c.id, kind: c.kind })),
       terminals: terminalsQ.data.map((t) => ({
         id: t.id,
         label: t.label,

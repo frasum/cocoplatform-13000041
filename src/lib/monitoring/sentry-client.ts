@@ -14,13 +14,13 @@
 //  * setSentryContext(...) — Org/Rolle/Route als Tags, User-ID (kein PII)
 //    als `user.id`, damit Fehler-Cluster nach Mandant filterbar sind.
 
-let started = false;
-let currentContext: SentryContextInput | null = null;
-
 // SM1 — Release muss exakt dem Namen entsprechen, unter dem der
 // @sentry/vite-plugin die Sourcemaps hochlädt (vite.config.ts: APP_VERSION),
 // sonst matcht Sentry die Maps nicht und die Frames bleiben minifiziert.
 import { APP_VERSION } from "@/lib/app-version";
+
+let started = false;
+let currentContext: SentryContextInput | null = null;
 
 export type SentryContextInput = {
   userId?: string | null;

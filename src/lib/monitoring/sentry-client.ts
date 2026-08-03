@@ -14,6 +14,11 @@
 //  * setSentryContext(...) — Org/Rolle/Route als Tags, User-ID (kein PII)
 //    als `user.id`, damit Fehler-Cluster nach Mandant filterbar sind.
 
+// SM1 — Release muss exakt dem Namen entsprechen, unter dem der
+// @sentry/vite-plugin die Sourcemaps hochlädt (vite.config.ts: APP_VERSION),
+// sonst matcht Sentry die Maps nicht und die Frames bleiben minifiziert.
+import { APP_VERSION } from "@/lib/app-version";
+
 let started = false;
 let currentContext: SentryContextInput | null = null;
 
@@ -37,6 +42,7 @@ export async function startSentryClient(): Promise<void> {
     Sentry.init({
       dsn: config.dsn,
       environment: config.environment,
+      release: APP_VERSION,
       // Bewusst konservativ: keine Session-Replays, kein Performance-Sampling,
       // nur Errors. Kann später erhöht werden, wenn wir das brauchen.
       tracesSampleRate: 0,

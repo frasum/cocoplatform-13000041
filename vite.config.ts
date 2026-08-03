@@ -28,6 +28,14 @@ const sentryOrg = process.env.SENTRY_ORG;
 const sentryProject = process.env.SENTRY_PROJECT;
 const sentryEnabled = Boolean(sentryAuthToken && sentryOrg && sentryProject);
 
+// SM1 — Ohne Credentials bleibt der Upload ein stiller No-op: der Build muss
+// lokal und in Previews unverändert durchlaufen. Nur ein Log-Hinweis.
+if (!sentryEnabled) {
+  console.info(
+    "[sentry] Sourcemap-Upload übersprungen — SENTRY_AUTH_TOKEN, SENTRY_ORG oder SENTRY_PROJECT fehlt.",
+  );
+}
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).

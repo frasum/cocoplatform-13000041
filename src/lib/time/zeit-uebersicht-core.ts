@@ -180,6 +180,10 @@ export type WeeklyEntry = {
   businessDate: string;
   startedAt: string;
   endedAt: string;
+  // ZS1 — „nicht mehr im Plan": keine planned/confirmed Roster-Schicht mehr
+  // für (Person, Geschäftstag). `removable` zusätzlich unberührt.
+  notInPlan?: boolean;
+  removable?: boolean;
 };
 
 export type WeeklyData = {

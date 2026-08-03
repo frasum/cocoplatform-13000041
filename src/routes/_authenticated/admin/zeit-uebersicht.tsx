@@ -31,6 +31,7 @@ import {
   createTimeEntryShift,
   deletePeriod,
   deleteTimeEntry,
+  removeUnplannedTimeEntry,
   getTimeOverview,
   getWeeklyTimeEntries,
   getSfnOverview,
@@ -144,6 +145,7 @@ function ZeitUebersichtPage() {
   const callSetShift = useServerFn(setTimeEntryShift);
   const callCreateShift = useServerFn(createTimeEntryShift);
   const callDeleteEntry = useServerFn(deleteTimeEntry);
+  const callRemoveUnplanned = useServerFn(removeUnplannedTimeEntry);
   const fetchPeriods = useServerFn(listPeriods);
   const callCreatePeriod = useServerFn(createPeriod);
   const callToggleLock = useServerFn(togglePeriodLock);
@@ -902,6 +904,17 @@ function ZeitUebersichtPage() {
     onSuccess: () => {
       invalidateWeekly();
       toast.success("Schicht gelöscht.");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // ZS1 — Ein-Klick-Entfernen: nur unberührte Einträge ohne Plan-Schicht;
+  // die Rollen-/Rechteprüfung entspricht exakt deleteTimeEntry.
+  const removeUnplannedMut = useMutation({
+    mutationFn: (id: string) => callRemoveUnplanned({ data: { id } }),
+    onSuccess: () => {
+      invalidateWeekly();
+      toast.success("Eintrag entfernt (nicht mehr im Dienstplan).");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -1705,6 +1718,7 @@ function ZeitUebersichtPage() {
             onDeleteEntry={(id, reason) => {
               deleteEntryMut.mutate({ id, reason });
             }}
+            onRemoveUnplanned={(id) => removeUnplannedMut.mutate(id)}
             staffDeptsByStaff={staffDeptsByStaff}
             entriesById={useMemo(() => {
               const m = new Map<string, WeeklyEntry>();

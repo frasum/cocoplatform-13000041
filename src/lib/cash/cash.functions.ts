@@ -33,6 +33,7 @@ import {
 } from "./tip-pool";
 import { kitchenShiftMinutes } from "./kitchen-shift-hours";
 import { applyRosterPoolSnapshot } from "./roster-pool-sync";
+import { isUntouched, removalBlockedReason } from "@/lib/roster/not-in-plan";
 import { resolveServicePoolEnd } from "./service-pool-end";
 import { assertCashWritable, CashLockedError } from "./cash-lock";
 import type { Json } from "@/integrations/supabase/types";
@@ -805,6 +806,36 @@ export const listOrgWaiters = createServerFn({ method: "GET" })
 // B4 — Trinkgeld-Pool Overview
 // ------------------------------------------------------------------------
 
+// ZS1 — Anzeigezeile des Pools inkl. Plan-Markierung. `notInPlan` = für
+// (Person, Geschäftstag) existiert keine planned/confirmed Roster-Schicht
+// mehr; `removable` = zusätzlich unberührt (kein Stempel, keine
+// Abrechnung, keine Notiz, keine Teilnahme-Übersteuerung). Das Entfernen
+// prüft serverseitig erneut — die Anzeige entscheidet nicht.
+export type TipPoolEntryView = {
+  staffId: string;
+  displayName: string;
+  department: "kitchen" | "service";
+  hoursMinutes: number;
+  shiftStart: string | null;
+  shiftEnd: string | null;
+  participates: boolean;
+  participatesOverride: boolean | null;
+  notInPlan: boolean;
+  removable: boolean;
+  removalBlockedReason: string | null;
+};
+
+export type TipPoolGlEntryView = {
+  staffId: string;
+  displayName: string;
+  shiftStart: string | null;
+  shiftEnd: string | null;
+  hoursMinutes: number;
+  notInPlan: boolean;
+  removable: boolean;
+  removalBlockedReason: string | null;
+};
+
 export const getTipPoolOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input ?? {}))
@@ -822,23 +853,8 @@ export async function getTipPoolOverviewCore(
     manualStaffIds: string[];
     kitchenManualOnly: boolean;
     servicePoolEnabled: boolean;
-    poolEntries: Array<{
-      staffId: string;
-      displayName: string;
-      department: "kitchen" | "service";
-      hoursMinutes: number;
-      shiftStart: string | null;
-      shiftEnd: string | null;
-      participates: boolean;
-      participatesOverride: boolean | null;
-    }>;
-    glEntries: Array<{
-      staffId: string;
-      displayName: string;
-      shiftStart: string | null;
-      shiftEnd: string | null;
-      hoursMinutes: number;
-    }>;
+    poolEntries: TipPoolEntryView[];
+    glEntries: TipPoolGlEntryView[];
   }
 > {
   const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
@@ -861,30 +877,15 @@ export async function computeSessionTipPoolCore(
     manualStaffIds: string[];
     kitchenManualOnly: boolean;
     servicePoolEnabled: boolean;
-    poolEntries: Array<{
-      staffId: string;
-      displayName: string;
-      department: "kitchen" | "service";
-      hoursMinutes: number;
-      shiftStart: string | null;
-      shiftEnd: string | null;
-      participates: boolean;
-      participatesOverride: boolean | null;
-    }>;
-    glEntries: Array<{
-      staffId: string;
-      displayName: string;
-      shiftStart: string | null;
-      shiftEnd: string | null;
-      hoursMinutes: number;
-    }>;
+    poolEntries: TipPoolEntryView[];
+    glEntries: TipPoolGlEntryView[];
   }
 > {
   // Standort-Vererbung: mergeTipSettings liefert den Wert bereits aufgelöst.
   const servicePoolEnabled = settings.servicePoolEnabled ?? true;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-  const [settlementsRes, timeRes, manualRes] = await Promise.all([
+  const [settlementsRes, timeRes, manualRes, plannedRes] = await Promise.all([
     supabaseAdmin
       .from("waiter_settlements")
       .select(
@@ -895,20 +896,39 @@ export async function computeSessionTipPoolCore(
       .neq("status", "superseded"),
     supabaseAdmin
       .from("time_entries")
-      .select("staff_id, started_at, ended_at")
+      .select("staff_id, started_at, ended_at, source")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", session.location_id)
       .eq("business_date", session.business_date)
       .not("ended_at", "is", null),
     supabaseAdmin
       .from("session_tip_pool_entries")
-      .select("staff_id, department, hours_minutes, shift_start, shift_end, participates")
+      .select("staff_id, department, hours_minutes, shift_start, shift_end, participates, note")
       .eq("organization_id", caller.organizationId)
       .eq("session_id", session.id),
+    // ZS1 — Plan-Menge des Geschäftstags am Standort (planned/confirmed).
+    supabaseAdmin
+      .from("roster_shifts")
+      .select("staff_id")
+      .eq("organization_id", caller.organizationId)
+      .eq("location_id", session.location_id)
+      .eq("shift_date", session.business_date)
+      .in("status", ["planned", "confirmed"]),
   ]);
   if (settlementsRes.error) throw settlementsRes.error;
   if (timeRes.error) throw timeRes.error;
   if (manualRes.error) throw manualRes.error;
+  if (plannedRes.error) throw plannedRes.error;
+  const plannedStaffIds = new Set<string>((plannedRes.data ?? []).map((r) => r.staff_id as string));
+  // Gestempelte Ist-Zeit bzw. Abrechnungsbezug je Person (Unberührtheit).
+  const clockedStaffIds = new Set<string>(
+    (timeRes.data ?? [])
+      .filter((r) => (r as { source?: string | null }).source === "clock")
+      .map((r) => r.staff_id as string),
+  );
+  const settledStaffIds = new Set<string>(
+    (settlementsRes.data ?? []).map((r) => r.staff_id as string),
+  );
 
   const settlements = (settlementsRes.data ?? []).map((r) => ({
     staffId: r.staff_id,
@@ -927,6 +947,7 @@ export async function computeSessionTipPoolCore(
     shiftStart: r.shift_start as string | null,
     shiftEnd: r.shift_end as string | null,
     participates: (r as { participates: boolean | null }).participates ?? null,
+    note: (r as { note: string | null }).note ?? null,
   }));
   // GL-Zeilen NIE als „manuell" an die Verteilrechnung geben — die
   // Verteillogik schließt zwar gl bereits aus, aber `staffParticipates`
@@ -943,10 +964,12 @@ export async function computeSessionTipPoolCore(
   const glRows = allPoolRows.filter((r) => r.department === "gl");
 
   const rawTimeEntries = (timeRes.data ?? [])
-    .filter(
-      (r): r is { staff_id: string; started_at: string; ended_at: string } => r.ended_at !== null,
-    )
-    .map((r) => ({ staffId: r.staff_id, startedAt: r.started_at, endedAt: r.ended_at }));
+    .filter((r) => r.ended_at !== null)
+    .map((r) => ({
+      staffId: r.staff_id,
+      startedAt: r.started_at,
+      endedAt: r.ended_at as string,
+    }));
 
   // staffDepartments VOR dem Stunden-Bau laden — der kitchenManualOnly-Filter
   // braucht das Department, um Küchen-Stempel zu verwerfen.
@@ -1070,6 +1093,14 @@ export async function computeSessionTipPoolCore(
         const row = allPoolRows.find((r) => r.staffId === id);
         const dept = staffDepartments.get(id) as "kitchen" | "service";
         const hoursMinutes = manual ? manual.hoursMinutes : (stampMinutes.get(id) ?? 0);
+        // ZS1 — Plan-Markierung + Entfernbarkeit (Anzeige; Server prüft erneut).
+        const touched = {
+          hasClockEntry: clockedStaffIds.has(id),
+          hasSettlement: settledStaffIds.has(id),
+          note: row?.note ?? null,
+          participatesOverride: manual ? (manual.participates ?? null) : null,
+        };
+        const notInPlan = !plannedStaffIds.has(id);
         return {
           staffId: id,
           displayName: staffNames[id] ?? id,
@@ -1079,16 +1110,31 @@ export async function computeSessionTipPoolCore(
           shiftEnd: row?.shiftEnd ? row.shiftEnd.slice(0, 5) : null,
           participates: staffParticipates.get(id) ?? false,
           participatesOverride: manual ? (manual.participates ?? null) : null,
+          notInPlan,
+          removable: notInPlan && isUntouched(touched),
+          removalBlockedReason: removalBlockedReason(touched),
         };
       });
     })(),
-    glEntries: glRows.map((r) => ({
-      staffId: r.staffId,
-      displayName: staffNames[r.staffId] ?? r.staffId,
-      shiftStart: r.shiftStart ? r.shiftStart.slice(0, 5) : null,
-      shiftEnd: r.shiftEnd ? r.shiftEnd.slice(0, 5) : null,
-      hoursMinutes: r.hoursMinutes,
-    })),
+    glEntries: glRows.map((r) => {
+      const touched = {
+        hasClockEntry: clockedStaffIds.has(r.staffId),
+        hasSettlement: settledStaffIds.has(r.staffId),
+        note: r.note,
+        participatesOverride: r.participates,
+      };
+      const notInPlan = !plannedStaffIds.has(r.staffId);
+      return {
+        staffId: r.staffId,
+        displayName: staffNames[r.staffId] ?? r.staffId,
+        shiftStart: r.shiftStart ? r.shiftStart.slice(0, 5) : null,
+        shiftEnd: r.shiftEnd ? r.shiftEnd.slice(0, 5) : null,
+        hoursMinutes: r.hoursMinutes,
+        notInPlan,
+        removable: notInPlan && isUntouched(touched),
+        removalBlockedReason: removalBlockedReason(touched),
+      };
+    }),
   };
 }
 
@@ -3533,6 +3579,74 @@ export async function deleteSessionTipPoolEntryCore(
     };
   });
 }
+
+// ZS1 — Ein-Klick-Entfernen für Pool-Zeilen, die nicht mehr im Dienstplan
+// stehen und unberührt sind. Rollenanforderung exakt wie
+// `deleteSessionTipPoolEntry` ("manager"), inklusive Vorschau-Sperre; die
+// Unberührtheit wird serverseitig erneut geprüft, die Anzeige entscheidet
+// nicht.
+export const removeUnplannedPoolEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ sessionId: z.string().uuid(), staffId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
+    const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [rowRes, plannedRes, timeRes, setRes] = await Promise.all([
+      supabaseAdmin
+        .from("session_tip_pool_entries")
+        .select("staff_id, note, participates")
+        .eq("organization_id", caller.organizationId)
+        .eq("session_id", session.id)
+        .eq("staff_id", data.staffId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("roster_shifts")
+        .select("staff_id")
+        .eq("organization_id", caller.organizationId)
+        .eq("location_id", session.location_id)
+        .eq("shift_date", session.business_date)
+        .eq("staff_id", data.staffId)
+        .in("status", ["planned", "confirmed"])
+        .limit(1),
+      supabaseAdmin
+        .from("time_entries")
+        .select("id")
+        .eq("organization_id", caller.organizationId)
+        .eq("location_id", session.location_id)
+        .eq("business_date", session.business_date)
+        .eq("staff_id", data.staffId)
+        .eq("source", "clock")
+        .limit(1),
+      supabaseAdmin
+        .from("waiter_settlements")
+        .select("id")
+        .eq("organization_id", caller.organizationId)
+        .eq("session_id", session.id)
+        .eq("staff_id", data.staffId)
+        .neq("status", "superseded")
+        .limit(1),
+    ]);
+    if (rowRes.error) throw rowRes.error;
+    if (plannedRes.error) throw plannedRes.error;
+    if (timeRes.error) throw timeRes.error;
+    if (setRes.error) throw setRes.error;
+    if (!rowRes.data) throw new Error("Pool-Eintrag nicht gefunden.");
+    if ((plannedRes.data ?? []).length > 0) {
+      throw new Error("Eintrag steht weiterhin im Dienstplan — kein Ein-Klick-Entfernen.");
+    }
+    const reason = removalBlockedReason({
+      hasClockEntry: (timeRes.data ?? []).length > 0,
+      hasSettlement: (setRes.data ?? []).length > 0,
+      note: (rowRes.data as { note: string | null }).note,
+      participatesOverride: (rowRes.data as { participates: boolean | null }).participates,
+    });
+    if (reason) throw new Error(reason);
+    return deleteSessionTipPoolEntryCore(caller, data);
+  });
 
 // Plan-Snapshot in den Pool: siehe `./roster-pool-sync` — dort liegt
 // `applyRosterPoolSnapshot` (Eröffnung + manueller Nachzug) und der

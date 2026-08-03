@@ -35,6 +35,7 @@ import {
 import { fmtCents } from "@/lib/format";
 import {
   deleteSessionTipPoolEntry,
+  removeUnplannedPoolEntry,
   getTipPoolOverview,
   listSessionTipPoolEntries,
   upsertSessionTipPoolEntry,
@@ -82,6 +83,7 @@ export function TipPoolCard({
   const callUpsert = useServerFn(upsertSessionTipPoolEntry);
   const callDelete = useServerFn(deleteSessionTipPoolEntry);
   const callAddSnapshot = useServerFn(addRosterSnapshotMissing);
+  const callRemoveUnplanned = useServerFn(removeUnplannedPoolEntry);
 
   const poolQ = useQuery({
     queryKey: ["cash", "tip-pool", sessionId],
@@ -261,6 +263,17 @@ export function TipPoolCard({
     }
   };
 
+  // ZS1 — Ein-Klick-Entfernen unberührter Zeilen ohne Plan-Schicht.
+  const removeUnplanned = async (staffId: string) => {
+    try {
+      await callRemoveUnplanned({ data: { sessionId, staffId } });
+      toast.success("Eintrag entfernt.");
+      invalidatePool();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   const renderTable = (title: string, rows: typeof poolEntries) => {
     return (
       <Card className="flex-1">
@@ -299,6 +312,7 @@ export function TipPoolCard({
                   editable={editable}
                   timeEditable={timeEditable}
                   onToggleParticipates={(v) => void toggleParticipates(r, v)}
+                  onRemove={() => void removeUnplanned(r.staffId)}
                   onSaveTimes={(shiftStart, shiftEnd) =>
                     callUpsert({
                       data: {
@@ -379,6 +393,7 @@ export function TipPoolCard({
                   key={g.staffId}
                   entry={g}
                   editable={editable}
+                  onRemove={() => void removeUnplanned(g.staffId)}
                   onSave={(shiftStart, shiftEnd) =>
                     callUpsert({
                       data: {
@@ -571,6 +586,7 @@ function GlRow({
   entry,
   editable,
   onSave,
+  onRemove,
 }: {
   entry: {
     staffId: string;
@@ -578,11 +594,15 @@ function GlRow({
     shiftStart: string | null;
     shiftEnd: string | null;
     hoursMinutes: number;
+    notInPlan: boolean;
+    removable: boolean;
+    removalBlockedReason: string | null;
   };
   editable: boolean;
   onSave: (shiftStart: string, shiftEnd: string) => Promise<unknown>;
+  onRemove: () => void;
 }) {
-  return <GlRowInner entry={entry} editable={editable} onSave={onSave} />;
+  return <GlRowInner entry={entry} editable={editable} onSave={onSave} onRemove={onRemove} />;
 }
 
 type PoolRowData = {
@@ -594,6 +614,9 @@ type PoolRowData = {
   shiftEnd: string | null;
   participates: boolean;
   participatesOverride: boolean | null;
+  notInPlan: boolean;
+  removable: boolean;
+  removalBlockedReason: string | null;
 };
 
 function PoolRow({
@@ -604,6 +627,7 @@ function PoolRow({
   timeEditable,
   onToggleParticipates,
   onSaveTimes,
+  onRemove,
 }: {
   row: PoolRowData;
   share: { hoursWorked: number; shareCents: number } | undefined;
@@ -612,6 +636,7 @@ function PoolRow({
   timeEditable: boolean;
   onToggleParticipates: (v: boolean) => void;
   onSaveTimes: (shiftStart: string, shiftEnd: string) => Promise<unknown>;
+  onRemove: () => void;
 }) {
   const [start, setStart] = useState(row.shiftStart ?? "");
   const [end, setEnd] = useState(row.shiftEnd ?? "");
@@ -645,6 +670,31 @@ function PoolRow({
           <Badge variant="outline" className="ml-2">
             übersteuert
           </Badge>
+        )}
+        {/* ZS1 — Badge ist für jeden sichtbar, der die Liste sieht; der
+            Entfernen-Klick gehorcht den bestehenden Schreibrechten. */}
+        {row.notInPlan && (
+          <span className="ml-2 inline-flex items-center gap-1 align-middle">
+            <Badge
+              variant="outline"
+              className="border-amber-500 text-amber-700"
+              title={row.removalBlockedReason ?? "Keine Plan-Schicht mehr für diesen Tag."}
+            >
+              nicht mehr im Plan
+            </Badge>
+            {row.removable && editable && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                title="Unberührten Eintrag entfernen"
+                aria-label="Unberührten Eintrag entfernen"
+                onClick={onRemove}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </span>
         )}
       </TableCell>
       <TableCell className="text-center">
@@ -707,6 +757,7 @@ function GlRowInner({
   entry,
   editable,
   onSave,
+  onRemove,
 }: {
   entry: {
     staffId: string;
@@ -714,9 +765,13 @@ function GlRowInner({
     shiftStart: string | null;
     shiftEnd: string | null;
     hoursMinutes: number;
+    notInPlan: boolean;
+    removable: boolean;
+    removalBlockedReason: string | null;
   };
   editable: boolean;
   onSave: (shiftStart: string, shiftEnd: string) => Promise<unknown>;
+  onRemove: () => void;
 }) {
   const [start, setStart] = useState(entry.shiftStart ?? "");
   const [end, setEnd] = useState(entry.shiftEnd ?? "");
@@ -734,7 +789,32 @@ function GlRowInner({
   }
   return (
     <TableRow>
-      <TableCell>{entry.displayName}</TableCell>
+      <TableCell>
+        {entry.displayName}
+        {entry.notInPlan && (
+          <span className="ml-2 inline-flex items-center gap-1 align-middle">
+            <Badge
+              variant="outline"
+              className="border-amber-500 text-amber-700"
+              title={entry.removalBlockedReason ?? "Keine Plan-Schicht mehr für diesen Tag."}
+            >
+              nicht mehr im Plan
+            </Badge>
+            {entry.removable && editable && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                title="Unberührten Eintrag entfernen"
+                aria-label="Unberührten Eintrag entfernen"
+                onClick={onRemove}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </span>
+        )}
+      </TableCell>
       <TableCell>
         <Input
           type="time"

@@ -50,6 +50,7 @@ export function WeeklyPlan({
   onCreateInline,
   onReassign,
   onDeleteEntry,
+  onRemoveUnplanned,
   staffDeptsByStaff,
   periodStart,
   periodEnd,
@@ -80,6 +81,8 @@ export function WeeklyPlan({
   // Aufrufer öffnet die eigentliche Server-Mutation; die UI hat die
   // Begründung bereits per Popover eingesammelt (≥3 Zeichen).
   onDeleteEntry: (id: string, reason: string) => void;
+  // ZS1 — Ein-Klick-Entfernen unberührter Einträge ohne Plan-Schicht.
+  onRemoveUnplanned: (id: string) => void;
   staffDeptsByStaff: Map<string, Department[]>;
   periodStart?: string;
   periodEnd?: string;
@@ -587,6 +590,15 @@ export function WeeklyPlan({
                           };
                           const singleExisting =
                             !empty && day.shifts.length === 1 && !isEditingCell;
+                          // ZS1 — Plan-Abgleich für diese Zelle. Badge/Marker
+                          // ist für jeden sichtbar, der die Liste sieht; der
+                          // Entfernen-Klick bleibt an isAdmin (Schreibrecht)
+                          // gebunden und wird serverseitig erneut geprüft.
+                          const cellEntries = empty ? [] : findEntries(row.staffId, day.iso);
+                          const unplannedEntry =
+                            cellEntries.length === 1 && cellEntries[0].notInPlan
+                              ? cellEntries[0]
+                              : null;
                           const openDeleteFromCell = (ev: React.MouseEvent) => {
                             ev.stopPropagation();
                             const en = findEntries(row.staffId, day.iso)[0];
@@ -718,6 +730,31 @@ export function WeeklyPlan({
                                 className={`group/cell relative w-[44px] min-w-[44px] border-l px-0.5 py-1 text-center align-middle tabular-nums text-xs ${cellBg} ${editable ? "cursor-pointer hover:bg-muted/60" : ""}`}
                               >
                                 {renderShift("from")}
+                                {unplannedEntry ? (
+                                  unplannedEntry.removable && isAdmin ? (
+                                    <button
+                                      type="button"
+                                      aria-label="Nicht mehr im Plan — unberührten Eintrag entfernen"
+                                      title="Nicht mehr im Dienstplan und unberührt — hier entfernen"
+                                      disabled={pending}
+                                      onClick={(ev) => {
+                                        ev.stopPropagation();
+                                        onRemoveUnplanned(unplannedEntry.id);
+                                      }}
+                                      className="absolute bottom-0 left-0 text-[10px] leading-none px-0.5 text-amber-600 hover:text-red-600"
+                                    >
+                                      ⚑
+                                    </button>
+                                  ) : (
+                                    <span
+                                      aria-label="Nicht mehr im Plan"
+                                      title="Nicht mehr im Dienstplan (Stempel, Abrechnung oder Notiz vorhanden — bewusst löschen)"
+                                      className="absolute bottom-0 left-0 text-[10px] leading-none px-0.5 text-amber-600"
+                                    >
+                                      ⚑
+                                    </span>
+                                  )
+                                ) : null}
                                 {editable && singleExisting ? (
                                   <button
                                     type="button"

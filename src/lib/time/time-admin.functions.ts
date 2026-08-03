@@ -25,6 +25,8 @@ import { isAbsenceWorkday } from "./urlaub-count";
 import type { SfnShiftRow } from "@/lib/lohn/sfn-geld/types";
 import { computeStaffSfn } from "@/lib/lohn/compute-staff-sfn";
 import { primaryDepartment, type Department } from "./primary-department";
+import { conflictMessage, findTimeConflict } from "./overlap";
+import { isUntouched, plannedKey } from "@/lib/roster/not-in-plan";
 import { sfnOverviewRateCents } from "./sfn-rate";
 import type { RateRow } from "@/lib/lohn/rate-resolution";
 import { selectAllPaged } from "@/lib/supabase/select-all";
@@ -181,6 +183,7 @@ export type TimeEntryWeeklyRow = {
   ended_at: string;
   business_date: string;
   department: Department | null;
+  source: string;
   staff: { display_name: string } | null;
 };
 
@@ -195,7 +198,7 @@ export async function _loadTimeEntriesForWeeklyBatch(
     supabaseAdmin
       .from("time_entries")
       .select(
-        "id, location_id, staff_id, started_at, ended_at, business_date, department, staff(display_name)",
+        "id, location_id, staff_id, started_at, ended_at, business_date, department, source, staff(display_name)",
       )
       .eq("organization_id", organizationId)
       .in("location_id", locationIds)
@@ -212,6 +215,7 @@ type WeeklyRosterRow = {
   area: Department | null;
   skill_id: string | null;
   shift_date: string;
+  status: string;
 };
 
 export async function _loadRosterShiftsForWeeklyBatch(
@@ -224,7 +228,7 @@ export async function _loadRosterShiftsForWeeklyBatch(
   return selectAllPaged<WeeklyRosterRow>(() =>
     supabaseAdmin
       .from("roster_shifts")
-      .select("location_id, staff_id, area, skill_id, shift_date")
+      .select("location_id, staff_id, area, skill_id, shift_date, status")
       .eq("organization_id", organizationId)
       .in("location_id", locationIds)
       .gte("shift_date", weekStart)
@@ -910,7 +914,7 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabaseAdmin
       .from("time_entries")
       .select(
-        "id, staff_id, started_at, ended_at, business_date, location_id, department, staff(display_name)",
+        "id, staff_id, started_at, ended_at, business_date, location_id, department, source, staff(display_name)",
       )
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId)
@@ -974,12 +978,19 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
     const rosterByStaff: Record<string, { areas: Department[]; skillIds: string[] }> = {};
     const { data: rosterRows, error: rosterErr } = await supabaseAdmin
       .from("roster_shifts")
-      .select("staff_id, area, skill_id, shift_date")
+      .select("staff_id, area, skill_id, shift_date, status")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId)
       .gte("shift_date", weekStart)
       .lte("shift_date", weekEnd);
     if (rosterErr) throw rosterErr;
+    // ZS1 — Plan-Menge (nur planned/confirmed) für die Markierung
+    // „nicht mehr im Plan".
+    const plannedKeys = new Set<string>(
+      (rosterRows ?? [])
+        .filter((r) => r.status === "planned" || r.status === "confirmed")
+        .map((r) => plannedKey(r.staff_id as string, r.shift_date as string)),
+    );
     // WZ2 — GL-Skill-IDs der Organisation (D-3: GL ist ein Skill der
     // Kategorie 'gl', kein Roster-Bereich). Ein Query, danach im Speicher
     // gejoint. Verwendet für rosterGlByStaffDate — die Tages-Typ-Quelle.
@@ -1059,22 +1070,66 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
       crossLocationDates[key] = arr;
     }
 
+    // ZS1 — Abrechnungsbezug der Woche (Standort): (staffId|businessDate).
+    const settledKeys = new Set<string>();
+    {
+      const { data: sessionRows, error: sessErr } = await supabaseAdmin
+        .from("sessions")
+        .select("id, business_date")
+        .eq("organization_id", caller.organizationId)
+        .eq("location_id", data.locationId)
+        .gte("business_date", weekStart)
+        .lte("business_date", weekEnd);
+      if (sessErr) throw sessErr;
+      const dateBySession = new Map<string, string>(
+        (sessionRows ?? []).map((s) => [s.id as string, s.business_date as string]),
+      );
+      if (dateBySession.size > 0) {
+        const { data: setRows, error: setErr } = await supabaseAdmin
+          .from("waiter_settlements")
+          .select("staff_id, session_id")
+          .eq("organization_id", caller.organizationId)
+          .in("session_id", Array.from(dateBySession.keys()))
+          .neq("status", "superseded");
+        if (setErr) throw setErr;
+        for (const s of setRows ?? []) {
+          const iso = dateBySession.get(s.session_id as string);
+          if (iso) settledKeys.add(plannedKey(s.staff_id as string, iso));
+        }
+      }
+    }
+
     return {
       weekStart,
       weekEnd,
-      entries: (rows ?? []).map((r) => ({
-        id: r.id as string,
-        staffId: r.staff_id as string,
-        displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
-        // Z3: Primär-Abteilung als Fallback für Grid-Kompatibilität; das Grid
-        // nutzt entryRowDepartment(rawDepartment, staffDepts) für die
-        // eigentliche Zeilen-Attribution.
-        department: deptByStaff.get(r.staff_id as string) ?? ("service" as const),
-        rawDepartment: (r.department as Department | null) ?? null,
-        businessDate: r.business_date as string,
-        startedAt: r.started_at as string,
-        endedAt: r.ended_at as string,
-      })),
+      entries: (rows ?? []).map((r) => {
+        const staffId = r.staff_id as string;
+        const businessDate = r.business_date as string;
+        const key = plannedKey(staffId, businessDate);
+        const notInPlan = !plannedKeys.has(key);
+        const removable =
+          notInPlan &&
+          isUntouched({
+            hasClockEntry: r.source === "clock",
+            hasSettlement: settledKeys.has(key),
+          });
+        return {
+          id: r.id as string,
+          staffId,
+          displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
+          // Z3: Primär-Abteilung als Fallback für Grid-Kompatibilität; das Grid
+          // nutzt entryRowDepartment(rawDepartment, staffDepts) für die
+          // eigentliche Zeilen-Attribution.
+          department: deptByStaff.get(staffId) ?? ("service" as const),
+          rawDepartment: (r.department as Department | null) ?? null,
+          businessDate,
+          startedAt: r.started_at as string,
+          endedAt: r.ended_at as string,
+          // ZS1 — Anzeige-Markierung; das Entfernen prüft serverseitig erneut.
+          notInPlan,
+          removable,
+        };
+      }),
       crossLocationDates,
       assignedStaff,
       rosterByStaff,
@@ -1474,6 +1529,7 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
       area: Department | null;
       skill_id: string | null;
       shift_date: string;
+      status: string;
     };
     const rosterByLoc = new Map<string, RosterRow[]>();
     for (const lid of data.locationIds) rosterByLoc.set(lid, []);
@@ -1507,6 +1563,8 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
           startedAt: string;
           endedAt: string;
           breakMinutes: number;
+          notInPlan: boolean;
+          removable: boolean;
         }>;
         crossLocationDates: Record<string, string[]>;
         assignedStaff: Array<{
@@ -1524,6 +1582,36 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
       }
     > = {};
 
+    // ZS1 — Abrechnungsbezug je (staffId|businessDate) über alle Standorte
+    // der Batch-Abfrage; ein Query-Paar, kein N+1.
+    const settledKeys = new Set<string>();
+    {
+      const { data: sessionRows, error: sessErr } = await supabaseAdmin
+        .from("sessions")
+        .select("id, business_date")
+        .eq("organization_id", caller.organizationId)
+        .in("location_id", data.locationIds)
+        .gte("business_date", weekStart)
+        .lte("business_date", weekEnd);
+      if (sessErr) throw sessErr;
+      const dateBySession = new Map<string, string>(
+        (sessionRows ?? []).map((s) => [s.id as string, s.business_date as string]),
+      );
+      if (dateBySession.size > 0) {
+        const { data: setRows, error: setErr } = await supabaseAdmin
+          .from("waiter_settlements")
+          .select("staff_id, session_id")
+          .eq("organization_id", caller.organizationId)
+          .in("session_id", Array.from(dateBySession.keys()))
+          .neq("status", "superseded");
+        if (setErr) throw setErr;
+        for (const s of setRows ?? []) {
+          const iso = dateBySession.get(s.session_id as string);
+          if (iso) settledKeys.add(plannedKey(s.staff_id as string, iso));
+        }
+      }
+    }
+
     for (const lid of data.locationIds) {
       const locDeptRows = deptByLoc.get(lid) ?? [];
       const deptByStaff = buildPrimaryDeptMap(
@@ -1536,7 +1624,11 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
       const rosterByStaff: Record<string, { areas: Department[]; skillIds: string[] }> = {};
       const rosterAreaByStaffDate: Record<string, Record<string, Department>> = {};
       const rosterGlByStaffDate: Record<string, Record<string, boolean>> = {};
+      const plannedKeys = new Set<string>();
       for (const r of rosterByLoc.get(lid) ?? []) {
+        if (r.status === "planned" || r.status === "confirmed") {
+          plannedKeys.add(plannedKey(r.staff_id, r.shift_date));
+        }
         const bucket = rosterByStaff[r.staff_id] ?? { areas: [], skillIds: [] };
         if (r.area && !bucket.areas.includes(r.area)) bucket.areas.push(r.area);
         if (r.skill_id && !bucket.skillIds.includes(r.skill_id)) bucket.skillIds.push(r.skill_id);
@@ -1570,17 +1662,31 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
         })
         .filter((s) => s.isActive);
 
-      const entries = (entriesByLoc.get(lid) ?? []).map((r) => ({
-        id: r.id as string,
-        staffId: r.staff_id as string,
-        displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
-        department: deptByStaff.get(r.staff_id as string) ?? ("service" as const),
-        rawDepartment: (r.department as Department | null) ?? null,
-        businessDate: r.business_date as string,
-        startedAt: r.started_at as string,
-        endedAt: r.ended_at as string,
-        breakMinutes: Number((r as { break_minutes?: number | null }).break_minutes ?? 0),
-      }));
+      const entries = (entriesByLoc.get(lid) ?? []).map((r) => {
+        const staffId = r.staff_id as string;
+        const businessDate = r.business_date as string;
+        const key = plannedKey(staffId, businessDate);
+        const notInPlan = !plannedKeys.has(key);
+        return {
+          id: r.id as string,
+          staffId,
+          displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
+          department: deptByStaff.get(staffId) ?? ("service" as const),
+          rawDepartment: (r.department as Department | null) ?? null,
+          businessDate,
+          startedAt: r.started_at as string,
+          endedAt: r.ended_at as string,
+          breakMinutes: Number((r as { break_minutes?: number | null }).break_minutes ?? 0),
+          // ZS1 — gleiche Felder wie die Single-Location-Variante.
+          notInPlan,
+          removable:
+            notInPlan &&
+            isUntouched({
+              hasClockEntry: (r as { source?: string | null }).source === "clock",
+              hasSettlement: settledKeys.has(key),
+            }),
+        };
+      });
 
       // crossLocationDates wird im „Alle Standorte"-Mode client-seitig nicht
       // gemergt (nur die Single-Location-Variante braucht das für die
@@ -1603,6 +1709,52 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
 
 // B6c — Inline-Edit/Create für Wochenplan (Admin)
 // Schmaler Wrapper, der nur Start/Ende setzt und break_minutes erhält bzw. 0 setzt.
+
+// ZS1 — Überlappungs-Guard. Lädt die Einträge derselben Person für
+// business_date ± 1 Tag (deckt Wrap-Schichten über Mitternacht ab) und
+// wirft bei identischem oder überlappendem Kandidaten. Reine Prüflogik
+// liegt in ./overlap.
+function shiftIsoDay(iso: string, delta: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+async function assertNoTimeConflict(
+  supabaseAdmin: SupabaseAdminLike,
+  organizationId: string,
+  staffId: string,
+  businessDate: string,
+  candidate: { startedAt: string; endedAt: string | null },
+  excludeId?: string,
+): Promise<void> {
+  const { data: rows, error } = await supabaseAdmin
+    .from("time_entries")
+    .select("id, started_at, ended_at")
+    .eq("organization_id", organizationId)
+    .eq("staff_id", staffId)
+    .gte("business_date", shiftIsoDay(businessDate, -1))
+    .lte("business_date", shiftIsoDay(businessDate, 1));
+  if (error) throw error;
+  const conflict = findTimeConflict(
+    (rows ?? []).map((r) => ({
+      id: r.id as string,
+      startedAt: r.started_at as string,
+      endedAt: (r.ended_at as string | null) ?? null,
+    })),
+    candidate,
+    excludeId,
+  );
+  if (!conflict) return;
+  const { data: staff } = await supabaseAdmin
+    .from("staff")
+    .select("display_name")
+    .eq("id", staffId)
+    .maybeSingle();
+  const name =
+    (staff as { display_name?: string | null } | null)?.display_name ?? "diesen Mitarbeiter";
+  throw new Error(conflictMessage(conflict, name));
+}
 
 export const setTimeEntryShift = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1665,6 +1817,15 @@ export const setTimeEntryShift = createServerFn({ method: "POST" })
         if (newBusinessDate !== before.business_date) {
           await assertBusinessDateUnlocked(supabaseAdmin, caller.organizationId, newBusinessDate);
         }
+        // ZS1 — kein identischer/überlappender Eintrag derselben Person.
+        await assertNoTimeConflict(
+          supabaseAdmin,
+          caller.organizationId,
+          before.staff_id,
+          newBusinessDate,
+          { startedAt: data.startedAt, endedAt: data.endedAt },
+          data.id,
+        );
         // Z3: Abteilungs-Zuordnung serverseitig gegen staff_locations prüfen.
         if (data.department != null && before.location_id) {
           await assertStaffDeptAssignment(
@@ -1762,6 +1923,14 @@ export const createTimeEntryShift = createServerFn({ method: "POST" })
         const businessDate = businessDateOf(new Date(data.startedAt));
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         await assertBusinessDateUnlocked(supabaseAdmin, caller.organizationId, businessDate);
+        // ZS1 — kein identischer/überlappender Eintrag derselben Person.
+        await assertNoTimeConflict(
+          supabaseAdmin,
+          caller.organizationId,
+          data.staffId,
+          businessDate,
+          { startedAt: data.startedAt, endedAt: data.endedAt },
+        );
 
         const { data: staff, error: sErr } = await supabaseAdmin
           .from("staff")
@@ -1923,6 +2092,100 @@ export const deleteTimeEntry = createServerFn({ method: "POST" })
           caller.organizationId,
           data.id,
           data.reason,
+        );
+        return { result: { ok: true as const }, audit };
+      },
+    );
+  });
+
+// ZS1 — Ein-Klick-Entfernen für Einträge, die NICHT MEHR im Dienstplan
+// stehen und UNBERÜHRT sind (kein Stempel, keine Abrechnung, keine Notiz).
+// Rollen- und Rechte-Anforderungen sind identisch zu deleteTimeEntry —
+// bewusst keinen Deut breiter. Die Anzeige entscheidet nicht: Plan-Abwesenheit
+// und Unberührtheit werden hier erneut geprüft.
+export const removeUnplannedTimeEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, [
+      "manager",
+      "admin",
+      "planer",
+    ]);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: pre, error: preErr } = await supabaseAdmin
+      .from("time_entries")
+      .select("id, staff_id, location_id, business_date, source")
+      .eq("id", data.id)
+      .eq("organization_id", caller.organizationId)
+      .maybeSingle();
+    if (preErr) throw preErr;
+    if (!pre) throw new Error("Eintrag nicht gefunden.");
+    if (caller.role === "planer") {
+      if (!isInCurrentBillingCycle(pre.business_date, todayIso())) {
+        throw new Error("Planer dürfen nur Einträge der laufenden Abrechnungsperiode löschen.");
+      }
+    }
+    return runWithPermission(
+      context.supabase,
+      "time.entry.edit",
+      pre.location_id,
+      makeAuditWriter(caller),
+      async () => {
+        // 1. Plan-Abwesenheit serverseitig prüfen.
+        const { data: shifts, error: shiftErr } = await supabaseAdmin
+          .from("roster_shifts")
+          .select("staff_id, shift_date")
+          .eq("organization_id", caller.organizationId)
+          .eq("staff_id", pre.staff_id)
+          .eq("shift_date", pre.business_date)
+          .in("status", ["planned", "confirmed"]);
+        if (shiftErr) throw shiftErr;
+        const planned = new Set(
+          (shifts ?? []).map((s) => plannedKey(s.staff_id as string, s.shift_date as string)),
+        );
+        if (planned.has(plannedKey(pre.staff_id, pre.business_date))) {
+          throw new Error("Eintrag steht weiterhin im Dienstplan — kein Ein-Klick-Entfernen.");
+        }
+        // 2. Unberührtheit serverseitig prüfen.
+        // waiter_settlements hängt an der Session, nicht am Geschäftstag —
+        // daher erst die Session(s) des Tages auflösen.
+        let sessionQuery = supabaseAdmin
+          .from("sessions")
+          .select("id")
+          .eq("organization_id", caller.organizationId)
+          .eq("business_date", pre.business_date);
+        if (pre.location_id) sessionQuery = sessionQuery.eq("location_id", pre.location_id);
+        const { data: sessionRows, error: sessErr } = await sessionQuery;
+        if (sessErr) throw sessErr;
+        const sessionIds = (sessionRows ?? []).map((s) => s.id as string);
+        let settlements: Array<{ id: string }> = [];
+        if (sessionIds.length > 0) {
+          const { data: setRows, error: setErr } = await supabaseAdmin
+            .from("waiter_settlements")
+            .select("id")
+            .eq("organization_id", caller.organizationId)
+            .eq("staff_id", pre.staff_id)
+            .in("session_id", sessionIds)
+            .neq("status", "superseded")
+            .limit(1);
+          if (setErr) throw setErr;
+          settlements = (setRows ?? []) as Array<{ id: string }>;
+        }
+        const untouched = isUntouched({
+          hasClockEntry: pre.source === "clock",
+          hasSettlement: settlements.length > 0,
+        });
+        if (!untouched) {
+          throw new Error(
+            "Eintrag ist nicht unberührt (Stempel oder Abrechnung vorhanden) — bitte bewusst mit Begründung löschen.",
+          );
+        }
+        const { audit } = await _deleteTimeEntryCore(
+          supabaseAdmin,
+          caller.organizationId,
+          data.id,
+          "nicht mehr im Dienstplan (unberührt)",
         );
         return { result: { ok: true as const }, audit };
       },

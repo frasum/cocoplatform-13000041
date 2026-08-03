@@ -594,6 +594,9 @@ type PoolRowData = {
   shiftEnd: string | null;
   participates: boolean;
   participatesOverride: boolean | null;
+  notInPlan: boolean;
+  removable: boolean;
+  removalBlockedReason: string | null;
 };
 
 function PoolRow({
@@ -604,6 +607,7 @@ function PoolRow({
   timeEditable,
   onToggleParticipates,
   onSaveTimes,
+  onRemove,
 }: {
   row: PoolRowData;
   share: { hoursWorked: number; shareCents: number } | undefined;
@@ -612,6 +616,7 @@ function PoolRow({
   timeEditable: boolean;
   onToggleParticipates: (v: boolean) => void;
   onSaveTimes: (shiftStart: string, shiftEnd: string) => Promise<unknown>;
+  onRemove: () => void;
 }) {
   const [start, setStart] = useState(row.shiftStart ?? "");
   const [end, setEnd] = useState(row.shiftEnd ?? "");
@@ -645,6 +650,31 @@ function PoolRow({
           <Badge variant="outline" className="ml-2">
             übersteuert
           </Badge>
+        )}
+        {/* ZS1 — Badge ist für jeden sichtbar, der die Liste sieht; der
+            Entfernen-Klick gehorcht den bestehenden Schreibrechten. */}
+        {row.notInPlan && (
+          <span className="ml-2 inline-flex items-center gap-1 align-middle">
+            <Badge
+              variant="outline"
+              className="border-amber-500 text-amber-700"
+              title={row.removalBlockedReason ?? "Keine Plan-Schicht mehr für diesen Tag."}
+            >
+              nicht mehr im Plan
+            </Badge>
+            {row.removable && editable && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                title="Unberührten Eintrag entfernen"
+                aria-label="Unberührten Eintrag entfernen"
+                onClick={onRemove}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </span>
         )}
       </TableCell>
       <TableCell className="text-center">

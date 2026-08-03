@@ -985,9 +985,9 @@ type TipPayload = {
   payload?: Array<{
     payload: {
       fullDate: string;
-      totalCents: number;
-      cardCents: number;
-      takeawayCents: number;
+      totalCents: number | null;
+      cardCents: number | null;
+      takeawayCents: number | null;
     };
   }>;
 };
@@ -998,24 +998,27 @@ type TipPayload = {
 type GuestHoursRow = {
   day: string;
   fullDate: string;
-  guests: number;
-  hours: number;
+  guests: number | null;
+  hours: number | null;
   perGuestCents: number | null;
   perHourCents: number | null;
 };
 
-function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
-  const rows: GuestHoursRow[] = fillDailyGaps(daily).map((d) => {
+function GuestHoursChart({ daily, range }: { daily: DailyRow[]; range: ChartRange }) {
+  const rows: GuestHoursRow[] = chartDaySlots(daily, range).map(({ day, businessDate, point }) => {
+    if (!point) {
+      return { day, fullDate: businessDate, guests: null, hours: null, perGuestCents: null, perHourCents: null };
+    }
     const k = derivedKpis({
-      houseCents: d.houseCents,
-      totalCents: d.totalCents,
-      guestCount: d.guestCount ?? 0,
-      workMinutes: d.workMinutes ?? 0,
+      houseCents: point.houseCents,
+      totalCents: point.totalCents,
+      guestCount: point.guestCount ?? 0,
+      workMinutes: point.workMinutes ?? 0,
     });
     return {
-      day: d.businessDate.slice(8, 10),
-      fullDate: d.businessDate,
-      guests: d.guestCount ?? 0,
+      day,
+      fullDate: businessDate,
+      guests: point.guestCount ?? 0,
       hours: k.workHours,
       perGuestCents: k.revenuePerGuestCents,
       perHourCents: k.revenuePerWorkHourCents,
@@ -1027,7 +1030,7 @@ function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} interval={1} />
           <YAxis
             yAxisId="guests"
             tickLine={false}
@@ -1057,12 +1060,13 @@ function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
           />
           <Line
             yAxisId="hours"
-            type="monotone"
+            type="linear"
             dataKey="hours"
             name="Arbeitsstunden"
             stroke="#f59e0b"
             strokeWidth={2}
-            dot={false}
+            dot={{ r: 2, strokeWidth: 0, fill: "#f59e0b" }}
+            connectNulls={false}
           />
         </ComposedChart>
       </ResponsiveContainer>

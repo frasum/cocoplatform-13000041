@@ -83,6 +83,7 @@ export function TipPoolCard({
   const callUpsert = useServerFn(upsertSessionTipPoolEntry);
   const callDelete = useServerFn(deleteSessionTipPoolEntry);
   const callAddSnapshot = useServerFn(addRosterSnapshotMissing);
+  const callRemoveUnplanned = useServerFn(removeUnplannedPoolEntry);
 
   const poolQ = useQuery({
     queryKey: ["cash", "tip-pool", sessionId],
@@ -262,6 +263,17 @@ export function TipPoolCard({
     }
   };
 
+  // ZS1 — Ein-Klick-Entfernen unberührter Zeilen ohne Plan-Schicht.
+  const removeUnplanned = async (staffId: string) => {
+    try {
+      await callRemoveUnplanned({ data: { sessionId, staffId } });
+      toast.success("Eintrag entfernt.");
+      invalidatePool();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   const renderTable = (title: string, rows: typeof poolEntries) => {
     return (
       <Card className="flex-1">
@@ -300,6 +312,7 @@ export function TipPoolCard({
                   editable={editable}
                   timeEditable={timeEditable}
                   onToggleParticipates={(v) => void toggleParticipates(r, v)}
+                  onRemove={() => void removeUnplanned(r.staffId)}
                   onSaveTimes={(shiftStart, shiftEnd) =>
                     callUpsert({
                       data: {

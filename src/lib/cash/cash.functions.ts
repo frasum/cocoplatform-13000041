@@ -3583,6 +3583,75 @@ export async function deleteSessionTipPoolEntryCore(
 }
 
 // Plan-Snapshot in den Pool: siehe `./roster-pool-sync` — dort liegt
+
+// ZS1 — Ein-Klick-Entfernen für Pool-Zeilen, die nicht mehr im Dienstplan
+// stehen und unberührt sind. Rollenanforderung exakt wie
+// `deleteSessionTipPoolEntry` ("manager"), inklusive Vorschau-Sperre; die
+// Unberührtheit wird serverseitig erneut geprüft, die Anzeige entscheidet
+// nicht.
+export const removeUnplannedPoolEntry = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z.object({ sessionId: z.string().uuid(), staffId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    assertRealIdentity(caller);
+    const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const [rowRes, plannedRes, timeRes, setRes] = await Promise.all([
+      supabaseAdmin
+        .from("session_tip_pool_entries")
+        .select("staff_id, note, participates")
+        .eq("organization_id", caller.organizationId)
+        .eq("session_id", session.id)
+        .eq("staff_id", data.staffId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("roster_shifts")
+        .select("staff_id")
+        .eq("organization_id", caller.organizationId)
+        .eq("location_id", session.location_id)
+        .eq("shift_date", session.business_date)
+        .eq("staff_id", data.staffId)
+        .in("status", ["planned", "confirmed"])
+        .limit(1),
+      supabaseAdmin
+        .from("time_entries")
+        .select("id")
+        .eq("organization_id", caller.organizationId)
+        .eq("location_id", session.location_id)
+        .eq("business_date", session.business_date)
+        .eq("staff_id", data.staffId)
+        .eq("source", "clock")
+        .limit(1),
+      supabaseAdmin
+        .from("waiter_settlements")
+        .select("id")
+        .eq("organization_id", caller.organizationId)
+        .eq("session_id", session.id)
+        .eq("staff_id", data.staffId)
+        .neq("status", "superseded")
+        .limit(1),
+    ]);
+    if (rowRes.error) throw rowRes.error;
+    if (plannedRes.error) throw plannedRes.error;
+    if (timeRes.error) throw timeRes.error;
+    if (setRes.error) throw setRes.error;
+    if (!rowRes.data) throw new Error("Pool-Eintrag nicht gefunden.");
+    if ((plannedRes.data ?? []).length > 0) {
+      throw new Error("Eintrag steht weiterhin im Dienstplan — kein Ein-Klick-Entfernen.");
+    }
+    const reason = removalBlockedReason({
+      hasClockEntry: (timeRes.data ?? []).length > 0,
+      hasSettlement: (setRes.data ?? []).length > 0,
+      note: (rowRes.data as { note: string | null }).note,
+      participatesOverride: (rowRes.data as { participates: boolean | null }).participates,
+    });
+    if (reason) throw new Error(reason);
+    return deleteSessionTipPoolEntryCore(caller, data);
+  });
+
 // `applyRosterPoolSnapshot` (Eröffnung + manueller Nachzug) und der
 // neue `syncOpenSessionsPoolAfterRosterWrite` (RS1, Nach-Sync bei
 // Dienstplan-Änderungen an offenen Sessions).

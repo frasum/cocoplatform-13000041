@@ -80,6 +80,8 @@ export function WeeklyPlan({
   // Aufrufer öffnet die eigentliche Server-Mutation; die UI hat die
   // Begründung bereits per Popover eingesammelt (≥3 Zeichen).
   onDeleteEntry: (id: string, reason: string) => void;
+  // ZS1 — Ein-Klick-Entfernen unberührter Einträge ohne Plan-Schicht.
+  onRemoveUnplanned: (id: string) => void;
   staffDeptsByStaff: Map<string, Department[]>;
   periodStart?: string;
   periodEnd?: string;

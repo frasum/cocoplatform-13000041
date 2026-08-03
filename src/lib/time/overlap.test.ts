@@ -79,10 +79,10 @@ describe("findTimeConflict", () => {
 
 describe("conflictMessage", () => {
   it("nennt Name und Zeitspanne", () => {
-    const c = findTimeConflict(
-      [span("a", "2026-08-03T13:00:00Z", "2026-08-03T21:00:00Z")],
-      { startedAt: "2026-08-03T13:00:00Z", endedAt: "2026-08-03T21:00:00Z" },
-    )!;
+    const c = findTimeConflict([span("a", "2026-08-03T13:00:00Z", "2026-08-03T21:00:00Z")], {
+      startedAt: "2026-08-03T13:00:00Z",
+      endedAt: "2026-08-03T21:00:00Z",
+    })!;
     const msg = conflictMessage(c, "Derau");
     expect(msg).toContain("Derau");
     expect(msg).toContain("15:00");

@@ -39,8 +39,10 @@ export function isUntouched(input: UntouchedInput): boolean {
 /** Tooltip-Grund, warum Ein-Klick-Entfernen gesperrt ist. null = entfernbar. */
 export function removalBlockedReason(input: UntouchedInput): string | null {
   if (input.hasClockEntry) return "Gestempelte Ist-Zeit vorhanden — nur bewusst manuell entfernen.";
-  if (input.hasSettlement) return "Abrechnung/Trinkgeldbezug vorhanden — nur bewusst manuell entfernen.";
-  if (input.note != null && input.note.trim() !== "") return "Notiz vorhanden — nur bewusst manuell entfernen.";
+  if (input.hasSettlement)
+    return "Abrechnung/Trinkgeldbezug vorhanden — nur bewusst manuell entfernen.";
+  if (input.note != null && input.note.trim() !== "")
+    return "Notiz vorhanden — nur bewusst manuell entfernen.";
   if (input.participatesOverride != null)
     return "Teilnahme wurde manuell übersteuert — nur bewusst manuell entfernen.";
   return null;

@@ -35,6 +35,7 @@ import {
 import { fmtCents } from "@/lib/format";
 import {
   deleteSessionTipPoolEntry,
+  removeUnplannedPoolEntry,
   getTipPoolOverview,
   listSessionTipPoolEntries,
   upsertSessionTipPoolEntry,

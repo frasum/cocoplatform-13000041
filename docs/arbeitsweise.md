@@ -4914,3 +4914,107 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 **EV1-R4 (`f0c4d4d9`) — Bauherren-Fund am Vortags-Rückblick:** Die Events-Karte rechnete fest mit dem Server-Heute und zeigte auf der 01.08.-Ansicht den 02.08.-Hinweis („Morgen beginnen die Sommerferien") — während das Wetter dem Seiten-Datum bereits folgte. Fix: `listEventNoticesForToday` → `listEventNotices` mit optionalem `businessDate` (Default: aktueller Geschäftstag), `kasse.tsx` übergibt das Seiten-Datum, Query-Key datumsbehaftet; Kernlogik unverändert. Wetter-Spalte 1 heißt nur noch „Heute", wenn der gewählte Tag der echte aktuelle Geschäftstag ist (`weather-labels.ts`, pure, DST-fest via UTC-Mittag). Tests: 01.08. ⇒ keine Ferien-Zeile · 02.08. ⇒ `tomorrow` · 03.08. ⇒ `running` 1/43. **Semantik-Grundsatz dokumentiert:** ALLE Karten der Tagesabrechnung beziehen sich auf den GEWÄHLTEN Geschäftstag.
 
 **Offene Merkposten:** wie §132 (insb. Manager-Gegenprobe Wochenplan, staff-Gegenprobe Kasse, §131-Vollzüge falls offen, Lohnbüro TSB).
+
+## §134 — Merkposten-Statusliste (03.08.2026)
+
+**Reiner Doku-Vorgang, keine Code-Änderung.** Diese Liste **ERSETZT** die Kettenform „wie §132, PLUS/MINUS …“ aus §128–§133: ab hier trägt jeder Merkposten einen **Status** (`offen` / `in Arbeit` / `erledigt`) und ein **Datum** (Stand bzw. Erledigungstag). **Statusregel (Ehrlichkeitsregel):** `erledigt` steht nur, wo ein Beleg in diesem Dokument nachweisbar ist (Anker-Commit, Produktions-Kontrollabfrage, Bauherren-/Prüfer-Meldung). Alles ohne Beleg bleibt `offen` — auch wenn es „eigentlich durch“ ist. `in Arbeit` heißt: begonnen und jemandem namentlich zugeordnet.
+
+### A — Produktions-Vollzüge & Sichtprüfungen
+
+| Merkposten                                                                                                     | Status   | Datum            |
+| -------------------------------------------------------------------------------------------------------------- | -------- | ---------------- |
+| Realtime-Migrationen `20260802165312` + Kommentar-Folge `20260802171331` ausgeführt (`pg_policies` = 0 Zeilen) | erledigt | 02.08.2026       |
+| WX1-Vollzug (Wetter-Migration + Erst-Sync)                                                                     | erledigt | 02.08.2026       |
+| MB1-Vollzug (Migration `20260801102355` + Excel-Historie)                                                      | erledigt | 01.08.2026       |
+| EV1-Einmal-Import + admin-Sichtprüfung Veranstaltungen                                                         | erledigt | 02.08.2026       |
+| R3/WX2-Vollzug: `weather_code`-Re-Backfill + Sync (Fragezeichen im Widget)                                     | offen    | Stand 03.08.2026 |
+| RS1-Kommentar-Migration + LS1-Migration (`cash_enabled`)                                                       | offen    | Stand 03.08.2026 |
+| Ursula PN 30 `roster_plannable=false` setzen                                                                   | offen    | Stand 03.08.2026 |
+| TSB `cash_enabled=false` setzen                                                                                | offen    | Stand 03.08.2026 |
+| Manager-Gegenprobe Wochenplan (laden, Zeiten anlegen/ändern/löschen, Konsole ohne Forbidden)                   | offen    | Stand 03.08.2026 |
+| staff-Gegenprobe Kasse (Tagesabrechnung aus Mitarbeitersicht)                                                  | offen    | Stand 03.08.2026 |
+| Testevent „Test Späte Veranstaltung“ löschen                                                                   | offen    | Stand 03.08.2026 |
+| Ferien-Hinweis „Tag 1/43“ am 03.08. beiläufig bestätigen                                                       | offen    | Stand 03.08.2026 |
+| Publish + Klicktest LAM/MO im Panel                                                                            | offen    | Stand 03.08.2026 |
+| WX-Cron (täglicher automatischer Sync; bis dahin trägt der Knopf)                                              | offen    | Stand 03.08.2026 |
+
+### B — Lohnbüro & August-Export (kritischer Pfad, Frist 25.08.)
+
+| Merkposten                                                                                       | Status    | Datum                                    |
+| ------------------------------------------------------------------------------------------------ | --------- | ---------------------------------------- |
+| Korrigiertes Statistik-PDF an Peter/Bank                                                         | erledigt  | 01.08.2026                               |
+| Lohnbüro-Fragenliste (4 Punkte + Slot-Vereinheitlichung ZL/ZL2)                                  | offen     | Stand 03.08.2026                         |
+| MO-Satzkorrektur (edlohn Service 23,00; Juli-Differenz 352,00 €)                                 | offen     | Stand 03.08.2026                         |
+| Lohnbüro-Anfrage TSB-Personalgestellung (eigene GmbH, Andres Stunden)                            | offen     | Stand 03.08.2026                         |
+| Ursula PN 30 PauSt                                                                               | offen     | Stand 03.08.2026                         |
+| PN 327 Eintrittsdatum                                                                            | offen     | Stand 03.08.2026                         |
+| August-Abgleich: gewollte edlohn-Netto-Anpassungen (GERARD, ANDI, ggf. weitere) vorab einsammeln | offen     | Stand 03.08.2026                         |
+| Prüfer-Sichtkontrolle erster August-Export (Checkliste liegt vor, Block A0 = U/K-Erfassung)      | offen     | Stand 03.08.2026                         |
+| TG4-Scharfstellung zum 26.08. (UPDATE-SQL im TG4-Prompt §7)                                      | offen     | Stand 03.08.2026                         |
+| Netto-Sextett-Analyse (~10.08.)                                                                  | offen     | Stand 03.08.2026                         |
+| SUMITR/CHEFIN Negativ-Auszahlung bestätigen · CHEFIN-Pool-Klärung                                | offen     | Stand 03.08.2026                         |
+| DEREJE-U/K-Erstverprobung in UK2 · Verifikation Kellner-Enden 28.07.                             | offen     | Stand 03.08.2026                         |
+| LAM-Probevertrag (ST1-B-Sichtbeweis + fünfter DEP1b-Smoke-Pfad)                                  | in Arbeit | Template beim Bauherrn, Stand 03.08.2026 |
+| ST1-B (Verträge mehrsätzig) · ST1-C (Import + Alt-Satz-Feldabriss)                               | offen     | Stand 03.08.2026                         |
+
+### C — Sicherheit & externer Audit (planmäßig NACH dem August-Export)
+
+| Merkposten                                                                                       | Status    | Datum                                       |
+| ------------------------------------------------------------------------------------------------ | --------- | ------------------------------------------- |
+| Realtime-Payload-Prüfung (Autorisierung über Quelltabellen-RLS belegt)                           | erledigt  | 02.08.2026                                  |
+| Domänen-Nachzug Vorschau-Schutz (114 `runGuarded`-Stellen; cash = 14 fertig)                     | in Arbeit | cash erledigt 30.07., Rest Stand 03.08.2026 |
+| SEC-01 (Export-Download-Autorisierung)                                                           | offen     | nach August-Export                          |
+| CORR-01 + CORR-03                                                                                | offen     | nach August-Export                          |
+| DOC-01-Handarbeit (Trefferliste Prüfer, < 25 reale Personenbezüge)                               | offen     | Stand 03.08.2026                            |
+| History-Purge entscheiden (Personaldaten in ~6.600 Commits)                                      | offen     | Stand 03.08.2026                            |
+| Doku auf Kürzel/PN umstellen (Klarnamen außerhalb des Repos)                                     | offen     | Stand 03.08.2026                            |
+| Alt-App-Repos/Lovable-Projekte archivieren (read-only)                                           | offen     | Stand 03.08.2026                            |
+| Dependency-/Build-Tooling-Runde (Advisories; NICHT „Try to fix all“; TanStack/seroval inklusive) | offen     | nach August-Export                          |
+| 27 ignorierte Scanner-Issues einmal querlesen                                                    | offen     | Stand 03.08.2026                            |
+| Broadcast-Topic-Autorisierung (SaaS-Erweiterungspunkt)                                           | offen     | geparkt, Stand 03.08.2026                   |
+| COCO-9: betroffene Akte + `tax_class`-Schema-Härtung                                             | offen     | Stand 03.08.2026                            |
+
+### D — CI & Tests
+
+| Merkposten                                                                               | Status    | Datum            |
+| ---------------------------------------------------------------------------------------- | --------- | ---------------- |
+| CI-Beweislauf E2E-G1 sichten (kasse-finalize)                                            | erledigt  | 01.08.2026       |
+| `db-integration` wieder scharf stellen (`continue-on-error` seit §8; Zehner-Serie läuft) | in Arbeit | Stand 03.08.2026 |
+| e2e-Job-Status prüfen (zweiter stiller Zeuge)                                            | offen     | Stand 03.08.2026 |
+| CI-Runde: Node-24-Actions + `GITHUB_STEP_SUMMARY` für db-integration/e2e                 | offen     | Stand 03.08.2026 |
+| DB1-C (84 Stellen / 17 Dateien)                                                          | offen     | Stand 03.08.2026 |
+| `retry()` dreifach zusammenführen (KGL, nach DB1-C)                                      | offen     | Stand 03.08.2026 |
+| `buildWeeklyXlsx`/`buildBuchhaltungXlsx` ohne Test                                       | offen     | Stand 03.08.2026 |
+| LG3a-DB-Tests                                                                            | offen     | Stand 03.08.2026 |
+
+### E — Code-Hygiene (kosmetisch, beim nächsten Anfassen)
+
+| Merkposten                                                                                                   | Status | Datum            |
+| ------------------------------------------------------------------------------------------------------------ | ------ | ---------------- |
+| Cast `u as AuthUserLike` in `orphan-accounts.functions.ts`                                                   | offen  | Stand 03.08.2026 |
+| `row!`-Assertions in `telegram.functions.ts`                                                                 | offen  | Stand 03.08.2026 |
+| `comparison-label(s)`-Umbenennung                                                                            | offen  | Stand 03.08.2026 |
+| `revenue_channels.is_takeaway` droppen · `staff_locations`-Leichen · Abriss `staff_compensation.hourly_rate` | offen  | Stand 03.08.2026 |
+| Orphan-Panel: Mehr-Org-Namensauflösung (SaaS-Punkt)                                                          | offen  | Stand 03.08.2026 |
+| Elson Stammblatt-Tippfehler                                                                                  | offen  | Stand 03.08.2026 |
+| `rosterPlanned`-Signaturvergleich · `export/download`-Härtung                                                | offen  | Stand 03.08.2026 |
+
+### F — Fachliche Entscheide (Bauherr)
+
+| Merkposten                                                                                            | Status | Datum                             |
+| ----------------------------------------------------------------------------------------------------- | ------ | --------------------------------- |
+| `no_hours`-U/K-Regel (aktuell `throw`)                                                                | offen  | Stand 03.08.2026                  |
+| LG-12-Erstanlage-Regel beim zweiten Auftreten neu entscheiden                                         | offen  | Stand 03.08.2026                  |
+| GERARD Planer-Rolle in COCO                                                                           | offen  | Stand 03.08.2026                  |
+| Provisions-Schalter-Frage                                                                             | offen  | geparkt, Stand 03.08.2026         |
+| ICS-Kalender So/Feiertag-Defaults                                                                     | offen  | Stand 03.08.2026                  |
+| Idee: Netto-Ziel-Feld in COCO                                                                         | offen  | Idee, Stand 03.08.2026            |
+| BWA-V2 (Break-even + Modell-Ergebnis je Kostenstelle)                                                 | offen  | Stand 03.08.2026                  |
+| Telegram-Adminliste: vierter Zustand „Einladung abgelaufen“                                           | offen  | falls gewünscht, Stand 03.08.2026 |
+| PG-Serie (Prognose-Ansicht; PG0: Events ✓ Wetter ✓ Ferien ✓, offen OpenLigaDB + Tageshistorien-Block) | offen  | nach CODE-AUDIT-1                 |
+
+### G — Backlog-Kürzel (unverändert offen, Stand 03.08.2026)
+
+PB3 · KM1 · TB1 · 034/035 · AV1b/c-Rest · Stk/BE · DL1 · AP1 · Kanal-/Terminalnamen-Notfallblatt.
+
+**Kritischer Pfad unverändert:** **August-Export** (bis 25.08., mit Prüfer-Sichtkontrolle) → **CODE-AUDIT-1** → **PG-Serie**.

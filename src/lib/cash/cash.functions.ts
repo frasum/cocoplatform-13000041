@@ -33,6 +33,7 @@ import {
 } from "./tip-pool";
 import { kitchenShiftMinutes } from "./kitchen-shift-hours";
 import { applyRosterPoolSnapshot } from "./roster-pool-sync";
+import { isUntouched, removalBlockedReason } from "@/lib/roster/not-in-plan";
 import { resolveServicePoolEnd } from "./service-pool-end";
 import { assertCashWritable, CashLockedError } from "./cash-lock";
 import type { Json } from "@/integrations/supabase/types";

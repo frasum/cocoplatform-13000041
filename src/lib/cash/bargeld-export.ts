@@ -10,22 +10,23 @@ export async function buildBargeldXlsx(rows: CashDailyRow[], monthLabel: string)
   wb.creator = "Coco";
   const ws = wb.addWorksheet(monthLabel);
 
+  // EX2 — Spaltensatz/Reihenfolge/Labels folgen der Bankeinzahlungs-Vorlage
+  // („bankeinzahlung 0726.xls"). Bewusste Abweichung: „offene rechnungen"
+  // statt des Vorlagen-Tippfehlers „offene rechnunge".
   ws.addRow([
-    "Datum",
-    "Tagesumsatz",
-    "Kreditkarten",
-    "Take-Away",
+    "datum",
+    "tagesumsatz",
+    "kreditkarten",
     "SoUse",
     "Wolt",
-    "Gutsch. EL",
+    "gutscheine",
     "FineDine",
-    "Gutsch. VK",
-    "Einladung",
-    "Offene RE",
-    "Vorschuss",
-    "Ausgaben",
-    "Bargeld",
-    "TG-Rest",
+    "Gutscheine VK",
+    "einladung gäste",
+    "offene rechnungen",
+    "personal",
+    "barausgaben",
+    "bargeld",
   ]);
   ws.getRow(1).font = { bold: true };
 
@@ -35,7 +36,6 @@ export async function buildBargeldXlsx(rows: CashDailyRow[], monthLabel: string)
       formatShortDate(r.businessDate),
       money(r.tagesumsatzCents),
       money(r.kreditkartenCents),
-      money(r.deliveryVectronCents),
       money(r.deliverySouseCents),
       money(r.deliveryWoltCents),
       money(r.vouchersRedeemedCents),
@@ -46,7 +46,6 @@ export async function buildBargeldXlsx(rows: CashDailyRow[], monthLabel: string)
       money(r.vorschussCents),
       money(r.expensesCents),
       money(r.bargeldCents),
-      money(r.tipRemainderCents),
     ]);
   }
 
@@ -55,7 +54,6 @@ export async function buildBargeldXlsx(rows: CashDailyRow[], monthLabel: string)
     "Summe",
     sum((r) => r.tagesumsatzCents),
     sum((r) => r.kreditkartenCents),
-    sum((r) => r.deliveryVectronCents),
     sum((r) => r.deliverySouseCents),
     sum((r) => r.deliveryWoltCents),
     sum((r) => r.vouchersRedeemedCents),
@@ -66,11 +64,10 @@ export async function buildBargeldXlsx(rows: CashDailyRow[], monthLabel: string)
     sum((r) => r.vorschussCents),
     sum((r) => r.expensesCents),
     sum((r) => r.bargeldCents),
-    sum((r) => r.tipRemainderCents),
   ]);
   ws.lastRow!.font = { bold: true };
 
-  for (let col = 2; col <= 15; col++) {
+  for (let col = 2; col <= 13; col++) {
     ws.getColumn(col).numFmt = '#,##0.00 "€"';
     ws.getColumn(col).width = 13;
   }

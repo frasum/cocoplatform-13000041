@@ -912,7 +912,7 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
     const { data: rows, error } = await supabaseAdmin
       .from("time_entries")
       .select(
-        "id, staff_id, started_at, ended_at, business_date, location_id, department, staff(display_name)",
+        "id, staff_id, started_at, ended_at, business_date, location_id, department, source, staff(display_name)",
       )
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId)
@@ -976,12 +976,19 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
     const rosterByStaff: Record<string, { areas: Department[]; skillIds: string[] }> = {};
     const { data: rosterRows, error: rosterErr } = await supabaseAdmin
       .from("roster_shifts")
-      .select("staff_id, area, skill_id, shift_date")
+      .select("staff_id, area, skill_id, shift_date, status")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId)
       .gte("shift_date", weekStart)
       .lte("shift_date", weekEnd);
     if (rosterErr) throw rosterErr;
+    // ZS1 — Plan-Menge (nur planned/confirmed) für die Markierung
+    // „nicht mehr im Plan".
+    const plannedKeys = new Set<string>(
+      (rosterRows ?? [])
+        .filter((r) => r.status === "planned" || r.status === "confirmed")
+        .map((r) => plannedKey(r.staff_id as string, r.shift_date as string)),
+    );
     // WZ2 — GL-Skill-IDs der Organisation (D-3: GL ist ein Skill der
     // Kategorie 'gl', kein Roster-Bereich). Ein Query, danach im Speicher
     // gejoint. Verwendet für rosterGlByStaffDate — die Tages-Typ-Quelle.
@@ -1061,22 +1068,66 @@ export const getWeeklyTimeEntries = createServerFn({ method: "GET" })
       crossLocationDates[key] = arr;
     }
 
+    // ZS1 — Abrechnungsbezug der Woche (Standort): (staffId|businessDate).
+    const settledKeys = new Set<string>();
+    {
+      const { data: sessionRows, error: sessErr } = await supabaseAdmin
+        .from("sessions")
+        .select("id, business_date")
+        .eq("organization_id", caller.organizationId)
+        .eq("location_id", data.locationId)
+        .gte("business_date", weekStart)
+        .lte("business_date", weekEnd);
+      if (sessErr) throw sessErr;
+      const dateBySession = new Map<string, string>(
+        (sessionRows ?? []).map((s) => [s.id as string, s.business_date as string]),
+      );
+      if (dateBySession.size > 0) {
+        const { data: setRows, error: setErr } = await supabaseAdmin
+          .from("waiter_settlements")
+          .select("staff_id, session_id")
+          .eq("organization_id", caller.organizationId)
+          .in("session_id", Array.from(dateBySession.keys()))
+          .neq("status", "superseded");
+        if (setErr) throw setErr;
+        for (const s of setRows ?? []) {
+          const iso = dateBySession.get(s.session_id as string);
+          if (iso) settledKeys.add(plannedKey(s.staff_id as string, iso));
+        }
+      }
+    }
+
     return {
       weekStart,
       weekEnd,
-      entries: (rows ?? []).map((r) => ({
-        id: r.id as string,
-        staffId: r.staff_id as string,
-        displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
-        // Z3: Primär-Abteilung als Fallback für Grid-Kompatibilität; das Grid
-        // nutzt entryRowDepartment(rawDepartment, staffDepts) für die
-        // eigentliche Zeilen-Attribution.
-        department: deptByStaff.get(r.staff_id as string) ?? ("service" as const),
-        rawDepartment: (r.department as Department | null) ?? null,
-        businessDate: r.business_date as string,
-        startedAt: r.started_at as string,
-        endedAt: r.ended_at as string,
-      })),
+      entries: (rows ?? []).map((r) => {
+        const staffId = r.staff_id as string;
+        const businessDate = r.business_date as string;
+        const key = plannedKey(staffId, businessDate);
+        const notInPlan = !plannedKeys.has(key);
+        const removable =
+          notInPlan &&
+          isUntouched({
+            hasClockEntry: r.source === "clock",
+            hasSettlement: settledKeys.has(key),
+          });
+        return {
+          id: r.id as string,
+          staffId,
+          displayName: (r.staff as { display_name: string } | null)?.display_name ?? "—",
+          // Z3: Primär-Abteilung als Fallback für Grid-Kompatibilität; das Grid
+          // nutzt entryRowDepartment(rawDepartment, staffDepts) für die
+          // eigentliche Zeilen-Attribution.
+          department: deptByStaff.get(staffId) ?? ("service" as const),
+          rawDepartment: (r.department as Department | null) ?? null,
+          businessDate,
+          startedAt: r.started_at as string,
+          endedAt: r.ended_at as string,
+          // ZS1 — Anzeige-Markierung; das Entfernen prüft serverseitig erneut.
+          notInPlan,
+          removable,
+        };
+      }),
       crossLocationDates,
       assignedStaff,
       rosterByStaff,

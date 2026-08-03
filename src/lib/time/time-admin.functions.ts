@@ -1751,7 +1751,8 @@ async function assertNoTimeConflict(
     .select("display_name")
     .eq("id", staffId)
     .maybeSingle();
-  const name = (staff as { display_name?: string | null } | null)?.display_name ?? "diesen Mitarbeiter";
+  const name =
+    (staff as { display_name?: string | null } | null)?.display_name ?? "diesen Mitarbeiter";
   throw new Error(conflictMessage(conflict, name));
 }
 

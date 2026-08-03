@@ -919,9 +919,7 @@ export async function computeSessionTipPoolCore(
   if (timeRes.error) throw timeRes.error;
   if (manualRes.error) throw manualRes.error;
   if (plannedRes.error) throw plannedRes.error;
-  const plannedStaffIds = new Set<string>(
-    (plannedRes.data ?? []).map((r) => r.staff_id as string),
-  );
+  const plannedStaffIds = new Set<string>((plannedRes.data ?? []).map((r) => r.staff_id as string));
   // Gestempelte Ist-Zeit bzw. Abrechnungsbezug je Person (Unberührtheit).
   const clockedStaffIds = new Set<string>(
     (timeRes.data ?? [])

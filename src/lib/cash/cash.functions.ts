@@ -3582,8 +3582,6 @@ export async function deleteSessionTipPoolEntryCore(
   });
 }
 
-// Plan-Snapshot in den Pool: siehe `./roster-pool-sync` — dort liegt
-
 // ZS1 — Ein-Klick-Entfernen für Pool-Zeilen, die nicht mehr im Dienstplan
 // stehen und unberührt sind. Rollenanforderung exakt wie
 // `deleteSessionTipPoolEntry` ("manager"), inklusive Vorschau-Sperre; die
@@ -3652,6 +3650,7 @@ export const removeUnplannedPoolEntry = createServerFn({ method: "POST" })
     return deleteSessionTipPoolEntryCore(caller, data);
   });
 
+// Plan-Snapshot in den Pool: siehe `./roster-pool-sync` — dort liegt
 // `applyRosterPoolSnapshot` (Eröffnung + manueller Nachzug) und der
 // neue `syncOpenSessionsPoolAfterRosterWrite` (RS1, Nach-Sync bei
 // Dienstplan-Änderungen an offenen Sessions).

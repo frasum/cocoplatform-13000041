@@ -9,6 +9,13 @@
 // Daten tragen) — Sichtbarkeit über täglichen Vollständigkeits-Check
 // (docs/t0-laufkarte.md) bzw. manuelles Entfernen in der Kassen-UI.
 //
+// ZS1 (Nachzug): Solche Zurückbleiber werden jetzt zusätzlich in der UI
+// markiert („nicht mehr im Plan", siehe `@/lib/roster/not-in-plan`) —
+// Kassen-Pool und Wochenplan. Ein-Klick-Entfernen gibt es NUR für
+// unberührte Einträge (kein Stempel, keine Abrechnung, keine Notiz, keine
+// Teilnahme-Übersteuerung); alles andere bleibt bewusst manuell mit
+// Begründung. Automatisch entfernt wird weiterhin nichts.
+//
 // Der Nach-Sync ist Best-effort: Fehler blocken den Roster-Save NICHT,
 // werden aber Sentry-sichtbar mitgeschrieben (§106 PZ1-Standard).
 

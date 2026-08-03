@@ -1712,6 +1712,15 @@ export const setTimeEntryShift = createServerFn({ method: "POST" })
         if (newBusinessDate !== before.business_date) {
           await assertBusinessDateUnlocked(supabaseAdmin, caller.organizationId, newBusinessDate);
         }
+        // ZS1 — kein identischer/überlappender Eintrag derselben Person.
+        await assertNoTimeConflict(
+          supabaseAdmin,
+          caller.organizationId,
+          before.staff_id,
+          newBusinessDate,
+          { startedAt: data.startedAt, endedAt: data.endedAt },
+          data.id,
+        );
         // Z3: Abteilungs-Zuordnung serverseitig gegen staff_locations prüfen.
         if (data.department != null && before.location_id) {
           await assertStaffDeptAssignment(
@@ -1809,6 +1818,14 @@ export const createTimeEntryShift = createServerFn({ method: "POST" })
         const businessDate = businessDateOf(new Date(data.startedAt));
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         await assertBusinessDateUnlocked(supabaseAdmin, caller.organizationId, businessDate);
+        // ZS1 — kein identischer/überlappender Eintrag derselben Person.
+        await assertNoTimeConflict(
+          supabaseAdmin,
+          caller.organizationId,
+          data.staffId,
+          businessDate,
+          { startedAt: data.startedAt, endedAt: data.endedAt },
+        );
 
         const { data: staff, error: sErr } = await supabaseAdmin
           .from("staff")

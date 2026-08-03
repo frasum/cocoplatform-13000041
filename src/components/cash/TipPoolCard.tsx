@@ -393,6 +393,7 @@ export function TipPoolCard({
                   key={g.staffId}
                   entry={g}
                   editable={editable}
+                  onRemove={() => void removeUnplanned(g.staffId)}
                   onSave={(shiftStart, shiftEnd) =>
                     callUpsert({
                       data: {

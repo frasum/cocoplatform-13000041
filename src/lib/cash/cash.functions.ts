@@ -1094,6 +1094,14 @@ export async function computeSessionTipPoolCore(
         const row = allPoolRows.find((r) => r.staffId === id);
         const dept = staffDepartments.get(id) as "kitchen" | "service";
         const hoursMinutes = manual ? manual.hoursMinutes : (stampMinutes.get(id) ?? 0);
+        // ZS1 — Plan-Markierung + Entfernbarkeit (Anzeige; Server prüft erneut).
+        const touched = {
+          hasClockEntry: clockedStaffIds.has(id),
+          hasSettlement: settledStaffIds.has(id),
+          note: row?.note ?? null,
+          participatesOverride: manual ? (manual.participates ?? null) : null,
+        };
+        const notInPlan = !plannedStaffIds.has(id);
         return {
           staffId: id,
           displayName: staffNames[id] ?? id,
@@ -1103,16 +1111,31 @@ export async function computeSessionTipPoolCore(
           shiftEnd: row?.shiftEnd ? row.shiftEnd.slice(0, 5) : null,
           participates: staffParticipates.get(id) ?? false,
           participatesOverride: manual ? (manual.participates ?? null) : null,
+          notInPlan,
+          removable: notInPlan && isUntouched(touched),
+          removalBlockedReason: removalBlockedReason(touched),
         };
       });
     })(),
-    glEntries: glRows.map((r) => ({
-      staffId: r.staffId,
-      displayName: staffNames[r.staffId] ?? r.staffId,
-      shiftStart: r.shiftStart ? r.shiftStart.slice(0, 5) : null,
-      shiftEnd: r.shiftEnd ? r.shiftEnd.slice(0, 5) : null,
-      hoursMinutes: r.hoursMinutes,
-    })),
+    glEntries: glRows.map((r) => {
+      const touched = {
+        hasClockEntry: clockedStaffIds.has(r.staffId),
+        hasSettlement: settledStaffIds.has(r.staffId),
+        note: r.note,
+        participatesOverride: r.participates,
+      };
+      const notInPlan = !plannedStaffIds.has(r.staffId);
+      return {
+        staffId: r.staffId,
+        displayName: staffNames[r.staffId] ?? r.staffId,
+        shiftStart: r.shiftStart ? r.shiftStart.slice(0, 5) : null,
+        shiftEnd: r.shiftEnd ? r.shiftEnd.slice(0, 5) : null,
+        hoursMinutes: r.hoursMinutes,
+        notInPlan,
+        removable: notInPlan && isUntouched(touched),
+        removalBlockedReason: removalBlockedReason(touched),
+      };
+    }),
   };
 }
 

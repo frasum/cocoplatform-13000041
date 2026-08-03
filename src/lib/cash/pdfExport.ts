@@ -8,6 +8,7 @@ import type { RowInput } from "jspdf-autotable";
 import { computeDailyCashWithTipRemainder, type DayInput } from "./cash-ledger";
 import { computeWechselgeld } from "./cash-summary";
 import { sessionToDayInput } from "./session-day-input";
+import { buildChannelKindMap } from "./channel-mapping";
 import { sumNonGlTerminalCents, resolveChannelKind } from "./session-channels";
 import { computeTipTotalCents } from "./tip-pool";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
@@ -69,6 +70,11 @@ export interface PdfExportData {
    *  (Geschäftsleitung) am Standort eingeplant waren. */
   managerOnDutyNames?: string[];
   channels: PdfChannel[];
+  /**
+   * CH1 — org-weite Kanal-Landkarte (alle Standorte, aktiv+inaktiv), NUR für
+   * die kind-Auflösung. Ohne Angabe wird `channels` verwendet.
+   */
+  channelKinds?: { id: string; kind: string }[];
   channelAmounts: { channelId: string; amountCents: Cents }[];
   terminals: PdfTerminal[];
   terminalAmounts: { terminalId: string; amountCents: Cents }[];
@@ -151,8 +157,9 @@ function totalsByKind(data: PdfExportData): Record<ChannelKindKey, number> {
     einladung: 0,
     sonstige: 0,
   };
-  // KA1: Map aus dem ungefilterten Kanalbestand; Lookup-Miss wirft mit ID.
-  const idToKind = new Map(data.channels.map((c) => [c.id, c.kind]));
+  // CH1: Map org-weit, alle Standorte, aktiv+inaktiv (Standort-Race CH1);
+  // Lookup-Miss wirft mit ID.
+  const idToKind = buildChannelKindMap(data.channelKinds ?? data.channels);
   for (const a of data.channelAmounts) {
     const k = resolveChannelKind(idToKind, a.channelId) as ChannelKindKey;
     if (!(k in out)) {
@@ -238,7 +245,7 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
   // N14 (Fachentscheidung Frank 13.07.): ⌀ pro Gast IMMER auf den
   // Haus-Umsatz (ohne Wolt/SoUse/eigener Außer-Haus-Verkauf) — identische
   // Ableitung wie Bildschirm und Druckansicht.
-  const kindById = new Map(data.channels.map((c) => [c.id, c.kind]));
+  const kindById = buildChannelKindMap(data.channelKinds ?? data.channels);
   const houseCentsForAvg = sessionHouseCentsFromKasse({
     vectronCents: posTotal,
     channels: data.channelAmounts.map((a) => ({

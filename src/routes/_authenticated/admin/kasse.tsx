@@ -52,6 +52,8 @@ import {
   updateSession,
 } from "@/lib/cash/cash.functions";
 import { buildDailySummaryData } from "@/lib/cash/daily-summary-data";
+import { buildChannelKindMap } from "@/lib/cash/channel-mapping";
+import { CardErrorBoundary } from "@/components/cash/CardErrorBoundary";
 import { printDailySummary } from "@/components/cash/DailyPrintView";
 import { DateSelector } from "@/components/shared/DateSelector";
 import { filterCashEnabled } from "@/lib/locations/cash-enabled";
@@ -195,6 +197,16 @@ function KassePage() {
     queryFn: () => fetchChannels({ data: { locationId } }),
     enabled: locationId !== "",
   });
+  // CH1: Mapping-Katalog — ORG-WEIT (alle Standorte, aktiv+inaktiv). Ohne
+  // Standort-Parameter gibt es kein Lade-Race mehr: ein Kanal eines anderen
+  // Standorts ist nie mehr „unbekannt". Nur für die kind-Auflösung; die
+  // ANZEIGE-Listen bleiben standortgefiltert (`channelsQ`).
+  const mappingChannelsQ = useQuery({
+    queryKey: ["cash", "channels", "mapping-all"],
+    queryFn: () => fetchChannels({ data: {} }),
+  });
+  const mappingChannels = mappingChannelsQ.data ?? [];
+  const mappingLoaded = mappingChannelsQ.data != null;
   const terminalsQ = useQuery({
     queryKey: ["cash", "terminals", locationId],
     queryFn: () => fetchTerminals({ data: { locationId } }),
@@ -428,13 +440,15 @@ function KassePage() {
     // KA1: Kein Rechnen auf leerer Kanal-/Terminal-Map. Bricht bei
     // ungeladenem Katalog ab statt in `resolveChannelKind` zu werfen —
     // der Nutzer bekommt eine klare Meldung.
-    if (!channelsQ.data || !terminalsQ.data) {
+    if (!channelsQ.data || !terminalsQ.data || !mappingLoaded) {
       toast.error("Kanal-/Terminal-Katalog wird noch geladen — bitte kurz warten.");
       return null;
     }
     return buildDailySummaryData({
       overview: ov,
       channels: channelsQ.data.map((c) => ({ id: c.id, label: c.label, kind: c.kind })),
+      // CH1: kind-Auflösung org-weit (alle Standorte, aktiv+inaktiv).
+      channelKinds: mappingChannels.map((c) => ({ id: c.id, kind: c.kind })),
       terminals: terminalsQ.data.map((t) => ({
         id: t.id,
         label: t.label,
@@ -685,144 +699,145 @@ function KassePage() {
             }
           />
 
-          <SessionFieldsCard
-            sessionId={sessionId!}
-            overview={ovQ.data}
-            channels={channelsQ.data ?? []}
-            channelsLoaded={channelsQ.data != null}
-            terminals={terminalsQ.data ?? []}
-            writable={writable}
-            cashBalanceTargetCents={cashBalanceTargetResolvedCents}
-            locationName={currentLocation?.name}
-            tipRemainderCents={
-              (poolQ.data?.kitchenRemainder ?? 0) + (poolQ.data?.serviceRemainder ?? 0)
-            }
-            kpiSlot={(() => {
-              const sess = ovQ.data.session;
-              if (!sess) return null;
-              // KA1: Erst rechnen, wenn der Kanal-Katalog geladen ist —
-              // sonst würde die Auflösung gegen eine leere Map laufen und
-              // in `resolveChannelKind` werfen (Lade-Rennen).
-              const channelsLoaded = channelsQ.data != null;
-              const vectronTotal = Number(sess.vectron_daily_total_cents ?? 0);
-              // KA1: Map aus dem ungefilterten Kanalbestand (inkl. inaktiver);
-              // Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
-              const channelKindById = new Map(
-                (channelsQ.data ?? []).map((c) => [c.id, c.kind] as const),
-              );
-              // N14b: gemeinsame Haus-Umsatz-Definition (Kasse-Modell) —
-              // dieselbe Größe wie Inline (SessionFieldsCard), PDF und Druck.
-              const inHouseCents = channelsLoaded
-                ? sessionHouseCentsFromKasse({
-                    vectronCents: vectronTotal,
-                    channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
-                      kind: resolveChannelKind(channelKindById, c.channelId),
-                      amountCents: c.amountCents,
-                    })),
-                  })
-                : null;
-              // Quote = nur aktive Abrechnungen; Liste zeigt superseded bewusst weiter.
-              const tipCents = computeTipTotalCents(
-                activeSettlements(ovQ.data.settlements).map((s) => ({
-                  cardTotalCents: Number(s.card_total_cents),
-                  cashHandedInCents: Number(s.cash_handed_in_cents),
-                  posSalesCents: Number(s.pos_sales_cents),
-                  kassiertBruttoCents: Number(
-                    (s as { kassiert_brutto_cents?: number | string | null })
-                      .kassiert_brutto_cents ?? s.pos_sales_cents,
-                  ),
-                  openInvoicesCents: Number(s.open_invoices_cents),
-                  hilfMahlCents: Number(s.hilf_mahl_cents),
-                })),
-              );
-              const tipPct =
-                inHouseCents != null && inHouseCents > 0
-                  ? ((tipCents / inHouseCents) * 100).toFixed(1).replace(".", ",")
+          <CardErrorBoundary label="SessionFieldsCard">
+            <SessionFieldsCard
+              sessionId={sessionId!}
+              overview={ovQ.data}
+              channels={channelsQ.data ?? []}
+              mappingChannels={mappingChannels}
+              channelsLoaded={mappingLoaded}
+              terminals={terminalsQ.data ?? []}
+              writable={writable}
+              cashBalanceTargetCents={cashBalanceTargetResolvedCents}
+              locationName={currentLocation?.name}
+              tipRemainderCents={
+                (poolQ.data?.kitchenRemainder ?? 0) + (poolQ.data?.serviceRemainder ?? 0)
+              }
+              kpiSlot={(() => {
+                const sess = ovQ.data.session;
+                if (!sess) return null;
+                // KA1: Erst rechnen, wenn der Kanal-Katalog geladen ist —
+                // sonst würde die Auflösung gegen eine leere Map laufen und
+                // in `resolveChannelKind` werfen (Lade-Rennen).
+                const channelsLoaded = mappingLoaded;
+                const vectronTotal = Number(sess.vectron_daily_total_cents ?? 0);
+                // CH1: Map org-weit, alle Standorte, aktiv+inaktiv
+                // (Standort-Race CH1); Lookup-Miss wirft weiterhin mit ID.
+                const channelKindById = buildChannelKindMap(mappingChannels);
+                // N14b: gemeinsame Haus-Umsatz-Definition (Kasse-Modell) —
+                // dieselbe Größe wie Inline (SessionFieldsCard), PDF und Druck.
+                const inHouseCents = channelsLoaded
+                  ? sessionHouseCentsFromKasse({
+                      vectronCents: vectronTotal,
+                      channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
+                        kind: resolveChannelKind(channelKindById, c.channelId),
+                        amountCents: c.amountCents,
+                      })),
+                    })
                   : null;
-              const guests = sess.guest_count ?? 0;
-              const perGuestCents =
-                inHouseCents != null && guests > 0 && inHouseCents > 0
-                  ? Math.round(inHouseCents / guests)
-                  : null;
-              return (
-                <div className="space-y-3">
-                  <Card className="p-4">
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Trinkgeld-Quote
-                    </div>
-                    <div className="mt-1 font-mono text-2xl font-semibold">
-                      {tipPct == null ? "–" : `${tipPct} %`}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Pool {fmtCents(tipCents)} / In-House-Umsatz{" "}
-                      {inHouseCents == null ? "–" : fmtCents(inHouseCents)}
-                    </div>
-                  </Card>
-                  <Card className="p-4">
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Ø Umsatz / Gast
-                    </div>
-                    <div className="mt-1 font-mono text-2xl font-semibold">
-                      {perGuestCents == null ? "–" : fmtCents(perGuestCents)}
-                    </div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {guests > 0 ? `${guests} Gäste` : "Gästeanzahl fehlt"}
-                    </div>
-                  </Card>
-                </div>
-              );
-            })()}
-            onSave={(data) =>
-              callUpdate({ data: { sessionId: sessionId!, ...data } }).then(() => {
-                // KAB1: Kein Toast – Feedback zeigt der Auto-Save-Status im Card-Footer.
-                void invalidate();
-              })
-            }
-            expenses={ovQ.data?.expenses ?? []}
-            advances={ovQ.data?.advances ?? []}
-            staff={staffQ.data ?? []}
-            onAddExpense={(desc, cents) =>
-              callAddSat({
-                data: {
-                  sessionId: sessionId!,
-                  kind: "expense",
-                  description: desc,
-                  amountCents: cents,
-                },
-              }).then(() => {
-                toast.success("Ausgabe hinzugefügt.");
-                void invalidate();
-              })
-            }
-            onRemoveExpense={(id) =>
-              callRemoveSat({ data: { sessionId: sessionId!, kind: "expense", id } }).then(() => {
-                toast.success("Entfernt.");
-                void invalidate();
-              })
-            }
-            onAddAdvance={(staffId, cents, note) =>
-              callAddSat({
-                data: {
-                  sessionId: sessionId!,
-                  kind: "advance",
-                  staffId,
-                  amountCents: cents,
-                  note,
-                },
-              }).then(() => {
-                toast.success("Vorschuss hinzugefügt.");
-                void invalidate();
-              })
-            }
-            onRemoveAdvance={(id) =>
-              callRemoveSat({ data: { sessionId: sessionId!, kind: "advance", id } }).then(() => {
-                toast.success("Entfernt.");
-                void invalidate();
-              })
-            }
-            previousDeficitCents={previousDeficitCents}
-            previousDeficitSourceDate={previousDeficitSourceDate}
-          />
+                // Quote = nur aktive Abrechnungen; Liste zeigt superseded bewusst weiter.
+                const tipCents = computeTipTotalCents(
+                  activeSettlements(ovQ.data.settlements).map((s) => ({
+                    cardTotalCents: Number(s.card_total_cents),
+                    cashHandedInCents: Number(s.cash_handed_in_cents),
+                    posSalesCents: Number(s.pos_sales_cents),
+                    kassiertBruttoCents: Number(
+                      (s as { kassiert_brutto_cents?: number | string | null })
+                        .kassiert_brutto_cents ?? s.pos_sales_cents,
+                    ),
+                    openInvoicesCents: Number(s.open_invoices_cents),
+                    hilfMahlCents: Number(s.hilf_mahl_cents),
+                  })),
+                );
+                const tipPct =
+                  inHouseCents != null && inHouseCents > 0
+                    ? ((tipCents / inHouseCents) * 100).toFixed(1).replace(".", ",")
+                    : null;
+                const guests = sess.guest_count ?? 0;
+                const perGuestCents =
+                  inHouseCents != null && guests > 0 && inHouseCents > 0
+                    ? Math.round(inHouseCents / guests)
+                    : null;
+                return (
+                  <div className="space-y-3">
+                    <Card className="p-4">
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Trinkgeld-Quote
+                      </div>
+                      <div className="mt-1 font-mono text-2xl font-semibold">
+                        {tipPct == null ? "–" : `${tipPct} %`}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Pool {fmtCents(tipCents)} / In-House-Umsatz{" "}
+                        {inHouseCents == null ? "–" : fmtCents(inHouseCents)}
+                      </div>
+                    </Card>
+                    <Card className="p-4">
+                      <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                        Ø Umsatz / Gast
+                      </div>
+                      <div className="mt-1 font-mono text-2xl font-semibold">
+                        {perGuestCents == null ? "–" : fmtCents(perGuestCents)}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {guests > 0 ? `${guests} Gäste` : "Gästeanzahl fehlt"}
+                      </div>
+                    </Card>
+                  </div>
+                );
+              })()}
+              onSave={(data) =>
+                callUpdate({ data: { sessionId: sessionId!, ...data } }).then(() => {
+                  // KAB1: Kein Toast – Feedback zeigt der Auto-Save-Status im Card-Footer.
+                  void invalidate();
+                })
+              }
+              expenses={ovQ.data?.expenses ?? []}
+              advances={ovQ.data?.advances ?? []}
+              staff={staffQ.data ?? []}
+              onAddExpense={(desc, cents) =>
+                callAddSat({
+                  data: {
+                    sessionId: sessionId!,
+                    kind: "expense",
+                    description: desc,
+                    amountCents: cents,
+                  },
+                }).then(() => {
+                  toast.success("Ausgabe hinzugefügt.");
+                  void invalidate();
+                })
+              }
+              onRemoveExpense={(id) =>
+                callRemoveSat({ data: { sessionId: sessionId!, kind: "expense", id } }).then(() => {
+                  toast.success("Entfernt.");
+                  void invalidate();
+                })
+              }
+              onAddAdvance={(staffId, cents, note) =>
+                callAddSat({
+                  data: {
+                    sessionId: sessionId!,
+                    kind: "advance",
+                    staffId,
+                    amountCents: cents,
+                    note,
+                  },
+                }).then(() => {
+                  toast.success("Vorschuss hinzugefügt.");
+                  void invalidate();
+                })
+              }
+              onRemoveAdvance={(id) =>
+                callRemoveSat({ data: { sessionId: sessionId!, kind: "advance", id } }).then(() => {
+                  toast.success("Entfernt.");
+                  void invalidate();
+                })
+              }
+              previousDeficitCents={previousDeficitCents}
+              previousDeficitSourceDate={previousDeficitSourceDate}
+            />
+          </CardErrorBoundary>
 
           <TipPoolCard
             sessionId={sessionId!}

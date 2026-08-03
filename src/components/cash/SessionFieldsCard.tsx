@@ -7,6 +7,7 @@ import { parseEuroToCents, focusNextInput } from "@/lib/cash/kasse-helpers";
 import type { Overview } from "@/lib/cash/kasse-types";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
 import { resolveChannelKind } from "@/lib/cash/session-channels";
+import { buildChannelKindMap } from "@/lib/cash/channel-mapping";
 import { AdvanceForm } from "./AdvanceForm";
 import { ExpenseForm } from "./ExpenseForm";
 import { CashSummaryBlock } from "./CashSummaryBlock";
@@ -30,6 +31,7 @@ type UpdatePayload = {
 export function SessionFieldsCard({
   overview,
   channels,
+  mappingChannels,
   channelsLoaded = true,
   terminals,
   writable,
@@ -52,7 +54,12 @@ export function SessionFieldsCard({
   overview: Overview;
   channels: { id: string; label: string; kind: string; isActive: boolean }[];
   /**
-   * KA1: `false`, solange der Kanal-Katalog noch nicht geladen ist. In dem
+   * CH1: ORG-WEITE Kanal-Landkarte (alle Standorte, aktiv+inaktiv) — dient
+   * NUR der kind-Auflösung. Fehlt sie, wird auf `channels` zurückgefallen.
+   */
+  mappingChannels?: { id: string; kind: string }[];
+  /**
+   * KA1/CH1: `false`, solange der Mapping-Katalog noch nicht geladen ist. In dem
    * Fall wird die Haus-Umsatz-Berechnung NICHT ausgeführt (kein Rechnen auf
    * leerer Map), sondern als „–" angezeigt. Bei echtem Lookup-Miss (Katalog
    * geladen, ID unbekannt) wirft `resolveChannelKind` weiterhin mit ID.
@@ -277,11 +284,10 @@ export function SessionFieldsCard({
         ? `Automatisch gespeichert · ${lastSavedAt.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`
         : "Auto-Save aktiv";
 
-  // KA1: Map aus dem ungefilterten Kanalbestand (channels-Prop enthält
-  // aktive UND inaktive Kanäle — historische Beträge referenzieren sie
-  // legitim). Lookup-Miss wirft in `resolveChannelKind` mit Kanal-ID.
+  // CH1: Map aus der org-weiten Landkarte — alle Standorte, aktiv+inaktiv
+  // (Standort-Race CH1). Lookup-Miss wirft in `resolveChannelKind` mit ID.
   const channelById = Object.fromEntries(channels.map((c) => [c.id, c]));
-  const channelKindById = new Map(channels.map((c) => [c.id, c.kind]));
+  const channelKindById = buildChannelKindMap(mappingChannels ?? channels);
   const terminalById = Object.fromEntries(terminals.map((t) => [t.id, t]));
   const posRows = chRows.filter((r) => channelById[r.id]?.kind === "pos");
   const delivRows = chRows.filter((r) => channelById[r.id]?.kind?.startsWith("delivery_"));

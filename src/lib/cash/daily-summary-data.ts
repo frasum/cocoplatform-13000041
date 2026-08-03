@@ -13,6 +13,11 @@ import type { Overview } from "./kasse-types";
 export interface BuildDailySummaryDataInput {
   overview: Overview;
   channels: { id: string; label: string; kind: string }[];
+  /**
+   * CH1 — org-weite Kanal-Landkarte (alle Standorte, aktiv+inaktiv), NUR für
+   * die kind-Auflösung. Ohne Angabe wird `channels` verwendet.
+   */
+  channelKinds?: { id: string; kind: string }[];
   terminals: { id: string; label: string; isGl: boolean }[];
   staffById: Map<string, string>;
   locationName: string | undefined;
@@ -54,6 +59,7 @@ export function buildDailySummaryData(input: BuildDailySummaryDataInput): PdfExp
     createdByName: input.createdByName ?? null,
     managerOnDutyNames: input.managerOnDutyNames ?? [],
     channels,
+    channelKinds: input.channelKinds,
     channelAmounts: ov.channelAmounts,
     terminals,
     terminalAmounts: ov.terminalAmounts,

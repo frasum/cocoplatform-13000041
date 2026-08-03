@@ -13,6 +13,7 @@
 import { computeDailyCashWithTipRemainder, type DayInput } from "@/lib/cash/cash-ledger";
 import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
+import { buildChannelKindMap } from "@/lib/cash/channel-mapping";
 import { sumNonGlTerminalCents, resolveChannelKind } from "@/lib/cash/session-channels";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
 import { computeTipTotalCents } from "@/lib/cash/tip-pool";
@@ -88,8 +89,9 @@ function totalsByKind(data: PdfExportData): Record<ChannelKindKey, number> {
     einladung: 0,
     sonstige: 0,
   };
-  // KA1: Map aus dem ungefilterten Kanalbestand; Lookup-Miss wirft mit ID.
-  const idToKind = new Map(data.channels.map((c) => [c.id, c.kind]));
+  // CH1: Map org-weit, alle Standorte, aktiv+inaktiv (Standort-Race CH1);
+  // Lookup-Miss wirft mit ID.
+  const idToKind = buildChannelKindMap(data.channelKinds ?? data.channels);
   for (const a of data.channelAmounts) {
     const k = resolveChannelKind(idToKind, a.channelId) as ChannelKindKey;
     if (!(k in out)) {
@@ -168,7 +170,7 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
   // N14 (Fachentscheidung Frank 13.07.): ⌀ pro Gast = Haus-Umsatz / Gäste
   // — Wolt/SoUse/eigener Außer-Haus raus. Gemeinsamer Helfer mit
   // Bildschirm und PDF.
-  const kindById = new Map(data.channels.map((c) => [c.id, c.kind]));
+  const kindById = buildChannelKindMap(data.channelKinds ?? data.channels);
   const houseCentsForAvg = sessionHouseCentsFromKasse({
     vectronCents: posTotal,
     channels: data.channelAmounts.map((a) => ({

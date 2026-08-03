@@ -852,23 +852,8 @@ export async function getTipPoolOverviewCore(
     manualStaffIds: string[];
     kitchenManualOnly: boolean;
     servicePoolEnabled: boolean;
-    poolEntries: Array<{
-      staffId: string;
-      displayName: string;
-      department: "kitchen" | "service";
-      hoursMinutes: number;
-      shiftStart: string | null;
-      shiftEnd: string | null;
-      participates: boolean;
-      participatesOverride: boolean | null;
-    }>;
-    glEntries: Array<{
-      staffId: string;
-      displayName: string;
-      shiftStart: string | null;
-      shiftEnd: string | null;
-      hoursMinutes: number;
-    }>;
+    poolEntries: TipPoolEntryView[];
+    glEntries: TipPoolGlEntryView[];
   }
 > {
   const session = await loadSessionWithLock(caller.organizationId, data.sessionId);

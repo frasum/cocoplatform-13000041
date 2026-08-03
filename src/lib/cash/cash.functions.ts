@@ -965,10 +965,12 @@ export async function computeSessionTipPoolCore(
   const glRows = allPoolRows.filter((r) => r.department === "gl");
 
   const rawTimeEntries = (timeRes.data ?? [])
-    .filter(
-      (r): r is { staff_id: string; started_at: string; ended_at: string } => r.ended_at !== null,
-    )
-    .map((r) => ({ staffId: r.staff_id, startedAt: r.started_at, endedAt: r.ended_at }));
+    .filter((r) => r.ended_at !== null)
+    .map((r) => ({
+      staffId: r.staff_id,
+      startedAt: r.started_at,
+      endedAt: r.ended_at as string,
+    }));
 
   // staffDepartments VOR dem Stunden-Bau laden — der kitchenManualOnly-Filter
   // braucht das Department, um Küchen-Stempel zu verwerfen.

@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCashDailyBreakdown, type CashDailyRow } from "@/lib/cash/cash.functions";
-import { buildBargeldXlsx } from "@/lib/cash/bargeld-export";
+import { buildBargeldXlsx, type BargeldSheet } from "@/lib/cash/bargeld-export";
 import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { downloadBlob } from "@/lib/time/weekly-export";
 import { formatShortDate } from "@/lib/format-date";
@@ -101,7 +101,6 @@ function KasseSaldoPage() {
 
   const selected = months.find((m) => m.key === monthKey) ?? months[0];
   const { fromDate, toDate } = monthRange(selected.year, selected.month);
-  const monthLabel = selected.label;
 
   const fetchLocations = useServerFn(listLocations);
   const locationsQ = useQuery({
@@ -174,10 +173,20 @@ function KasseSaldoPage() {
 
   async function handleExport() {
     try {
-      const label = `${monthLabel} – ${locationName}`;
-      const blob = await buildBargeldXlsx(rows, label);
-      const safe = locationName.replace(/[\s/\\]+/g, "_");
-      downloadBlob(blob, `bargeld_uebersicht_${safe}_${fromDate}_bis_${toDate}.xlsx`);
+      // EX2 — eine Mappe, ein Blatt je Kassen-Standort (wie die Vorlage).
+      const sheets: BargeldSheet[] = [];
+      for (const loc of cashLocations) {
+        const locRows = await fetchBreakdown({
+          data: { fromDate, toDate, locationId: loc.id },
+        });
+        sheets.push({ locationName: loc.name, rows: locRows });
+      }
+      if (sheets.length === 0) {
+        toast.error("Keine Kassen-Standorte vorhanden.");
+        return;
+      }
+      const blob = await buildBargeldXlsx(sheets);
+      downloadBlob(blob, `bankeinzahlung_${fromDate}_bis_${toDate}.xlsx`);
     } catch (e) {
       console.error("Excel-Export fehlgeschlagen", e);
       toast.error("Excel-Export fehlgeschlagen: " + (e as Error).message);

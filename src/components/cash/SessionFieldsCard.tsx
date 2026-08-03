@@ -7,6 +7,7 @@ import { parseEuroToCents, focusNextInput } from "@/lib/cash/kasse-helpers";
 import type { Overview } from "@/lib/cash/kasse-types";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
 import { resolveChannelKind } from "@/lib/cash/session-channels";
+import { buildChannelKindMap } from "@/lib/cash/channel-mapping";
 import { AdvanceForm } from "./AdvanceForm";
 import { ExpenseForm } from "./ExpenseForm";
 import { CashSummaryBlock } from "./CashSummaryBlock";

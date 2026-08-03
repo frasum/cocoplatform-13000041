@@ -186,9 +186,10 @@ describe("statistik-pdf — Summen kommen aus der Kernfunktion", () => {
 
     // Gesamtumsatz-Kachel und Kopfzeile der Kanal-Tabelle — exakt die Kernwerte.
     expect(texts).toContain(eur(sum.totalCents));
-    const split = drawn("Haus ", "Takeaway ");
-    expect(split).toContain(`Haus ${eur(sum.houseCents)}`);
+    // STAT3m — Überschrift nennt nur noch den Take-Away-Wert samt Bezug.
+    const split = drawn("Takeaway ", "vom Gesamtumsatz");
     expect(split).toContain(`Takeaway ${eur(sum.takeawayCents)}`);
+    expect(split).not.toContain("Haus ");
     // STAT3b — Kanalzeilen: Wolt-Betrag steht in der Tabelle, nicht im Text.
     const wolt = findRow("Wolt");
     expect(wolt[1]).toBe(eur(17_210));

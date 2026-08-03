@@ -159,9 +159,9 @@ describe("STAT1 E2E — Dashboard, Verlauf und PDF zeigen identische Werte", () 
     await generateStatistikPdf(data);
 
     // STAT3 — Summen und Segmente stehen im gezeichneten Einseiter-Text.
-    const split = drawn("Haus ", "Takeaway ");
-    expect(split).toContain(`Haus ${eurPdf(EXPECTED.houseCents)}`);
+    const split = drawn("Takeaway ", "vom Gesamtumsatz");
     expect(split).toContain(`Takeaway ${eurPdf(EXPECTED.takeawayCents)}`);
+    expect(split).not.toContain("Haus ");
     expect(texts).toContain(eurPdf(EXPECTED.totalCents));
 
     // STAT3b — Kanalzeilen stehen in der Tabelle und stammen aus demselben Donut.

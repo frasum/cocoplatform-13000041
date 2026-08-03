@@ -2043,18 +2043,33 @@ export const removeUnplannedTimeEntry = createServerFn({ method: "POST" })
           throw new Error("Eintrag steht weiterhin im Dienstplan — kein Ein-Klick-Entfernen.");
         }
         // 2. Unberührtheit serverseitig prüfen.
-        const { data: settlements, error: setErr } = await supabaseAdmin
-          .from("waiter_settlements")
+        // waiter_settlements hängt an der Session, nicht am Geschäftstag —
+        // daher erst die Session(s) des Tages auflösen.
+        let sessionQuery = supabaseAdmin
+          .from("sessions")
           .select("id")
           .eq("organization_id", caller.organizationId)
-          .eq("staff_id", pre.staff_id)
-          .eq("business_date", pre.business_date)
-          .neq("status", "superseded")
-          .limit(1);
-        if (setErr) throw setErr;
+          .eq("business_date", pre.business_date);
+        if (pre.location_id) sessionQuery = sessionQuery.eq("location_id", pre.location_id);
+        const { data: sessionRows, error: sessErr } = await sessionQuery;
+        if (sessErr) throw sessErr;
+        const sessionIds = (sessionRows ?? []).map((s) => s.id as string);
+        let settlements: Array<{ id: string }> = [];
+        if (sessionIds.length > 0) {
+          const { data: setRows, error: setErr } = await supabaseAdmin
+            .from("waiter_settlements")
+            .select("id")
+            .eq("organization_id", caller.organizationId)
+            .eq("staff_id", pre.staff_id)
+            .in("session_id", sessionIds)
+            .neq("status", "superseded")
+            .limit(1);
+          if (setErr) throw setErr;
+          settlements = (setRows ?? []) as Array<{ id: string }>;
+        }
         const untouched = isUntouched({
           hasClockEntry: pre.source === "clock",
-          hasSettlement: (settlements ?? []).length > 0,
+          hasSettlement: settlements.length > 0,
         });
         if (!untouched) {
           throw new Error(

@@ -29,7 +29,11 @@ describe("buildChannelKindMap (CH1)", () => {
   });
 
   it("standortgefilterter Katalog hätte geworfen (Regression)", () => {
-    const spiceryOnly = buildChannelKindMap(orgWideCatalog.filter((c) => c.locationId === "spicery"));
-    expect(() => resolveChannelKind(spiceryOnly, "dfa3e9b8-wolt-yum")).toThrowError(/unbekannter Kanal/);
+    const spiceryOnly = buildChannelKindMap(
+      orgWideCatalog.filter((c) => c.locationId === "spicery"),
+    );
+    expect(() => resolveChannelKind(spiceryOnly, "dfa3e9b8-wolt-yum")).toThrowError(
+      /unbekannter Kanal/,
+    );
   });
 });

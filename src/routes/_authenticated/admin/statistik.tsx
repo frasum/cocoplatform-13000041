@@ -1088,9 +1088,11 @@ function GuestHoursTip({
       <div className="font-medium">{row.fullDate}</div>
       <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
         <span className="text-muted-foreground">Gäste</span>
-        <span className="text-right">{row.guests.toLocaleString("de-DE")}</span>
+        <span className="text-right">
+          {row.guests === null ? "—" : row.guests.toLocaleString("de-DE")}
+        </span>
         <span className="text-muted-foreground">Stunden</span>
-        <span className="text-right">{row.hours.toFixed(2)}</span>
+        <span className="text-right">{row.hours === null ? "—" : row.hours.toFixed(2)}</span>
         <span className="text-muted-foreground">€/Gast</span>
         <span className="text-right">
           {row.perGuestCents === null ? "—" : fmtEuro(row.perGuestCents)}
@@ -1112,11 +1114,15 @@ function ChartTip({ active, payload }: TipPayload) {
       <div className="font-medium">{row.fullDate}</div>
       <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
         <span className="text-muted-foreground">Tagesumsatz</span>
-        <span className="text-right">{fmtEuro(row.totalCents)}</span>
+        <span className="text-right">
+          {row.totalCents === null ? "—" : fmtEuro(row.totalCents)}
+        </span>
         <span className="text-muted-foreground">Kreditkarten</span>
-        <span className="text-right">{fmtEuro(row.cardCents)}</span>
+        <span className="text-right">{row.cardCents === null ? "—" : fmtEuro(row.cardCents)}</span>
         <span className="text-muted-foreground">Takeaway</span>
-        <span className="text-right">{fmtEuro(row.takeawayCents)}</span>
+        <span className="text-right">
+          {row.takeawayCents === null ? "—" : fmtEuro(row.takeawayCents)}
+        </span>
       </div>
     </div>
   );

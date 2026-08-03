@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 02.08.2026 (§133: 7-Tage-Wetter; Notices folgen dem gewählten Geschäftstag; Realtime-Vollzug belegt)
+Stand: 03.08.2026 (§134: Merkposten-Statusliste — ab hier EINE Liste mit Status je Punkt; §133: 7-Tage-Wetter, Notices folgen dem gewählten Geschäftstag, Realtime-Vollzug belegt)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 

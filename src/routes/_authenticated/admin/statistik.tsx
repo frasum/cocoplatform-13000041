@@ -69,7 +69,7 @@ import {
   estimatedPreTaxResultCents,
 } from "@/lib/bwa/bwa-analytics";
 import { currentMonth, monthRange } from "@/lib/statistics/period-window";
-import { fillDailyGaps } from "@/lib/statistics/chart-fill";
+import { chartDaySlots } from "@/lib/statistics/chart-days";
 import { fmtCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -856,7 +856,9 @@ function StatsView({ data }: { data: RevenueStats }) {
         <CardHeader>
           <CardTitle className="text-base">Umsatzverlauf</CardTitle>
         </CardHeader>
-        <CardContent>{hasDaily ? <RevenueChart daily={data.daily} /> : <EmptyChart />}</CardContent>
+        <CardContent>
+          {hasDaily ? <RevenueChart daily={data.daily} range={data.range} /> : <EmptyChart />}
+        </CardContent>
       </Card>
 
       <Card>
@@ -865,7 +867,7 @@ function StatsView({ data }: { data: RevenueStats }) {
         </CardHeader>
         <CardContent>
           {hasDaily ? (
-            <GuestHoursChart daily={data.daily} />
+            <GuestHoursChart daily={data.daily} range={data.range} />
           ) : (
             <div className="flex h-[280px] flex-col items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
               Keine Daten in diesem Zeitraum.
@@ -907,16 +909,20 @@ function EmptyChart() {
 
 type DailyRow = RevenueStats["daily"][number];
 
-function RevenueChart({ daily }: { daily: DailyRow[] }) {
-  const rows = fillDailyGaps(daily).map((d) => ({
-    day: d.businessDate.slice(8, 10),
-    fullDate: d.businessDate,
-    total: d.totalCents / 100,
-    card: (d.cardCents ?? 0) / 100,
-    takeaway: d.takeawayCents / 100,
-    totalCents: d.totalCents,
-    cardCents: d.cardCents ?? 0,
-    takeawayCents: d.takeawayCents,
+type ChartRange = { startDate: string; endDate: string };
+
+// STAT4a — Achse = volles Fenster, fehlende Tage sind LEER (null), damit die
+// Linien nach dem letzten echten Tag enden statt auf 0 zu stürzen.
+function RevenueChart({ daily, range }: { daily: DailyRow[]; range: ChartRange }) {
+  const rows = chartDaySlots(daily, range).map(({ day, businessDate, point }) => ({
+    day,
+    fullDate: businessDate,
+    total: point ? point.totalCents / 100 : null,
+    card: point ? (point.cardCents ?? 0) / 100 : null,
+    takeaway: point ? point.takeawayCents / 100 : null,
+    totalCents: point?.totalCents ?? null,
+    cardCents: point?.cardCents ?? null,
+    takeawayCents: point?.takeawayCents ?? null,
   }));
 
   return (
@@ -924,7 +930,7 @@ function RevenueChart({ daily }: { daily: DailyRow[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} interval={1} />
           <YAxis
             tickFormatter={(v: number) => `${Math.round(v).toLocaleString("de-DE")} €`}
             tickLine={false}
@@ -935,30 +941,34 @@ function RevenueChart({ daily }: { daily: DailyRow[] }) {
           <Tooltip content={<ChartTip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Area
-            type="monotone"
+            type="linear"
             dataKey="total"
             name="Tagesumsatz"
             fill="#2563eb"
             stroke="#2563eb"
             fillOpacity={0.18}
             strokeWidth={2}
+            dot={{ r: 2.5, strokeWidth: 0, fill: "#2563eb" }}
+            connectNulls={false}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="card"
             name="Kreditkarten"
             stroke="#f59e0b"
             strokeWidth={2}
             strokeDasharray="4 3"
-            dot={false}
+            dot={{ r: 2, strokeWidth: 0, fill: "#f59e0b" }}
+            connectNulls={false}
           />
           <Line
-            type="monotone"
+            type="linear"
             dataKey="takeaway"
             name="Takeaway"
             stroke="#16a34a"
             strokeWidth={2}
-            dot={false}
+            dot={{ r: 2, strokeWidth: 0, fill: "#16a34a" }}
+            connectNulls={false}
           />
         </ComposedChart>
       </ResponsiveContainer>
@@ -971,9 +981,9 @@ type TipPayload = {
   payload?: Array<{
     payload: {
       fullDate: string;
-      totalCents: number;
-      cardCents: number;
-      takeawayCents: number;
+      totalCents: number | null;
+      cardCents: number | null;
+      takeawayCents: number | null;
     };
   }>;
 };
@@ -984,24 +994,34 @@ type TipPayload = {
 type GuestHoursRow = {
   day: string;
   fullDate: string;
-  guests: number;
-  hours: number;
+  guests: number | null;
+  hours: number | null;
   perGuestCents: number | null;
   perHourCents: number | null;
 };
 
-function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
-  const rows: GuestHoursRow[] = fillDailyGaps(daily).map((d) => {
+function GuestHoursChart({ daily, range }: { daily: DailyRow[]; range: ChartRange }) {
+  const rows: GuestHoursRow[] = chartDaySlots(daily, range).map(({ day, businessDate, point }) => {
+    if (!point) {
+      return {
+        day,
+        fullDate: businessDate,
+        guests: null,
+        hours: null,
+        perGuestCents: null,
+        perHourCents: null,
+      };
+    }
     const k = derivedKpis({
-      houseCents: d.houseCents,
-      totalCents: d.totalCents,
-      guestCount: d.guestCount ?? 0,
-      workMinutes: d.workMinutes ?? 0,
+      houseCents: point.houseCents,
+      totalCents: point.totalCents,
+      guestCount: point.guestCount ?? 0,
+      workMinutes: point.workMinutes ?? 0,
     });
     return {
-      day: d.businessDate.slice(8, 10),
-      fullDate: d.businessDate,
-      guests: d.guestCount ?? 0,
+      day,
+      fullDate: businessDate,
+      guests: point.guestCount ?? 0,
       hours: k.workHours,
       perGuestCents: k.revenuePerGuestCents,
       perHourCents: k.revenuePerWorkHourCents,
@@ -1013,7 +1033,7 @@ function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
-          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+          <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} interval={1} />
           <YAxis
             yAxisId="guests"
             tickLine={false}
@@ -1043,12 +1063,13 @@ function GuestHoursChart({ daily }: { daily: DailyRow[] }) {
           />
           <Line
             yAxisId="hours"
-            type="monotone"
+            type="linear"
             dataKey="hours"
             name="Arbeitsstunden"
             stroke="#f59e0b"
             strokeWidth={2}
-            dot={false}
+            dot={{ r: 2, strokeWidth: 0, fill: "#f59e0b" }}
+            connectNulls={false}
           />
         </ComposedChart>
       </ResponsiveContainer>
@@ -1070,9 +1091,11 @@ function GuestHoursTip({
       <div className="font-medium">{row.fullDate}</div>
       <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
         <span className="text-muted-foreground">Gäste</span>
-        <span className="text-right">{row.guests.toLocaleString("de-DE")}</span>
+        <span className="text-right">
+          {row.guests === null ? "—" : row.guests.toLocaleString("de-DE")}
+        </span>
         <span className="text-muted-foreground">Stunden</span>
-        <span className="text-right">{row.hours.toFixed(2)}</span>
+        <span className="text-right">{row.hours === null ? "—" : row.hours.toFixed(2)}</span>
         <span className="text-muted-foreground">€/Gast</span>
         <span className="text-right">
           {row.perGuestCents === null ? "—" : fmtEuro(row.perGuestCents)}
@@ -1094,11 +1117,15 @@ function ChartTip({ active, payload }: TipPayload) {
       <div className="font-medium">{row.fullDate}</div>
       <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
         <span className="text-muted-foreground">Tagesumsatz</span>
-        <span className="text-right">{fmtEuro(row.totalCents)}</span>
+        <span className="text-right">
+          {row.totalCents === null ? "—" : fmtEuro(row.totalCents)}
+        </span>
         <span className="text-muted-foreground">Kreditkarten</span>
-        <span className="text-right">{fmtEuro(row.cardCents)}</span>
+        <span className="text-right">{row.cardCents === null ? "—" : fmtEuro(row.cardCents)}</span>
         <span className="text-muted-foreground">Takeaway</span>
-        <span className="text-right">{fmtEuro(row.takeawayCents)}</span>
+        <span className="text-right">
+          {row.takeawayCents === null ? "—" : fmtEuro(row.takeawayCents)}
+        </span>
       </div>
     </div>
   );

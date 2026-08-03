@@ -1606,6 +1606,51 @@ export const getWeeklyTimeEntriesBatch = createServerFn({ method: "GET" })
 // B6c — Inline-Edit/Create für Wochenplan (Admin)
 // Schmaler Wrapper, der nur Start/Ende setzt und break_minutes erhält bzw. 0 setzt.
 
+// ZS1 — Überlappungs-Guard. Lädt die Einträge derselben Person für
+// business_date ± 1 Tag (deckt Wrap-Schichten über Mitternacht ab) und
+// wirft bei identischem oder überlappendem Kandidaten. Reine Prüflogik
+// liegt in ./overlap.
+function shiftIsoDay(iso: string, delta: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+async function assertNoTimeConflict(
+  supabaseAdmin: SupabaseAdminLike,
+  organizationId: string,
+  staffId: string,
+  businessDate: string,
+  candidate: { startedAt: string; endedAt: string | null },
+  excludeId?: string,
+): Promise<void> {
+  const { data: rows, error } = await supabaseAdmin
+    .from("time_entries")
+    .select("id, started_at, ended_at")
+    .eq("organization_id", organizationId)
+    .eq("staff_id", staffId)
+    .gte("business_date", shiftIsoDay(businessDate, -1))
+    .lte("business_date", shiftIsoDay(businessDate, 1));
+  if (error) throw error;
+  const conflict = findTimeConflict(
+    (rows ?? []).map((r) => ({
+      id: r.id as string,
+      startedAt: r.started_at as string,
+      endedAt: (r.ended_at as string | null) ?? null,
+    })),
+    candidate,
+    excludeId,
+  );
+  if (!conflict) return;
+  const { data: staff } = await supabaseAdmin
+    .from("staff")
+    .select("display_name")
+    .eq("id", staffId)
+    .maybeSingle();
+  const name = (staff as { display_name?: string | null } | null)?.display_name ?? "diesen Mitarbeiter";
+  throw new Error(conflictMessage(conflict, name));
+}
+
 export const setTimeEntryShift = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input) =>

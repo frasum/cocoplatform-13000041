@@ -39,6 +39,7 @@ import { assertCashWritable, CashLockedError } from "./cash-lock";
 import type { Json } from "@/integrations/supabase/types";
 import { ForbiddenError } from "@/lib/admin/role-guard";
 import { sessionToDayInput } from "./session-day-input";
+import { otherIncomesTable } from "./other-incomes-access";
 import { loadTipSettings, type TipSettings } from "./tip-settings";
 import {
   openInvoiceEntriesSchema,
@@ -474,6 +475,12 @@ export async function getCashOverviewCore(
         amountCents: number;
         createdAt: string;
       }>,
+      otherIncomes: [] as Array<{
+        id: string;
+        description: string;
+        amountCents: number;
+        createdAt: string;
+      }>,
       advances: [] as Array<{
         id: string;
         staffId: string;
@@ -512,6 +519,7 @@ export async function getCashOverviewCore(
     terminalAmtRes,
     expensesRes,
     advancesRes,
+    otherIncomesRes,
     cardRes,
     bankRes,
     transferRes,
@@ -544,6 +552,12 @@ export async function getCashOverviewCore(
     supabaseAdmin
       .from("session_advances")
       .select("id, staff_id, amount_cents, note, created_at")
+      .eq("organization_id", caller.organizationId)
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: true }),
+    // SE1: Sonstige Einnahmen als Positionsliste (Muster session_expenses).
+    otherIncomesTable(supabaseAdmin)
+      .select("id, description, amount_cents, created_at")
       .eq("organization_id", caller.organizationId)
       .eq("session_id", session.id)
       .order("created_at", { ascending: true }),
@@ -635,6 +649,12 @@ export async function getCashOverviewCore(
       staffId: r.staff_id,
       amountCents: Number(r.amount_cents),
       note: r.note,
+      createdAt: r.created_at,
+    })),
+    otherIncomes: (otherIncomesRes.data ?? []).map((r) => ({
+      id: r.id,
+      description: r.description,
+      amountCents: Number(r.amount_cents),
       createdAt: r.created_at,
     })),
     cardTransactions: (cardRes.data ?? []).map((r) => ({
@@ -1405,7 +1425,9 @@ const updateSessionSchema = z.object({
   // Cutover-Mapping verifiziert (§88, N15b).
   vorschussCents: z.number().int().default(0),
   einladungCents: z.number().int().default(0),
-  sonstigeEinnahmeCents: z.number().int().default(0),
+  // SE1 (04.08.): „Sonstige Einnahme" ist kein Session-Feld mehr, sondern eine
+  // Positionsliste (session_other_incomes) wie Ausgaben/Vorschüsse. Die
+  // DB-Spalte `sessions.sonstige_einnahme_cents` wird nicht mehr beschrieben.
   vectronDailyTotalCents: z.number().int().optional(),
   cashActualCents: z.number().int().nullable().optional(),
   guestCount: z.number().int().nonnegative().default(0),
@@ -1458,7 +1480,6 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
         finedine_vouchers_cents: data.finedineVouchersCents,
         vorschuss_cents: data.vorschussCents,
         einladung_cents: data.einladungCents,
-        sonstige_einnahme_cents: data.sonstigeEinnahmeCents,
         vectron_daily_total_cents: data.vectronDailyTotalCents ?? 0,
         cash_actual_cents: data.cashActualCents ?? null,
         guest_count: data.guestCount,
@@ -1817,6 +1838,13 @@ const satelliteAddSchema = z.discriminatedUnion("kind", [
     description: z.string().min(1).max(500),
     amountCents: z.number().int().positive(),
   }),
+  // SE1: sonstige Einnahme als Position (identisches Muster zur Ausgabe).
+  z.object({
+    sessionId: z.string().uuid(),
+    kind: z.literal("other_income"),
+    description: z.string().min(1).max(500),
+    amountCents: z.number().int().positive(),
+  }),
   z.object({
     sessionId: z.string().uuid(),
     kind: z.literal("advance"),
@@ -1872,6 +1900,18 @@ export async function addSessionSatelliteCore(caller: AdminCaller, data: AddSate
     if (data.kind === "expense") {
       const { data: r, error } = await supabaseAdmin
         .from("session_expenses")
+        .insert({
+          organization_id: caller.organizationId,
+          session_id: session.id,
+          description: data.description,
+          amount_cents: data.amountCents,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      createdId = r.id;
+    } else if (data.kind === "other_income") {
+      const { data: r, error } = await otherIncomesTable(supabaseAdmin)
         .insert({
           organization_id: caller.organizationId,
           session_id: session.id,
@@ -1969,6 +2009,7 @@ export const removeSessionSatellite = createServerFn({ method: "POST" })
         sessionId: z.string().uuid(),
         kind: z.enum([
           "expense",
+          "other_income",
           "advance",
           "card_transaction",
           "bank_deposit",
@@ -1991,13 +2032,20 @@ export const removeSessionSatellite = createServerFn({ method: "POST" })
         cashLockedThroughDate: waterline,
       });
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const table = SATELLITE_TABLE[data.kind];
-      const { error } = await supabaseAdmin
-        .from(table)
-        .delete()
-        .eq("id", data.id)
-        .eq("session_id", session.id)
-        .eq("organization_id", caller.organizationId);
+      // SE1: neue Positionstabelle über den Typ-Shim, alles andere wie bisher.
+      const { error } =
+        data.kind === "other_income"
+          ? await otherIncomesTable(supabaseAdmin)
+              .delete()
+              .eq("id", data.id)
+              .eq("session_id", session.id)
+              .eq("organization_id", caller.organizationId)
+          : await supabaseAdmin
+              .from(SATELLITE_TABLE[data.kind])
+              .delete()
+              .eq("id", data.id)
+              .eq("session_id", session.id)
+              .eq("organization_id", caller.organizationId);
       if (error) throw error;
       return {
         result: { ok: true as const },
@@ -2796,6 +2844,12 @@ export type CashDayAgg = {
   finedine: number;
   einladung: number;
   sonstige: number;
+  /**
+   * SE1: Einzelpositionen der sonstigen Einnahmen des Tages (Beschreibung +
+   * Betrag). `sonstige` ist ihre Summe — die EINE Rechenquelle; das frühere
+   * Session-Feld wird nicht mehr gelesen.
+   */
+  otherIncomes: Array<{ description: string; amountCents: number }>;
   vorschuss: number;
   openInvoices: number[];
   expenses: number[];
@@ -2839,6 +2893,7 @@ function makeEmptyAgg(): CashDayAgg {
     finedine: 0,
     einladung: 0,
     sonstige: 0,
+    otherIncomes: [],
     vorschuss: 0,
     openInvoices: [],
     expenses: [],
@@ -2910,7 +2965,7 @@ export async function loadCashDayAggregates(
   let sessionQuery = supabaseAdmin
     .from("sessions")
     .select(
-      "id, business_date, status, location_id, opening_balance_cents, vouchers_sold_cents, vouchers_redeemed_cents, finedine_vouchers_cents, vorschuss_cents, einladung_cents, sonstige_einnahme_cents, cash_actual_cents, vectron_daily_total_cents",
+      "id, business_date, status, location_id, opening_balance_cents, vouchers_sold_cents, vouchers_redeemed_cents, finedine_vouchers_cents, vorschuss_cents, einladung_cents, cash_actual_cents, vectron_daily_total_cents",
     )
     .eq("organization_id", caller.organizationId)
     .gte("business_date", data.fromDate)
@@ -2958,7 +3013,7 @@ export async function loadCashDayAggregates(
     ]),
   );
 
-  const [chRes, tRes, expRes, advRes, depRes, trRes, wsRes] = await Promise.all([
+  const [chRes, tRes, expRes, advRes, depRes, trRes, wsRes, oiRes] = await Promise.all([
     supabaseAdmin
       .from("session_channel_amounts")
       .select("session_id, amount_cents, revenue_channels(kind)")
@@ -2995,6 +3050,12 @@ export async function loadCashDayAggregates(
       .eq("organization_id", caller.organizationId)
       .in("session_id", sessionIds)
       .neq("status", "superseded"),
+    // SE1: sonstige Einnahmen als Positionsliste.
+    otherIncomesTable(supabaseAdmin)
+      .select("session_id, description, amount_cents")
+      .eq("organization_id", caller.organizationId)
+      .in("session_id", sessionIds)
+      .order("created_at", { ascending: true }),
   ]);
   if (chRes.error) throw chRes.error;
   if (tRes.error) throw tRes.error;
@@ -3003,6 +3064,7 @@ export async function loadCashDayAggregates(
   if (depRes.error) throw depRes.error;
   if (trRes.error) throw trRes.error;
   if (wsRes.error) throw wsRes.error;
+  if (oiRes.error) throw oiRes.error;
 
   const byDate = new Map<string, CashDayAgg>();
   const sessionDate = new Map<string, string>();
@@ -3031,7 +3093,6 @@ export async function loadCashDayAggregates(
     a.vouchersRedeemed += Number(s.vouchers_redeemed_cents ?? 0);
     a.finedine += Number(s.finedine_vouchers_cents ?? 0);
     a.einladung += Number(s.einladung_cents ?? 0);
-    a.sonstige += Number(s.sonstige_einnahme_cents ?? 0);
     a.vorschuss += Number(s.vorschuss_cents ?? 0);
     a.vectronDailyTotal += Number(s.vectron_daily_total_cents ?? 0);
     a.cashTargetSum += locTargetById.get(s.location_id as string) ?? orgTargetCents;
@@ -3089,6 +3150,14 @@ export async function loadCashDayAggregates(
     const a = getAgg(d);
     a.openInvoices.push(Number(r.open_invoices_cents));
     a.differenz += Number(r.differenz_cents);
+  }
+  for (const r of oiRes.data ?? []) {
+    const d = sessionDate.get(r.session_id);
+    if (!d) continue;
+    const a = getAgg(d);
+    const amt = Number(r.amount_cents);
+    a.otherIncomes.push({ description: r.description, amountCents: amt });
+    a.sonstige += amt;
   }
 
   return { sortedDates, firstDate, byDate };
@@ -3232,6 +3301,11 @@ export type CashDailyRow = {
   vorschussCents: number;
   expensesCents: number;
   sonstigeEinnahmeCents: number;
+  /**
+   * SE1: Einzelpositionen der sonstigen Einnahmen (Datum · Beschreibung ·
+   * Betrag im Export). `sonstigeEinnahmeCents` bleibt ihre Summe.
+   */
+  otherIncomes: Array<{ description: string; amountCents: number }>;
   bargeldCents: number;
   /**
    * Trinkgeld-Rest des Tages (kitchen + service). Selbe Quelle wie
@@ -3289,6 +3363,7 @@ export async function getCashDailyBreakdownCore(
       vorschussCents: effectiveVorschussCents(day),
       expensesCents: a.expenses.reduce((s, x) => s + x, 0),
       sonstigeEinnahmeCents: a.sonstige,
+      otherIncomes: a.otherIncomes,
       bargeldCents: computeDailyCash(day),
       tipRemainderCents: tipByDate.get(date) ?? 0,
     };
@@ -3806,7 +3881,7 @@ export async function getPreviousOperativeDeficitCore(
 
   const sessionIds = sessions.map((s) => s.id);
 
-  const [chRes, tmRes, wsRes, expRes, advRes, chanRes] = await Promise.all([
+  const [chRes, tmRes, wsRes, expRes, advRes, chanRes, oiRes] = await Promise.all([
     supabaseAdmin
       .from("session_channel_amounts")
       .select("session_id, channel_id, amount_cents")
@@ -3837,6 +3912,11 @@ export async function getPreviousOperativeDeficitCore(
       .select("id, kind")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId),
+    // SE1: sonstige Einnahmen als Positionsliste.
+    otherIncomesTable(supabaseAdmin)
+      .select("session_id, amount_cents")
+      .eq("organization_id", caller.organizationId)
+      .in("session_id", sessionIds),
   ]);
   if (chRes.error) throw chRes.error;
   if (tmRes.error) throw tmRes.error;
@@ -3844,6 +3924,7 @@ export async function getPreviousOperativeDeficitCore(
   if (expRes.error) throw expRes.error;
   if (advRes.error) throw advRes.error;
   if (chanRes.error) throw chanRes.error;
+  if (oiRes.error) throw oiRes.error;
 
   const channelKindById = new Map<string, string>(
     (chanRes.data ?? []).map((c) => [c.id, c.kind as string]),
@@ -3856,6 +3937,7 @@ export async function getPreviousOperativeDeficitCore(
     openInvoicesCents: number[];
     expensesCents: number[];
     advancesCents: number[];
+    otherIncomesCents: number[];
   };
   const bySession = new Map<string, Bucket>();
   const ensure = (id: string): Bucket => {
@@ -3868,6 +3950,7 @@ export async function getPreviousOperativeDeficitCore(
         openInvoicesCents: [],
         expensesCents: [],
         advancesCents: [],
+        otherIncomesCents: [],
       };
       bySession.set(id, b);
     }
@@ -3897,6 +3980,9 @@ export async function getPreviousOperativeDeficitCore(
   for (const r of advRes.data ?? []) {
     ensure(r.session_id).advancesCents.push(Number(r.amount_cents));
   }
+  for (const r of oiRes.data ?? []) {
+    ensure(r.session_id).otherIncomesCents.push(Number(r.amount_cents));
+  }
 
   // rawBargeld pro Session in chronologischer Reihenfolge sammeln — Endsaldo
   // kommt aus der getesteten Helper-Funktion, für sourceDate wird derselbe
@@ -3913,7 +3999,6 @@ export async function getPreviousOperativeDeficitCore(
         vouchers_redeemed_cents: sess.vouchers_redeemed_cents,
         finedine_vouchers_cents: sess.finedine_vouchers_cents,
         einladung_cents: sess.einladung_cents,
-        sonstige_einnahme_cents: sess.sonstige_einnahme_cents,
         vorschuss_cents: sess.vorschuss_cents,
       },
       {
@@ -3923,6 +4008,7 @@ export async function getPreviousOperativeDeficitCore(
         openInvoicesCents: b.openInvoicesCents,
         expensesCents: b.expensesCents,
         advancesCents: b.advancesCents,
+        otherIncomesCents: b.otherIncomesCents,
       },
     );
     rawByDay.push(computeDailyCash(dayInput));

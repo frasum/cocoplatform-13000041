@@ -21,6 +21,7 @@ function emptyAgg(): CashDayAgg {
     finedine: 0,
     einladung: 0,
     sonstige: 0,
+    otherIncomes: [],
     vorschuss: 0,
     openInvoices: [],
     expenses: [],

@@ -18,14 +18,15 @@ const july01: CashDailyRow = {
   vorschussCents: 0,
   expensesCents: 42200,
   sonstigeEinnahmeCents: 0,
+  otherIncomes: [],
   bargeldCents: -38423,
   tipRemainderCents: 0,
 };
 
 const july02: CashDailyRow = { ...july01, businessDate: "2026-07-02" };
 
-// EX2-b — 27.07. (YUM): 30,00 € sonstige Einnahme; Spalten ergeben 374,07,
-// gespeichertes Tages-Bargeld 404,07.
+// EX2-b/SE1 — 27.07. (YUM): 30,00 € sonstige Einnahme, jetzt als POSITION;
+// Spalten ergeben 374,07, gespeichertes Tages-Bargeld 404,07.
 const july27: CashDailyRow = {
   ...july01,
   businessDate: "2026-07-27",
@@ -34,6 +35,7 @@ const july27: CashDailyRow = {
   deliveryWoltCents: 0,
   expensesCents: 0,
   sonstigeEinnahmeCents: 3000,
+  otherIncomes: [{ description: "Übernahme Alt-Erfassung", amountCents: 3000 }],
   bargeldCents: 40407,
 };
 
@@ -76,5 +78,28 @@ describe("buildBargeldXlsx", () => {
   it("EX2-b: Blatt mit sonstiger Einnahme wird erzeugt", async () => {
     const blob = await buildBargeldXlsx([{ locationName: "YUM", rows: [july27] }]);
     expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it("SE1: Positions-Summe ergibt die ausgewiesene Summe (mehrere Positionen)", () => {
+    const multi: CashDailyRow = {
+      ...july27,
+      sonstigeEinnahmeCents: 4500,
+      otherIncomes: [
+        { description: "Pfand", amountCents: 1500 },
+        { description: "Gefundenes Bargeld", amountCents: 3000 },
+      ],
+      bargeldCents: 37407 + 4500,
+    };
+    expect(bargeldFromRowCents(multi)).toBe(37407);
+    expect(() => assertBargeldFormula([multi], "YUM")).not.toThrow();
+  });
+
+  it("SE1: blockiert, wenn Positionen nicht die ausgewiesene Summe ergeben", () => {
+    expect(() =>
+      assertBargeldFormula(
+        [{ ...july27, otherIncomes: [{ description: "Pfand", amountCents: 1000 }] }],
+        "YUM",
+      ),
+    ).toThrow(/Positionen der sonstigen/);
   });
 });

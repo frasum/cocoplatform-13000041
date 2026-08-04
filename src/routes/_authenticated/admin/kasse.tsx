@@ -853,6 +853,7 @@ function KassePage() {
                 })
               }
               expenses={ovQ.data?.expenses ?? []}
+              otherIncomes={ovQ.data?.otherIncomes ?? []}
               advances={ovQ.data?.advances ?? []}
               staff={staffQ.data ?? []}
               onAddExpense={(desc, cents) =>
@@ -870,6 +871,27 @@ function KassePage() {
               }
               onRemoveExpense={(id) =>
                 callRemoveSat({ data: { sessionId: sessionId!, kind: "expense", id } }).then(() => {
+                  toast.success("Entfernt.");
+                  void invalidate();
+                })
+              }
+              onAddOtherIncome={(desc, cents) =>
+                callAddSat({
+                  data: {
+                    sessionId: sessionId!,
+                    kind: "other_income",
+                    description: desc,
+                    amountCents: cents,
+                  },
+                }).then(() => {
+                  toast.success("Sonstige Einnahme hinzugefügt.");
+                  void invalidate();
+                })
+              }
+              onRemoveOtherIncome={(id) =>
+                callRemoveSat({
+                  data: { sessionId: sessionId!, kind: "other_income", id },
+                }).then(() => {
                   toast.success("Entfernt.");
                   void invalidate();
                 })

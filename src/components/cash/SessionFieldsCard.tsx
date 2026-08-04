@@ -21,7 +21,6 @@ type UpdatePayload = {
   finedineVouchersCents: number;
   vorschussCents: number;
   einladungCents: number;
-  sonstigeEinnahmeCents: number;
   vectronDailyTotalCents: number;
   cashActualCents: number | null;
   guestCount: number;
@@ -38,9 +37,12 @@ export function SessionFieldsCard({
   onSave,
   expenses,
   advances,
+  otherIncomes,
   staff,
   onAddExpense,
   onRemoveExpense,
+  onAddOtherIncome,
+  onRemoveOtherIncome,
   onAddAdvance,
   onRemoveAdvance,
   cashBalanceTargetCents,
@@ -69,6 +71,8 @@ export function SessionFieldsCard({
   writable: boolean;
   onSave: (data: UpdatePayload) => Promise<unknown>;
   expenses: Array<{ id: string; description: string | null; amountCents: number }>;
+  /** SE1: sonstige Einnahmen als Positionsliste (Muster Ausgaben). */
+  otherIncomes: Array<{ id: string; description: string; amountCents: number }>;
   advances: Array<{
     id: string;
     staffId: string;
@@ -78,6 +82,8 @@ export function SessionFieldsCard({
   staff: { id: string; displayName: string }[];
   onAddExpense: (description: string, amountCents: number) => Promise<unknown>;
   onRemoveExpense: (id: string) => Promise<unknown>;
+  onAddOtherIncome: (description: string, amountCents: number) => Promise<unknown>;
+  onRemoveOtherIncome: (id: string) => Promise<unknown>;
   onAddAdvance: (staffId: string, amountCents: number, note: string | null) => Promise<unknown>;
   onRemoveAdvance: (id: string) => Promise<unknown>;
   cashBalanceTargetCents: number;
@@ -105,7 +111,6 @@ export function SessionFieldsCard({
     finedineVouchers: string;
     vorschuss: string;
     einladung: string;
-    sonstige: string;
     vectron: string;
     cashActual: string;
     guestCount: string;
@@ -117,7 +122,6 @@ export function SessionFieldsCard({
     finedineVouchers: (Number(sess.finedine_vouchers_cents ?? 0) / 100).toFixed(2),
     vorschuss: (Number(sess.vorschuss_cents ?? 0) / 100).toFixed(2),
     einladung: (Number(sess.einladung_cents ?? 0) / 100).toFixed(2),
-    sonstige: (Number(sess.sonstige_einnahme_cents ?? 0) / 100).toFixed(2),
     vectron: (Number(sess.vectron_daily_total_cents ?? 0) / 100).toFixed(2),
     cashActual:
       sess.cash_actual_cents === null || sess.cash_actual_cents === undefined
@@ -169,7 +173,6 @@ export function SessionFieldsCard({
     const fv = parseEuroToCents(misc.finedineVouchers);
     const vo = parseEuroToCents(misc.vorschuss);
     const ei = parseEuroToCents(misc.einladung);
-    const so = parseEuroToCents(misc.sonstige);
     const ve = parseEuroToCents(misc.vectron);
     const caRaw = misc.cashActual.trim();
     const caParsed = caRaw === "" ? null : parseEuroToCents(caRaw);
@@ -181,7 +184,6 @@ export function SessionFieldsCard({
       fv === null ||
       vo === null ||
       ei === null ||
-      so === null ||
       ve === null ||
       (caRaw !== "" && caParsed === null) ||
       !Number.isFinite(gcParsed) ||
@@ -196,7 +198,6 @@ export function SessionFieldsCard({
       finedineVouchersCents: fv,
       vorschussCents: vo,
       einladungCents: ei,
-      sonstigeEinnahmeCents: so,
       vectronDailyTotalCents: ve,
       cashActualCents: caParsed,
       guestCount: gcParsed,
@@ -468,17 +469,14 @@ export function SessionFieldsCard({
                 disabled={!writable}
                 onChange={(v) => setMisc({ ...misc, einladung: v })}
               />
-              <ExcelInputRow
-                label="Sonstige Einnahme"
-                value={misc.sonstige}
-                disabled={!writable}
-                onChange={(v) => setMisc({ ...misc, sonstige: v })}
-              />
+              {/* SE1: „Sonstige Einnahme" ist keine Eingabezeile mehr, sondern
+                  eine Positionskarte in der rechten Spalte (Muster Ausgaben). */}
               {(() => {
                 const advSum = advances.reduce((s, a) => s + a.amountCents, 0);
                 const effVorschussCents =
                   advances.length > 0 ? advSum : (parseEuroToCents(misc.vorschuss) ?? 0);
                 const totalExpensesCents = expenses.reduce((s, e) => s + e.amountCents, 0);
+                const totalOtherIncomeCents = otherIncomes.reduce((s, o) => s + o.amountCents, 0);
                 return (
                   <>
                     {effVorschussCents !== 0 && (
@@ -491,6 +489,12 @@ export function SessionFieldsCard({
                       <ExcelReadonlyRow
                         label="Ausgaben (Abzug)"
                         value={fmtCents(totalExpensesCents)}
+                      />
+                    )}
+                    {totalOtherIncomeCents !== 0 && (
+                      <ExcelReadonlyRow
+                        label="Sonstige Einnahmen"
+                        value={fmtCents(totalOtherIncomeCents)}
                       />
                     )}
                   </>
@@ -507,6 +511,7 @@ export function SessionFieldsCard({
             channelById={channelById}
             tmRows={tmRows}
             expenses={expenses}
+            otherIncomes={otherIncomes}
             advances={advances}
             overview={overview}
             cashBalanceTargetCents={cashBalanceTargetCents}
@@ -564,6 +569,39 @@ export function SessionFieldsCard({
                 </ul>
               )}
               {writable && <ExpenseForm writable={writable} onAdd={onAddExpense} />}
+            </div>
+          </div>
+
+          {/* SE1: SONSTIGE EINNAHMEN — zwischen „Ausgaben" und „Vorschüsse",
+              Interaktion identisch zur Ausgaben-Karte. */}
+          <div className="border rounded-lg overflow-hidden">
+            <div className="bg-muted/50 px-3 py-2 border-b">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Sonstige Einnahmen
+              </span>
+            </div>
+            <div className="p-3 space-y-2">
+              {otherIncomes.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Keine sonstigen Einnahmen.</p>
+              ) : (
+                <ul className="space-y-1 text-sm">
+                  {otherIncomes.map((o) => (
+                    <li key={o.id} className="flex items-center justify-between gap-2">
+                      <span className="flex-1 truncate">{o.description}</span>
+                      <span className="font-mono tabular-nums">{fmtCents(o.amountCents)} €</span>
+                      {writable && (
+                        <button
+                          className="text-destructive hover:opacity-70 text-xs"
+                          onClick={() => void onRemoveOtherIncome(o.id)}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {writable && <ExpenseForm writable={writable} onAdd={onAddOtherIncome} />}
             </div>
           </div>
 

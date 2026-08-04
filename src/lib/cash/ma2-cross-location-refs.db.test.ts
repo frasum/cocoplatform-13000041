@@ -51,7 +51,6 @@ describe.skipIf(!dbTestsEnabled)("MA2 — cross-location channel/terminal refs (
       finedineVouchersCents: 0,
       vorschussCents: 0,
       einladungCents: 0,
-      sonstigeEinnahmeCents: 0,
       guestCount: 99, // bewusst != INITIAL_GUEST_COUNT → Unverändert-Assertion
       notes: null,
       ...overrides,

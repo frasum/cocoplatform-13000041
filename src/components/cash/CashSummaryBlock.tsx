@@ -12,7 +12,6 @@ type CashSummaryMisc = {
   finedineVouchers: string;
   vorschuss: string;
   einladung: string;
-  sonstige: string;
   vectron: string;
   cashActual: string;
   guestCount: string;
@@ -26,6 +25,7 @@ export function CashSummaryBlock({
   channelById,
   tmRows,
   expenses,
+  otherIncomes,
   advances,
   overview,
   cashBalanceTargetCents,
@@ -39,6 +39,8 @@ export function CashSummaryBlock({
   channelById: Record<string, { kind: string } | undefined>;
   tmRows: { id: string; euro: string; isGl: boolean }[];
   expenses: Array<{ amountCents: number }>;
+  /** SE1: Positionsliste der sonstigen Einnahmen (Summe ersetzt das Altfeld). */
+  otherIncomes: Array<{ amountCents: number }>;
   advances: Array<{ amountCents: number }>;
   overview: Overview;
   cashBalanceTargetCents: number;
@@ -70,7 +72,6 @@ export function CashSummaryBlock({
       vouchers_redeemed_cents: parseEuroToCents(misc.vouchersRedeemed) ?? 0,
       finedine_vouchers_cents: parseEuroToCents(misc.finedineVouchers) ?? 0,
       einladung_cents: parseEuroToCents(misc.einladung) ?? 0,
-      sonstige_einnahme_cents: parseEuroToCents(misc.sonstige) ?? 0,
       vorschuss_cents: parseEuroToCents(misc.vorschuss) ?? 0,
     },
     {
@@ -80,6 +81,7 @@ export function CashSummaryBlock({
       openInvoicesCents,
       expensesCents: expenses.map((e) => e.amountCents),
       advancesCents: advances.map((a) => a.amountCents),
+      otherIncomesCents: otherIncomes.map((o) => o.amountCents),
       tipRemainderCents,
     },
   );

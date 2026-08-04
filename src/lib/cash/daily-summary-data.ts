@@ -52,7 +52,6 @@ export function buildDailySummaryData(input: BuildDailySummaryDataInput): PdfExp
       vouchers_redeemed_cents: sess.vouchers_redeemed_cents,
       finedine_vouchers_cents: sess.finedine_vouchers_cents,
       einladung_cents: sess.einladung_cents,
-      sonstige_einnahme_cents: sess.sonstige_einnahme_cents,
       vorschuss_cents: sess.vorschuss_cents,
     },
     locationName: input.locationName,
@@ -87,6 +86,11 @@ export function buildDailySummaryData(input: BuildDailySummaryDataInput): PdfExp
     expenses: ov.expenses.map((e) => ({
       description: e.description,
       amountCents: e.amountCents,
+    })),
+    // SE1: sonstige Einnahmen als Positionsliste (Muster `expenses`).
+    otherIncomes: ov.otherIncomes.map((o) => ({
+      description: o.description,
+      amountCents: o.amountCents,
     })),
     advances: ov.advances.map((a) => ({
       staffName: staffById.get(a.staffId) ?? a.staffId.slice(0, 8),

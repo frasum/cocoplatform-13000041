@@ -683,6 +683,10 @@ function DropCell({
   const tdInner = (
     <td
       ref={setNodeRef}
+      // UB1/E2E — stabile Prüf-Haken: Zelle je Mitarbeiter/Tag plus der
+      // Abwesenheitstyp, der die Planung blockt (leer = keine Abwesenheit).
+      data-testid={`roster-cell-${staffId}-${iso}`}
+      data-absence={absenceType ?? ""}
       className={cn(
         "relative px-0.5 py-1 text-center align-middle",
         weekend && "bg-muted-foreground/15",

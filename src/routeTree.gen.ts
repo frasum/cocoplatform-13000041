@@ -83,6 +83,7 @@ import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicTrmnlDienstplanTokenRouteImport } from './routes/api/public/trmnl-dienstplan.$token'
 import { Route as ApiPublicTrmnlPlanungstafelTokenRouteImport } from './routes/api/public/trmnl-planungstafel.$token'
 import { Route as ApiPublicTrmnlTasksTokenRouteImport } from './routes/api/public/trmnl-tasks.$token'
+import { Route as ApiPublicWeatherSyncRouteImport } from './routes/api/public/weather/sync'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
@@ -507,6 +508,11 @@ const ApiPublicTrmnlTasksTokenRoute =
     path: '/api/public/trmnl-tasks/$token',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWeatherSyncRoute = ApiPublicWeatherSyncRouteImport.update({
+  id: '/api/public/weather/sync',
+  path: '/api/public/weather/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -579,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/api/public/trmnl-dienstplan/$token': typeof ApiPublicTrmnlDienstplanTokenRoute
   '/api/public/trmnl-planungstafel/$token': typeof ApiPublicTrmnlPlanungstafelTokenRoute
   '/api/public/trmnl-tasks/$token': typeof ApiPublicTrmnlTasksTokenRoute
+  '/api/public/weather/sync': typeof ApiPublicWeatherSyncRoute
   '/admin/bestellung/': typeof AuthenticatedAdminBestellungIndexRoute
   '/admin/einstellungen/': typeof AuthenticatedAdminEinstellungenIndexRoute
   '/admin/staff/': typeof AuthenticatedAdminStaffIndexRoute
@@ -650,6 +657,7 @@ export interface FileRoutesByTo {
   '/api/public/trmnl-dienstplan/$token': typeof ApiPublicTrmnlDienstplanTokenRoute
   '/api/public/trmnl-planungstafel/$token': typeof ApiPublicTrmnlPlanungstafelTokenRoute
   '/api/public/trmnl-tasks/$token': typeof ApiPublicTrmnlTasksTokenRoute
+  '/api/public/weather/sync': typeof ApiPublicWeatherSyncRoute
   '/admin/bestellung': typeof AuthenticatedAdminBestellungIndexRoute
   '/admin/einstellungen': typeof AuthenticatedAdminEinstellungenIndexRoute
   '/admin/staff': typeof AuthenticatedAdminStaffIndexRoute
@@ -727,6 +735,7 @@ export interface FileRoutesById {
   '/api/public/trmnl-dienstplan/$token': typeof ApiPublicTrmnlDienstplanTokenRoute
   '/api/public/trmnl-planungstafel/$token': typeof ApiPublicTrmnlPlanungstafelTokenRoute
   '/api/public/trmnl-tasks/$token': typeof ApiPublicTrmnlTasksTokenRoute
+  '/api/public/weather/sync': typeof ApiPublicWeatherSyncRoute
   '/_authenticated/admin/bestellung/': typeof AuthenticatedAdminBestellungIndexRoute
   '/_authenticated/admin/einstellungen/': typeof AuthenticatedAdminEinstellungenIndexRoute
   '/_authenticated/admin/staff/': typeof AuthenticatedAdminStaffIndexRoute
@@ -804,6 +813,7 @@ export interface FileRouteTypes {
     | '/api/public/trmnl-dienstplan/$token'
     | '/api/public/trmnl-planungstafel/$token'
     | '/api/public/trmnl-tasks/$token'
+    | '/api/public/weather/sync'
     | '/admin/bestellung/'
     | '/admin/einstellungen/'
     | '/admin/staff/'
@@ -875,6 +885,7 @@ export interface FileRouteTypes {
     | '/api/public/trmnl-dienstplan/$token'
     | '/api/public/trmnl-planungstafel/$token'
     | '/api/public/trmnl-tasks/$token'
+    | '/api/public/weather/sync'
     | '/admin/bestellung'
     | '/admin/einstellungen'
     | '/admin/staff'
@@ -951,6 +962,7 @@ export interface FileRouteTypes {
     | '/api/public/trmnl-dienstplan/$token'
     | '/api/public/trmnl-planungstafel/$token'
     | '/api/public/trmnl-tasks/$token'
+    | '/api/public/weather/sync'
     | '/_authenticated/admin/bestellung/'
     | '/_authenticated/admin/einstellungen/'
     | '/_authenticated/admin/staff/'
@@ -972,6 +984,7 @@ export interface RootRouteChildren {
   ApiPublicTrmnlDienstplanTokenRoute: typeof ApiPublicTrmnlDienstplanTokenRoute
   ApiPublicTrmnlPlanungstafelTokenRoute: typeof ApiPublicTrmnlPlanungstafelTokenRoute
   ApiPublicTrmnlTasksTokenRoute: typeof ApiPublicTrmnlTasksTokenRoute
+  ApiPublicWeatherSyncRoute: typeof ApiPublicWeatherSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1494,6 +1507,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTrmnlTasksTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/weather/sync': {
+      id: '/api/public/weather/sync'
+      path: '/api/public/weather/sync'
+      fullPath: '/api/public/weather/sync'
+      preLoaderRoute: typeof ApiPublicWeatherSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1707,6 +1727,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicTrmnlDienstplanTokenRoute: ApiPublicTrmnlDienstplanTokenRoute,
   ApiPublicTrmnlPlanungstafelTokenRoute: ApiPublicTrmnlPlanungstafelTokenRoute,
   ApiPublicTrmnlTasksTokenRoute: ApiPublicTrmnlTasksTokenRoute,
+  ApiPublicWeatherSyncRoute: ApiPublicWeatherSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

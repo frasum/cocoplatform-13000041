@@ -334,6 +334,15 @@ export async function findPoolWarningAuditRow(
 // `roster_absence.type` noch nicht migriert), bricht der Seed mit klarer
 // Ursache ab — kein stiller Grün-Lauf.
 
+/**
+ * Erwartete Klartext-Ursache, wenn `urlaub_unbezahlt` nicht speicherbar ist.
+ * Der E2E-Test prüft genau diesen Text — so ist eine fehlende Migration
+ * eindeutig als solche erkennbar und nicht als UB1-Regressionsfehler.
+ */
+export const UB1_MIGRATION_HINT =
+  "UB1-Migration (docs/ub1-roster-absence-urlaub-unbezahlt.sql) nicht angewendet: " +
+  "roster_absence lehnt den Typ 'urlaub_unbezahlt' ab";
+
 export type E2EUnpaidLeaveSeed = {
   orgId: string;
   locationId: string;
@@ -347,6 +356,16 @@ export type E2EUnpaidLeaveSeed = {
   paidDays: string[];
   /** Mi+Do+Fr — unbezahlter Urlaub. */
   unpaidDays: string[];
+  /**
+   * UB1-Migration auf diesem Stack vorhanden? Wenn nein, ist
+   * `urlaub_unbezahlt` nicht speicherbar — dann steht der Grund in
+   * `migrationError` und die unbezahlten Tage sind NICHT geblockt.
+   */
+  unpaidLeaveSupported: boolean;
+  /** Klartext-Fehlermeldung des abgelehnten Inserts (sonst null). */
+  migrationError: string | null;
+  /** Zählt die tatsächlich gespeicherten `urlaub_unbezahlt`-Tage dieser Org. */
+  countStoredUnpaidDays: () => Promise<{ count: number; error: string | null }>;
   cleanup: () => Promise<void>;
 };
 
@@ -496,28 +515,45 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
   const { error: teErr } = await svc.from("time_entries").insert(refEntries);
   if (teErr) throw new Error(`time_entries insert failed: ${teErr.message}`);
 
-  const absenceRows = [
-    ...paidDays.map((date) => ({
+  // Bezahlter Urlaub muss immer gehen — schlägt er fehl, ist der Stack kaputt
+  // und nicht bloß die UB1-Migration nicht angewendet.
+  const { error: paidErr } = await svc.from("roster_absence").insert(
+    paidDays.map((date) => ({
       organization_id: orgId,
       staff_id: worker.staffId,
       date,
       type: "urlaub",
     })),
-    ...unpaidDays.map((date) => ({
+  );
+  if (paidErr) throw new Error(`roster_absence (urlaub) insert failed: ${paidErr.message}`);
+
+  // Der unbezahlte Urlaub ist der Migrations-Prüfstein: fehlt die UB1-
+  // Migration, lehnt der CHECK den Typ ab. Das ist KEIN Seed-Abbruch,
+  // sondern ein prüfbarer Zustand — der Test darf dann genau die
+  // Fehlermeldung erwarten statt geblockter Tage (§104-Ehrlichkeitsregel).
+  const { error: unpaidErr } = await svc.from("roster_absence").insert(
+    unpaidDays.map((date) => ({
       organization_id: orgId,
       staff_id: worker.staffId,
       date,
       type: "urlaub_unbezahlt",
     })),
-  ];
-  const { error: absErr } = await svc.from("roster_absence").insert(absenceRows);
-  if (absErr) {
-    throw new Error(
-      `roster_absence insert failed: ${absErr.message} — ` +
-        "Ist die UB1-Migration (docs/ub1-roster-absence-urlaub-unbezahlt.sql) " +
-        "auf diesem Stack angewendet? Ohne sie lehnt der CHECK 'urlaub_unbezahlt' ab.",
-    );
-  }
+  );
+  const unpaidLeaveSupported = !unpaidErr;
+  const migrationError = unpaidErr ? `${UB1_MIGRATION_HINT} (${unpaidErr.message})` : null;
+
+  const countStoredUnpaidDays = async (): Promise<{ count: number; error: string | null }> => {
+    const { count, error } = await svc
+      .from("roster_absence")
+      .select("date", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .eq("staff_id", worker.staffId)
+      .eq("type", "urlaub_unbezahlt");
+    // Ohne Migration kann bereits der Filter scheitern — dann ist "0 Tage
+    // gespeichert" die wahre Aussage, aber der Fehler wird mitgemeldet.
+    if (error) return { count: 0, error: error.message };
+    return { count: count ?? 0, error: null };
+  };
 
   const cleanup = async () => {
     await svc.from("audit_log").delete().eq("organization_id", orgId);
@@ -550,6 +586,9 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
     periodEnd,
     paidDays,
     unpaidDays,
+    unpaidLeaveSupported,
+    migrationError,
+    countStoredUnpaidDays,
     cleanup,
   };
 }

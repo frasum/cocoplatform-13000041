@@ -242,7 +242,11 @@ function KasseSaldoPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" disabled={rows.length === 0 || exporting} onClick={handleExport}>
+          <Button
+            variant="outline"
+            disabled={rows.length === 0 || exporting}
+            onClick={handleExport}
+          >
             {exporting ? "Exportiere…" : "Export Excel"}
           </Button>
         </div>

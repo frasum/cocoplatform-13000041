@@ -196,3 +196,45 @@ Gäste: 42 (⌀ 36,27 €)
 `);
   });
 });
+
+// TG5-b — „Umsatz/Std" ist eine eigene Inhalts-Option.
+describe("buildDailyReport — Flag umsatzStd (TG5-b)", () => {
+  const input: ReportInput = {
+    businessDate: "2026-07-03",
+    locations: [
+      {
+        locationId: "loc-1",
+        name: "COCO Mitte",
+        hasSession: true,
+        vectronCents: 152340,
+        revenuePerWorkHourCents: 7600,
+      },
+    ],
+  };
+
+  it("Flag an (Default): Kennzahl hängt an der Umsatzzeile", () => {
+    const out = buildDailyReport(input, DEFAULT_REPORT_FLAGS);
+    expect(out).toContain("Vectron: 1.523,40 € · 76 €/Std");
+  });
+
+  it("Flag aus: Kennzahl fehlt, Umsatzzeile bleibt", () => {
+    const out = buildDailyReport(input, { ...DEFAULT_REPORT_FLAGS, umsatzStd: false });
+    expect(out).toContain("Vectron: 1.523,40 €");
+    expect(out).not.toMatch(/€\/Std/);
+  });
+
+  it("umsatz aus, umsatzStd an: eigene kompakte Zeile", () => {
+    const out = buildDailyReport(input, { ...DEFAULT_REPORT_FLAGS, umsatz: false });
+    expect(out).not.toMatch(/Vectron:/);
+    expect(out).toContain("Umsatz/Std: 76 €/Std");
+  });
+
+  it("beide aus: keine der beiden Zeilen", () => {
+    const out = buildDailyReport(input, {
+      ...DEFAULT_REPORT_FLAGS,
+      umsatz: false,
+      umsatzStd: false,
+    });
+    expect(out).not.toMatch(/Vectron:|€\/Std/);
+  });
+});

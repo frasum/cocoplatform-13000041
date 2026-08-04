@@ -34,6 +34,7 @@ export function TelegramTagesberichtSection({ canEdit }: { canEdit: boolean }) {
   const [hour, setHour] = useState(7);
   const [flags, setFlags] = useState({
     umsatz: true,
+    umsatzStd: true,
     gaeste: true,
     kontrolle: true,
     kellner: true,
@@ -50,6 +51,7 @@ export function TelegramTagesberichtSection({ canEdit }: { canEdit: boolean }) {
     setHour(settingsQ.data.hour);
     setFlags({
       umsatz: settingsQ.data.flags.umsatz,
+      umsatzStd: settingsQ.data.flags.umsatzStd,
       gaeste: settingsQ.data.flags.gaeste,
       kontrolle: settingsQ.data.flags.kontrolle,
       kellner: settingsQ.data.flags.kellner,
@@ -168,6 +170,7 @@ export function TelegramTagesberichtSection({ canEdit }: { canEdit: boolean }) {
           {(
             [
               ["umsatz", "Umsatz"],
+              ["umsatzStd", "Umsatz/Std"],
               ["gaeste", "Gäste"],
               ["kontrolle", "Kontrolle"],
               ["kellner", "Kellner"],

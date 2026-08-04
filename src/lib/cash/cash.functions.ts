@@ -40,6 +40,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { ForbiddenError } from "@/lib/admin/role-guard";
 import { sessionToDayInput } from "./session-day-input";
 import { otherIncomesTable } from "./other-incomes-access";
+import { assertSessionFieldWritable } from "./session-fields";
 import { loadTipSettings, type TipSettings } from "./tip-settings";
 import {
   openInvoiceEntriesSchema,

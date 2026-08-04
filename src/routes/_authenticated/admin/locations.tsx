@@ -10,6 +10,7 @@ import {
   listLocations,
   setLocationActive,
   setLocationCashEnabled,
+  setLocationDisabledSessionFields,
   updateLocation,
   updateLocationGeo,
 } from "@/lib/admin/locations.functions";
@@ -19,6 +20,12 @@ import {
   upsertDisplaySettings,
 } from "@/lib/display/display.functions";
 import { LocationCalendarPanel } from "@/components/admin/LocationCalendarPanel";
+import {
+  SESSION_FIELD_KEYS,
+  SESSION_FIELD_LABELS,
+  isSessionFieldEnabled,
+  type SessionFieldKey,
+} from "@/lib/cash/session-fields";
 import { LocationTipPoolPanel } from "@/components/admin/LocationTipPoolPanel";
 import { tabClass } from "@/components/ui/nav-tab";
 
@@ -196,6 +203,14 @@ function LocationsPage() {
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler."),
   });
 
+  // FS1: Kassenfelder je Standort ein-/ausschalten.
+  const setSessionFieldsMut = useMutation({
+    mutationFn: ({ id, disabled }: { id: string; disabled: SessionFieldKey[] }) =>
+      callSetSessionFields({ data: { locationId: id, disabledSessionFields: disabled } }),
+    onSuccess: refresh,
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler."),
+  });
+
   const locations = locationsQ.data ?? [];
   // Default-Auswahl: erster aktiver Standort, sonst erster überhaupt.
   const defaultLocId =
@@ -336,6 +351,12 @@ function LocationsPage() {
             onToggleCashEnabled={(next) => {
               setMsg(null);
               setCashEnabledMut.mutate({ id: activeLoc.id, cashEnabled: next });
+            }}
+            onToggleSessionField={(key, enabled) => {
+              setMsg(null);
+              const current = (activeLoc.disabledSessionFields ?? []) as SessionFieldKey[];
+              const next = enabled ? current.filter((k) => k !== key) : [...current, key];
+              setSessionFieldsMut.mutate({ id: activeLoc.id, disabled: [...new Set(next)] });
             }}
             onGeoChanged={refresh}
           />

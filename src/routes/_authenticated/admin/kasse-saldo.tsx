@@ -392,6 +392,13 @@ function KasseSaldoPage() {
                 </TableRow>
               </TableFooter>
             </Table>
+            <div className="border-t px-2 py-3 text-xs text-muted-foreground">
+              Sonstige Einnahmen: {fmtEuro(totals.sonstige)} ({totals.sonstigeTage}{" "}
+              {totals.sonstigeTage === 1 ? "Tag" : "Tage"}) — nicht in der Bargeld-Spalte enthalten;
+              die Kassen-Kontrolle zeigt sie bewusst inklusive.
+              <br />
+              Einzahlung gesamt: {fmtEuro(totals.bargeld + totals.sonstige)}
+            </div>
           </div>
         )}
       </Card>

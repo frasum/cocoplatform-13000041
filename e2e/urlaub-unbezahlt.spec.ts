@@ -219,4 +219,32 @@ test.describe("Urlaub (unbezahlt) — UB1", () => {
     expect(error).toBeNull();
     expect(count).toBe(seed.unpaidDays.length);
   });
+
+  test("(5) ICS-Feed weist unbezahlten Urlaub eigenständig aus", async ({ request }) => {
+    seed = await seedUnpaidLeave("ub1-ics");
+    assertMigrationApplied(seed);
+
+    const { feedPath } = await seed.createCalendarFeedToken();
+    const events = parseIcsEvents(await fetchIcsFeed(request, feedPath));
+
+    const unpaid = events.filter((e) => e["SUMMARY"] === "Urlaub (unbezahlt)");
+    const paid = events.filter((e) => e["SUMMARY"] === "Urlaub");
+
+    // Unbezahlt: eigenes Event, eigene Kategorie — NICHT auf "Urlaub" gemappt.
+    expect(unpaid).toHaveLength(1);
+    expect(unpaid[0]!["CATEGORIES"]).toBe("URLAUB_UNBEZAHLT");
+    // Mi–Fr am Stück: DTSTART = erster unbezahlter Tag, DTEND exklusiv.
+    const lastPlusOne = new Date(`${seed.unpaidDays[seed.unpaidDays.length - 1]!}T00:00:00Z`);
+    lastPlusOne.setUTCDate(lastPlusOne.getUTCDate() + 1);
+    expect(unpaid[0]!["DTSTART"]).toBe(seed.unpaidDays[0]!.replace(/-/g, ""));
+    expect(unpaid[0]!["DTEND"]).toBe(lastPlusOne.toISOString().slice(0, 10).replace(/-/g, ""));
+
+    // Bezahlt bleibt getrennt und behält Label/Kategorie "URLAUB".
+    expect(paid).toHaveLength(1);
+    expect(paid[0]!["CATEGORIES"]).toBe("URLAUB");
+    expect(paid[0]!["DTSTART"]).toBe(seed.paidDays[0]!.replace(/-/g, ""));
+
+    // Genau ein Event trägt die unbezahlte Kategorie — keine Doppelausgabe.
+    expect(events.filter((e) => e["CATEGORIES"] === "URLAUB_UNBEZAHLT")).toHaveLength(1);
+  });
 });

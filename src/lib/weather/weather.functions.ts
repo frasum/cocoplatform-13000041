@@ -15,7 +15,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { makeAuditWriter } from "@/lib/admin/audit";
 import { businessDateOf } from "@/lib/business-date";
-import { backfillInputSchema, validateRange } from "./weather-core";
+import { archiveUrl, backfillInputSchema, mapOpenMeteoDaily, validateRange } from "./weather-core";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Datum im Format YYYY-MM-DD erwartet");
 
@@ -116,7 +116,6 @@ export const backfillWeather = createServerFn({ method: "POST" })
     const check = validateRange(data.from, data.to, today);
     if (!check.ok) throw new Error(check.message);
 
-    const { archiveUrl, mapOpenMeteoDaily } = await import("./weather-core");
     const { fetchDaily, upsertRows } = await import("./weather-sync.server");
     const json = await fetchDaily(archiveUrl(data.from, data.to));
     const rows = mapOpenMeteoDaily(json, "archive");

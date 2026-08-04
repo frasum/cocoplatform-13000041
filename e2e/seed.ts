@@ -504,28 +504,32 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
   const { error: teErr } = await svc.from("time_entries").insert(refEntries);
   if (teErr) throw new Error(`time_entries insert failed: ${teErr.message}`);
 
-  const absenceRows = [
-    ...paidDays.map((date) => ({
+  // Bezahlter Urlaub muss immer gehen — schlägt er fehl, ist der Stack kaputt
+  // und nicht bloß die UB1-Migration nicht angewendet.
+  const { error: paidErr } = await svc.from("roster_absence").insert(
+    paidDays.map((date) => ({
       organization_id: orgId,
       staff_id: worker.staffId,
       date,
       type: "urlaub",
     })),
-    ...unpaidDays.map((date) => ({
+  );
+  if (paidErr) throw new Error(`roster_absence (urlaub) insert failed: ${paidErr.message}`);
+
+  // Der unbezahlte Urlaub ist der Migrations-Prüfstein: fehlt die UB1-
+  // Migration, lehnt der CHECK den Typ ab. Das ist KEIN Seed-Abbruch,
+  // sondern ein prüfbarer Zustand — der Test darf dann genau die
+  // Fehlermeldung erwarten statt geblockter Tage (§104-Ehrlichkeitsregel).
+  const { error: unpaidErr } = await svc.from("roster_absence").insert(
+    unpaidDays.map((date) => ({
       organization_id: orgId,
       staff_id: worker.staffId,
       date,
       type: "urlaub_unbezahlt",
     })),
-  ];
-  const { error: absErr } = await svc.from("roster_absence").insert(absenceRows);
-  if (absErr) {
-    throw new Error(
-      `roster_absence insert failed: ${absErr.message} — ` +
-        "Ist die UB1-Migration (docs/ub1-roster-absence-urlaub-unbezahlt.sql) " +
-        "auf diesem Stack angewendet? Ohne sie lehnt der CHECK 'urlaub_unbezahlt' ab.",
-    );
-  }
+  );
+  const unpaidLeaveSupported = !unpaidErr;
+  const migrationError = unpaidErr ? `${UB1_MIGRATION_HINT} (${unpaidErr.message})` : null;
 
   const cleanup = async () => {
     await svc.from("audit_log").delete().eq("organization_id", orgId);
@@ -558,6 +562,8 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
     periodEnd,
     paidDays,
     unpaidDays,
+    unpaidLeaveSupported,
+    migrationError,
     cleanup,
   };
 }

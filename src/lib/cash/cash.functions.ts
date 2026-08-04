@@ -2843,6 +2843,12 @@ export type CashDayAgg = {
   finedine: number;
   einladung: number;
   sonstige: number;
+  /**
+   * SE1: Einzelpositionen der sonstigen Einnahmen des Tages (Beschreibung +
+   * Betrag). `sonstige` ist ihre Summe — die EINE Rechenquelle; das frühere
+   * Session-Feld wird nicht mehr gelesen.
+   */
+  otherIncomes: Array<{ description: string; amountCents: number }>;
   vorschuss: number;
   openInvoices: number[];
   expenses: number[];
@@ -2886,6 +2892,7 @@ function makeEmptyAgg(): CashDayAgg {
     finedine: 0,
     einladung: 0,
     sonstige: 0,
+    otherIncomes: [],
     vorschuss: 0,
     openInvoices: [],
     expenses: [],
@@ -2957,7 +2964,7 @@ export async function loadCashDayAggregates(
   let sessionQuery = supabaseAdmin
     .from("sessions")
     .select(
-      "id, business_date, status, location_id, opening_balance_cents, vouchers_sold_cents, vouchers_redeemed_cents, finedine_vouchers_cents, vorschuss_cents, einladung_cents, sonstige_einnahme_cents, cash_actual_cents, vectron_daily_total_cents",
+      "id, business_date, status, location_id, opening_balance_cents, vouchers_sold_cents, vouchers_redeemed_cents, finedine_vouchers_cents, vorschuss_cents, einladung_cents, cash_actual_cents, vectron_daily_total_cents",
     )
     .eq("organization_id", caller.organizationId)
     .gte("business_date", data.fromDate)
@@ -3005,7 +3012,7 @@ export async function loadCashDayAggregates(
     ]),
   );
 
-  const [chRes, tRes, expRes, advRes, depRes, trRes, wsRes] = await Promise.all([
+  const [chRes, tRes, expRes, advRes, depRes, trRes, wsRes, oiRes] = await Promise.all([
     supabaseAdmin
       .from("session_channel_amounts")
       .select("session_id, amount_cents, revenue_channels(kind)")
@@ -3042,6 +3049,12 @@ export async function loadCashDayAggregates(
       .eq("organization_id", caller.organizationId)
       .in("session_id", sessionIds)
       .neq("status", "superseded"),
+    // SE1: sonstige Einnahmen als Positionsliste.
+    otherIncomesTable(supabaseAdmin)
+      .select("session_id, description, amount_cents")
+      .eq("organization_id", caller.organizationId)
+      .in("session_id", sessionIds)
+      .order("created_at", { ascending: true }),
   ]);
   if (chRes.error) throw chRes.error;
   if (tRes.error) throw tRes.error;
@@ -3050,6 +3063,7 @@ export async function loadCashDayAggregates(
   if (depRes.error) throw depRes.error;
   if (trRes.error) throw trRes.error;
   if (wsRes.error) throw wsRes.error;
+  if (oiRes.error) throw oiRes.error;
 
   const byDate = new Map<string, CashDayAgg>();
   const sessionDate = new Map<string, string>();
@@ -3078,7 +3092,6 @@ export async function loadCashDayAggregates(
     a.vouchersRedeemed += Number(s.vouchers_redeemed_cents ?? 0);
     a.finedine += Number(s.finedine_vouchers_cents ?? 0);
     a.einladung += Number(s.einladung_cents ?? 0);
-    a.sonstige += Number(s.sonstige_einnahme_cents ?? 0);
     a.vorschuss += Number(s.vorschuss_cents ?? 0);
     a.vectronDailyTotal += Number(s.vectron_daily_total_cents ?? 0);
     a.cashTargetSum += locTargetById.get(s.location_id as string) ?? orgTargetCents;
@@ -3136,6 +3149,14 @@ export async function loadCashDayAggregates(
     const a = getAgg(d);
     a.openInvoices.push(Number(r.open_invoices_cents));
     a.differenz += Number(r.differenz_cents);
+  }
+  for (const r of oiRes.data ?? []) {
+    const d = sessionDate.get(r.session_id);
+    if (!d) continue;
+    const a = getAgg(d);
+    const amt = Number(r.amount_cents);
+    a.otherIncomes.push({ description: r.description, amountCents: amt });
+    a.sonstige += amt;
   }
 
   return { sortedDates, firstDate, byDate };

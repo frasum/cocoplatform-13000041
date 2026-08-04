@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { fmtCents } from "@/lib/format";
-import { parseEuroToCents, focusNextInput } from "@/lib/cash/kasse-helpers";
+import { parseEuroToCents, focusNextInput, fmtSignedCents } from "@/lib/cash/kasse-helpers";
 import type { Overview } from "@/lib/cash/kasse-types";
 import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
 import { resolveChannelKind } from "@/lib/cash/session-channels";
@@ -494,19 +494,19 @@ export function SessionFieldsCard({
                     {effVorschussCents !== 0 && (
                       <ExcelReadonlyRow
                         label="Vorschuss (Abzug)"
-                        value={fmtCents(effVorschussCents)}
+                        value={fmtSignedCents(-Math.abs(effVorschussCents))}
                       />
                     )}
                     {totalExpensesCents !== 0 && (
                       <ExcelReadonlyRow
                         label="Ausgaben (Abzug)"
-                        value={fmtCents(totalExpensesCents)}
+                        value={fmtSignedCents(-Math.abs(totalExpensesCents))}
                       />
                     )}
                     {totalOtherIncomeCents !== 0 && (
                       <ExcelReadonlyRow
                         label="Sonstige Einnahmen"
-                        value={fmtCents(totalOtherIncomeCents)}
+                        value={fmtSignedCents(Math.abs(totalOtherIncomeCents))}
                       />
                     )}
                   </>
@@ -613,7 +613,13 @@ export function SessionFieldsCard({
                   ))}
                 </ul>
               )}
-              {writable && <ExpenseForm writable={writable} onAdd={onAddOtherIncome} />}
+              {writable && (
+                <ExpenseForm
+                  writable={writable}
+                  onAdd={onAddOtherIncome}
+                  submitLabel="Einnahme hinzufügen"
+                />
+              )}
             </div>
           </div>
 

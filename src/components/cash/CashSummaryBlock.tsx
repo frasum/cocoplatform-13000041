@@ -100,6 +100,12 @@ export function CashSummaryBlock({
   };
   const below = wechselgeldbestandCents < cashBalanceTargetCents;
   const expensesTotalCents = expenses.reduce((s, e) => s + e.amountCents, 0);
+  // SE1-b: Positionsarten im Kontrolle-Block gleich darstellen —
+  // Ausgaben/Vorschuss mindern (−), sonstige Einnahmen erhöhen (+).
+  const otherIncomeTotalCents = otherIncomes.reduce((s, o) => s + o.amountCents, 0);
+  const advancesTotalCents = advances.reduce((s, a) => s + a.amountCents, 0);
+  const effVorschussCents =
+    advances.length > 0 ? advancesTotalCents : (parseEuroToCents(misc.vorschuss) ?? 0);
   // WG1: beidseitig ehrliche Differenz aus dem Core (ungekappt).
   const diffToTargetCents = diffToTargetSignedCents;
 
@@ -121,6 +127,22 @@ export function CashSummaryBlock({
           <span className="text-foreground">Ausgaben</span>
           <span className="font-mono tabular-nums text-foreground">
             {fmtEur(-expensesTotalCents)}
+          </span>
+        </div>
+      )}
+      {effVorschussCents > 0 && (
+        <div className="border-b px-3 py-2 flex items-center justify-between text-sm">
+          <span className="text-foreground">Vorschuss</span>
+          <span className="font-mono tabular-nums text-foreground">
+            {fmtEur(-effVorschussCents)}
+          </span>
+        </div>
+      )}
+      {otherIncomes.length > 0 && (
+        <div className="border-b px-3 py-2 flex items-center justify-between text-sm">
+          <span className="text-foreground">Sonstige Einnahmen</span>
+          <span className="font-mono tabular-nums text-emerald-700">
+            {fmtSignedCents(otherIncomeTotalCents)}
           </span>
         </div>
       )}

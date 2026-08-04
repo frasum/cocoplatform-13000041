@@ -6,9 +6,12 @@ import { parseEuroToCents } from "@/lib/cash/kasse-helpers";
 export function ExpenseForm({
   writable,
   onAdd,
+  submitLabel = "Ausgabe hinzufügen",
 }: {
   writable: boolean;
   onAdd: (description: string, cents: number) => Promise<unknown>;
+  /** SE1-b: Button-Text je Karte (Ausgaben vs. Sonstige Einnahmen). */
+  submitLabel?: string;
 }) {
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
@@ -45,7 +48,7 @@ export function ExpenseForm({
           }
         }}
       >
-        Ausgabe hinzufügen
+        {submitLabel}
       </Button>
     </div>
   );

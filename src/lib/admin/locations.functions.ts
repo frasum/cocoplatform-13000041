@@ -696,3 +696,45 @@ export const setLocationCashEnabled = createServerFn({ method: "POST" })
       };
     });
   });
+
+// FS1 — Session-Feld-Sichtbarkeit je Standort: welche Felder der Kassenmaske
+// am Standort NICHT geführt werden (heute: 'finedine'). Eine Wahrheit für
+// Maske, Export und Druck.
+export const setLocationDisabledSessionFields = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) =>
+    z
+      .object({
+        locationId: z.string().uuid(),
+        disabledSessionFields: z.array(z.enum(SESSION_FIELD_KEYS)),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
+    return runGuarded(caller.role, "admin", makeAuditWriter(caller), async () => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const loc = expectMaybe<{ id: string; name: string }>(
+        await supabaseAdmin
+          .from("locations")
+          .select("id, name")
+          .eq("id", data.locationId)
+          .eq("organization_id", caller.organizationId)
+          .maybeSingle(),
+        "setLocationDisabledSessionFields.load",
+      );
+      if (!loc) throw new Error("Standort nicht gefunden.");
+      const keys = [...new Set(data.disabledSessionFields)];
+      const { saveDisabledSessionFields } = await import("@/lib/cash/session-fields-access");
+      await saveDisabledSessionFields(supabaseAdmin, caller.organizationId, data.locationId, keys);
+      return {
+        result: { ok: true as const, disabledSessionFields: keys },
+        audit: {
+          action: "location.session_fields_changed",
+          entity: "location",
+          entityId: data.locationId,
+          meta: { name: loc.name, disabledSessionFields: keys },
+        },
+      };
+    });
+  });

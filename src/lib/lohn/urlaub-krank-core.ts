@@ -11,3 +11,24 @@ export function workRate(scheduledDays: number, windowDays: number): number {
 export function estimateWorkdays(calendarDays: number, rate: number): number {
   return Math.round(calendarDays * rate);
 }
+
+/**
+ * UB1 — Kalendertage der Periode nach Typ trennen. `urlaub_unbezahlt` wird
+ * getrennt geführt: die Person war weg, die Tage sind aber NICHT
+ * fortzahlungsrelevant und dürfen den Urlaubs-Vorschlag nicht erhöhen.
+ */
+export function splitAbsenceCalDays(rows: ReadonlyArray<{ type: string }>): {
+  urlaub: number;
+  krank: number;
+  urlaubUnbezahlt: number;
+} {
+  let urlaub = 0;
+  let krank = 0;
+  let urlaubUnbezahlt = 0;
+  for (const r of rows) {
+    if (r.type === "urlaub") urlaub += 1;
+    else if (r.type === "krank") krank += 1;
+    else if (r.type === "urlaub_unbezahlt") urlaubUnbezahlt += 1;
+  }
+  return { urlaub, krank, urlaubUnbezahlt };
+}

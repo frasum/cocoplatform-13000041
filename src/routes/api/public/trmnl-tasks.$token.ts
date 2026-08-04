@@ -28,6 +28,7 @@ import {
   truncateNames,
   type RosterShiftLite,
 } from "@/lib/trmnl/board";
+import { ABSENCE_TYPE_FILTER } from "@/lib/roster/absence-types";
 
 function notFound(): Response {
   return new Response("Not found", {
@@ -212,7 +213,7 @@ export const Route = createFileRoute("/api/public/trmnl-tasks/$token")({
               .select("staff_id, type")
               .eq("organization_id", orgId)
               .eq("date", target.iso)
-              .in("type", ["urlaub", "krank"])
+              .in("type", ABSENCE_TYPE_FILTER)
               .order("staff_id")
               .range(from, to),
           500,

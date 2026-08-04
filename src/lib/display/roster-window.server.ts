@@ -7,6 +7,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  ABSENCE_TYPE_FILTER,
+  absenceBlockingType,
+  normalizeAbsenceType,
+} from "@/lib/roster/absence-types";
 
 type Admin = SupabaseClient<Database>;
 
@@ -77,7 +82,9 @@ export async function loadRosterAbsencesRaw(
     .from("roster_absence")
     .select("staff_id, date, type")
     .eq("organization_id", params.organizationId)
-    .in("type", ["urlaub", "krank"])
+    // UB1: unbezahlter Urlaub blockt die Planung wie Urlaub — hier mitladen
+    // und unten auf die Anzeige-Klasse "urlaub" abbilden.
+    .in("type", ABSENCE_TYPE_FILTER)
     .gte("date", params.from)
     .lte("date", params.to);
   if (params.staffIds && params.staffIds.length > 0) {
@@ -87,13 +94,11 @@ export async function loadRosterAbsencesRaw(
   if (error) return { ok: false };
   return {
     ok: true,
-    rows: (data ?? [])
-      .map((r) => ({
-        staff_id: r.staff_id as string,
-        date: r.date as string,
-        type: r.type as string,
-      }))
-      .filter((r): r is RawRosterAbsence => r.type === "urlaub" || r.type === "krank"),
+    rows: (data ?? []).map((r) => ({
+      staff_id: r.staff_id as string,
+      date: r.date as string,
+      type: absenceBlockingType(normalizeAbsenceType(r.type)),
+    })),
   };
 }
 

@@ -33,6 +33,7 @@ import {
   type SwapPeer,
   type SwapShift,
 } from "./swap-rules";
+import { ABSENCE_TYPE_FILTER } from "./absence-types";
 
 // ---------------------------------------------------------------------------
 // Hilfen
@@ -124,7 +125,7 @@ async function hasAbsenceOnDate(
     .eq("organization_id", organizationId)
     .eq("staff_id", staffId)
     .eq("date", isoDate)
-    .in("type", ["urlaub", "krank"])
+    .in("type", ABSENCE_TYPE_FILTER)
     .maybeSingle();
   if (error) throw error;
   return !!data;

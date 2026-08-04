@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, CalendarX, CalendarCheck, Umbrella, HeartPulse } from "lucide-react";
 import type { RosterShift, RosterSkill } from "@/lib/roster/roster.functions";
 import { AbsenceRangeForm } from "./AbsenceRangeForm";
+import { type AbsenceType } from "@/lib/roster/absence-types";
 
 type Props = {
   open: boolean;
@@ -21,12 +22,8 @@ type Props = {
   onDelete: () => void;
   onSetUnavailable: () => void;
   onClearUnavailable: () => void;
-  absenceType: "urlaub" | "krank" | null;
-  onSetAbsenceRange: (
-    fromIso: string,
-    toIso: string,
-    type: "urlaub" | "krank",
-  ) => void | Promise<void>;
+  absenceType: AbsenceType | null;
+  onSetAbsenceRange: (fromIso: string, toIso: string, type: AbsenceType) => void | Promise<void>;
   onClearAbsence: () => void;
   staffShiftDates: string[];
 };
@@ -56,7 +53,7 @@ export function PillConfirmPopover({
   onClearAbsence,
   staffShiftDates,
 }: Props) {
-  const [mode, setMode] = React.useState<"menu" | "urlaub" | "krank">("menu");
+  const [mode, setMode] = React.useState<"menu" | AbsenceType>("menu");
   React.useEffect(() => {
     if (!open) setMode("menu");
   }, [open]);
@@ -183,6 +180,24 @@ export function PillConfirmPopover({
               >
                 <HeartPulse className="mr-1.5 h-3.5 w-3.5 text-red-600" />
                 {absenceType === "krank" ? "Krank entfernen" : "Krank eintragen"}
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={
+                  absenceType === "urlaub_unbezahlt"
+                    ? onClearAbsence
+                    : () => setMode("urlaub_unbezahlt")
+                }
+                className="mt-2 h-7 w-full border-dashed text-xs"
+              >
+                <Umbrella className="mr-1.5 h-3.5 w-3.5 text-green-600 opacity-60" />
+                {absenceType === "urlaub_unbezahlt"
+                  ? "Urlaub (unbezahlt) entfernen"
+                  : "Urlaub (unbezahlt) eintragen"}
               </Button>
             )}
           </>

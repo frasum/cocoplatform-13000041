@@ -10,6 +10,11 @@ import { buildRosterIcs, type RosterIcsEvent } from "@/lib/calendar/roster-ics";
 import { poolLocalTimeToIso } from "@/lib/cash/pool-time-writeback";
 import { mergeAbsenceRanges } from "@/lib/roster/vacation-planner";
 import { todayIso } from "@/lib/format";
+import {
+  ABSENCE_TYPE_FILTER,
+  absenceBlockingType,
+  normalizeAbsenceType,
+} from "@/lib/roster/absence-types";
 
 function notFound(): Response {
   return new Response("Not found", {
@@ -156,13 +161,14 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
           .select("date, type")
           .eq("organization_id", orgId)
           .eq("staff_id", staffId)
-          .in("type", ["urlaub", "krank"])
+          .in("type", ABSENCE_TYPE_FILTER)
           .gte("date", windowStart)
           .lte("date", windowEnd);
         if (absErr) return notFound();
+        // UB1: unbezahlter Urlaub erscheint im Feed als Urlaub.
         const byType = new Map<"urlaub" | "krank", string[]>();
         for (const a of absences ?? []) {
-          const t = a.type as "urlaub" | "krank";
+          const t = absenceBlockingType(normalizeAbsenceType(a.type));
           const arr = byType.get(t) ?? [];
           arr.push(a.date as string);
           byType.set(t, arr);

@@ -55,6 +55,7 @@ import { SkillFilterChips } from "@/components/roster/SkillFilterChips";
 import { PeriodNav } from "@/components/roster/PeriodNav";
 import { PlanerRosterView } from "@/components/roster/PlanerRosterView";
 import { RosterDayView } from "@/components/roster/RosterDayView";
+import { ABSENCE_LABEL, type AbsenceType } from "@/lib/roster/absence-types";
 
 export const Route = createFileRoute("/_authenticated/admin/dienstplan")({
   head: () => ({ meta: [{ title: "Dienstplan" }] }),
@@ -437,7 +438,7 @@ function AdminManagerDienstplan() {
   }, [unavailable]);
   const absences = useMemo(() => absenceQ.data ?? [], [absenceQ.data]);
   const absenceMap = useMemo(() => {
-    const m = new Map<string, "urlaub" | "krank">();
+    const m = new Map<string, AbsenceType>();
     for (const a of absences) m.set(`${a.staffId}|${a.date}`, a.type);
     return m;
   }, [absences]);
@@ -663,7 +664,7 @@ function AdminManagerDienstplan() {
     staffId: string,
     fromIso: string,
     toIso: string,
-    type: "urlaub" | "krank",
+    type: AbsenceType,
   ) {
     if (!canEdit) return;
     setBusy(true);
@@ -673,7 +674,7 @@ function AdminManagerDienstplan() {
       });
       qc.invalidateQueries({ queryKey: ["roster-absence"] });
       qc.invalidateQueries({ queryKey: ["roster-shifts"] });
-      const label = type === "urlaub" ? "Urlaub" : "Krank";
+      const label = ABSENCE_LABEL[type];
       const days = res.daysCount;
       const del = res.deletedShiftCount;
       toast.success(

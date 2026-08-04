@@ -26,6 +26,11 @@ import {
   type PtShift,
   type PtStaff,
 } from "@/lib/trmnl/planungstafel";
+import {
+  buildWeatherRow,
+  type PtWeatherCell,
+  type PtWeatherRow,
+} from "@/lib/trmnl/planungstafel-weather";
 
 // EP2 — vier Tage. Der vierte Tag trägt den Wochentagsnamen (siehe
 // dayHeader in @/lib/trmnl/planungstafel). Spalten sind gleich breit.
@@ -211,7 +216,20 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
           releases,
         });
 
-        const html = renderPage({ blocks, days, todayIso: today, now: new Date() });
+        // WX3-b — Wetterzeile. Ein Fehler hier darf die Tafel NICHT stürzen
+        // lassen: der Dienstplan ist wichtiger als das Wetter, bei Fehler
+        // zeigt die Zeile durchgehend „—".
+        const { data: wxRows, error: wxErr } = await supabaseAdmin
+          .from("weather_days")
+          .select("business_date, temp_max_c, temp_min_c, precipitation_mm, weather_code")
+          .eq("organization_id", orgId)
+          .in("business_date", days);
+        const weather = buildWeatherRow(
+          days,
+          wxErr ? [] : ((wxRows ?? []) as unknown as PtWeatherRow[]),
+        );
+
+        const html = renderPage({ blocks, days, weather, todayIso: today, now: new Date() });
         return new Response(html, {
           status: 200,
           headers: {
@@ -227,6 +245,7 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
 function renderPage(input: {
   blocks: PtLocationBlock[];
   days: string[];
+  weather: PtWeatherCell[];
   todayIso: string;
   now: Date;
 }): string {
@@ -310,6 +329,13 @@ function renderPage(input: {
   .entry .dot { width: 12px; height: 12px; border-radius: 999px; background: #000; margin-right: 8px; display: inline-block; }
   .entry .sym { margin-left: 8px; font-size: 22px; }
   .footer { position: absolute; left: 36px; right: 36px; bottom: 16px; border-top: 2px solid #000; padding-top: 8px; font-size: 18px; display: flex; justify-content: space-between; }
+  /* WX3-b: Wetterzeile — Fernlesbarkeit, volle Schwärze (e-ink stellt Grau schlecht dar). */
+  .grid { padding-bottom: 0; margin-bottom: 64px; }
+  .grid > .wx-head { border-top: 4px solid #000; }
+  .grid > .wx-cell { border-top: 4px solid #000; min-height: 0; color: #000; text-align: center; }
+  .wx-cell .wx-temp { font-size: 36px; font-weight: 800; color: #000; }
+  .wx-cell .wx-label { font-size: 24px; color: #000; }
+  .wx-cell .wx-rain { font-size: 20px; color: #000; }
 </style>
 </head>
 <body>
@@ -323,6 +349,7 @@ function renderPage(input: {
       .replace(/<div class="day-head/g, '<div class="col-head day-head')
       .replace(/day-head col-head/g, "col-head day-head")}
     ${bodyHtml}
+    ${renderWeatherRow(input.weather, input.days)}
   </div>
   <footer class="footer">
     <span>● Cross-Standort · Abwesende (Urlaub/krank) werden nicht angezeigt.</span>
@@ -352,6 +379,34 @@ function renderCell(cell: PtCell | undefined, iso: string, isLast: boolean): str
   const dow = d.getUTCDay();
   const we = dow === 0 || dow === 6 ? " we" : "";
   const last = isLast ? " last-col" : "";
+  return renderCellInner(cell, we, last);
+}
+
+// WX3-b — Wetterzeile: gleiche Grid-Struktur wie renderLocationBlock, damit
+// die Tagesspalten nicht verrutschen. Nur Text, keine Bildsymbole.
+function renderWeatherRow(cells: readonly PtWeatherCell[], days: readonly string[]): string {
+  const head = `<div class="row-head wx-head"><div>Wetter</div></div>`;
+  const body = days
+    .map((iso, i) => {
+      const cell = cells.find((c) => c.date === iso);
+      const d = new Date(iso + "T00:00:00Z");
+      const dow = d.getUTCDay();
+      const we = dow === 0 || dow === 6 ? " we" : "";
+      const last = i === days.length - 1 ? " last-col" : "";
+      const hasTemp = !!cell && cell.tempMaxC !== null && cell.tempMinC !== null;
+      const temp = hasTemp ? `${cell.tempMaxC}° / ${cell.tempMinC}°` : "—";
+      const label = hasTemp && cell.label !== "—" ? cell.label : "";
+      const rain =
+        cell && cell.rainMm !== null
+          ? `<div class="wx-rain">${escapeHtml(String(cell.rainMm).replace(".", ","))} mm</div>`
+          : "";
+      return `<div class="cell wx-cell${we}${last}"><div class="wx-temp">${escapeHtml(temp)}</div><div class="wx-label">${escapeHtml(label)}</div>${rain}</div>`;
+    })
+    .join("");
+  return `${head}${body}`;
+}
+
+function renderCellInner(cell: PtCell | undefined, we: string, last: string): string {
   if (!cell || cell.kind === "not_released") {
     return `<div class="cell not-released${we}${last}">— noch nicht freigegeben —</div>`;
   }

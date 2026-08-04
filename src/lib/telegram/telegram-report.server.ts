@@ -346,13 +346,19 @@ export async function runDailyReportForOrg(params: {
 
   let delivered = 0;
   let failed = 0;
+  const failures: DeliveryFailure[] = [];
   for (const r of recipients) {
+    const recipient = maskChatId(r.telegram_chat_id as string | number | null);
     try {
       const res = await sendTelegramToStaff({ staffId: r.staff_id, text });
       if (res.delivered) delivered += 1;
-      else failed += 1;
-    } catch {
+      else {
+        failed += 1;
+        failures.push({ recipient, reason: normalizeSendReason(res.reason) });
+      }
+    } catch (e) {
       failed += 1;
+      failures.push({ recipient, reason: describeNetworkFailure(e) });
     }
   }
 
@@ -388,7 +394,13 @@ export async function runDailyReportForOrg(params: {
         failed,
         manual: skipGate === true,
       },
+      extra: { failures },
     });
+  } else if (failed > 0) {
+    // Teilausfall: sichtbar machen, aber ohne High-Priority-Alarm.
+    console.warn(
+      `[telegram.daily_report] Teilausfall org=${organizationId}: ${delivered}/${recipients.length} zugestellt — ${formatFailures(failures)}`,
+    );
   }
 
   return {
@@ -398,6 +410,7 @@ export async function runDailyReportForOrg(params: {
     recipientsDelivered: delivered,
     recipientsFailed: failed,
     locationsTotal: reportInput.locations.length,
+    failures,
   };
 }
 

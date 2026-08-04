@@ -828,7 +828,10 @@ function KassePage() {
                         <div className="mt-1 font-mono text-2xl font-semibold">
                           {perHour?.revenuePerWorkHourCents == null
                             ? "—"
-                            : fmtCents(perHour.revenuePerWorkHourCents)}
+                            : // KA2: kaufmännisch auf ganze Euro gerundet (wie TG5/Statistik).
+                              Math.round(perHour.revenuePerWorkHourCents / 100).toLocaleString(
+                                "de-DE",
+                              )}
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           {workMinutes > 0

@@ -22,6 +22,7 @@ import {
 } from "@/lib/roster/roster.functions";
 import { skillsForCell } from "./skills-for-cell";
 import { AbsenceRangeForm } from "./AbsenceRangeForm";
+import { ABSENCE_LABEL, type AbsenceType } from "@/lib/roster/absence-types";
 
 export type DayEditTarget =
   | {
@@ -69,7 +70,7 @@ export function DayEditSheet({
     | { view: "menu" }
     | { view: "skill" }
     | { view: "confirm-delete" }
-    | { view: "absence"; type: "urlaub" | "krank" }
+    | { view: "absence"; type: AbsenceType }
     | { view: "add-pick-staff" }
     | { view: "add-pick-skill"; staffId: string; staffName: string }
   >({ view: "menu" });
@@ -141,13 +142,13 @@ export function DayEditSheet({
     onError: toastError,
   });
   const setAbs = useMutation({
-    mutationFn: (v: { staffId: string; from: string; to: string; type: "urlaub" | "krank" }) =>
+    mutationFn: (v: { staffId: string; from: string; to: string; type: AbsenceType }) =>
       setAbsenceRange({
         data: { staffId: v.staffId, fromDate: v.from, toDate: v.to, type: v.type },
       }),
     onSuccess: async (res, vars) => {
       await invalidate();
-      const label = vars.type === "urlaub" ? "Urlaub" : "Krank";
+      const label = ABSENCE_LABEL[vars.type];
       const n = res?.deletedShiftCount ?? 0;
       toast.success(
         n > 0
@@ -275,6 +276,7 @@ export function DayEditSheet({
                 busy={busy}
                 onUrlaub={() => setInner({ view: "absence", type: "urlaub" })}
                 onKrank={() => setInner({ view: "absence", type: "krank" })}
+                onUrlaubUnbezahlt={() => setInner({ view: "absence", type: "urlaub_unbezahlt" })}
                 onClear={() => clearAbs.mutate({ staffId: target.staffId, date: target.date })}
               />
             </>
@@ -333,6 +335,7 @@ export function DayEditSheet({
                 busy={busy}
                 onUrlaub={() => setInner({ view: "absence", type: "urlaub" })}
                 onKrank={() => setInner({ view: "absence", type: "krank" })}
+                onUrlaubUnbezahlt={() => setInner({ view: "absence", type: "urlaub_unbezahlt" })}
                 onClear={() => clearAbs.mutate({ staffId: currentStaffId, date: target.date })}
               />
             </div>
@@ -348,12 +351,14 @@ function AbsenceButtons({
   busy,
   onUrlaub,
   onKrank,
+  onUrlaubUnbezahlt,
   onClear,
 }: {
   hasAbsence: boolean;
   busy: boolean;
   onUrlaub: () => void;
   onKrank: () => void;
+  onUrlaubUnbezahlt: () => void;
   onClear: () => void;
 }) {
   if (hasAbsence) {
@@ -370,6 +375,14 @@ function AbsenceButtons({
       </Button>
       <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={onKrank}>
         <HeartPulse className="mr-2 h-4 w-4 text-red-600" /> Krank eintragen
+      </Button>
+      <Button
+        variant="outline"
+        className="w-full justify-start border-dashed"
+        disabled={busy}
+        onClick={onUrlaubUnbezahlt}
+      >
+        <Umbrella className="mr-2 h-4 w-4 text-green-600 opacity-60" /> Urlaub (unbezahlt)
       </Button>
     </>
   );

@@ -62,6 +62,7 @@ function dayHeader(iso: string): { dow: string; dm: string } {
 }
 
 import { skillsForCell } from "./skills-for-cell";
+import { ABSENCE_LABEL, type AbsenceType } from "@/lib/roster/absence-types";
 
 type Props = {
   activeArea: GridArea;
@@ -84,7 +85,7 @@ type Props = {
     { locationId: string; locationName: string; area: "kitchen" | "service" | "gl" }
   >;
   unavailableSet: Set<string>;
-  absenceMap: Map<string, "urlaub" | "krank">;
+  absenceMap: Map<string, AbsenceType>;
   wishMap: Map<string, string | null>;
   canEdit: boolean;
   locked: boolean;
@@ -107,7 +108,7 @@ type Props = {
     staffId: string,
     fromIso: string,
     toIso: string,
-    type: "urlaub" | "krank",
+    type: AbsenceType,
   ) => Promise<void> | void;
   onClearAbsence: (staffId: string, iso: string) => Promise<void> | void;
   onSetWish: (staffId: string, iso: string) => Promise<void> | void;
@@ -651,7 +652,7 @@ function DropCell({
   unavailable: boolean;
   hasShift: boolean;
   absent: boolean;
-  absenceType: "urlaub" | "krank" | null;
+  absenceType: AbsenceType | null;
   birthday: boolean;
   birthdayLabel: string | null;
   hasWish: boolean;
@@ -710,11 +711,16 @@ function DropCell({
               {absenceType === "krank" ? (
                 <HeartPulse className="h-4 w-4 text-red-600" />
               ) : (
-                <Umbrella className="h-4 w-4 text-green-600" />
+                <Umbrella
+                  className={cn(
+                    "h-4 w-4 text-green-600",
+                    absenceType === "urlaub_unbezahlt" && "opacity-50",
+                  )}
+                />
               )}
             </span>
           </TooltipTrigger>
-          <TooltipContent>{absenceType === "krank" ? "Krank" : "Urlaub"}</TooltipContent>
+          <TooltipContent>{absenceType ? ABSENCE_LABEL[absenceType] : "Urlaub"}</TooltipContent>
         </Tooltip>
       ) : null}
       {showBirthdayFull ? (
@@ -751,11 +757,16 @@ function DropCell({
               {absenceType === "krank" ? (
                 <HeartPulse className="h-3 w-3 text-red-600" />
               ) : (
-                <Umbrella className="h-3 w-3 text-green-600" />
+                <Umbrella
+                  className={cn(
+                    "h-3 w-3 text-green-600",
+                    absenceType === "urlaub_unbezahlt" && "opacity-50",
+                  )}
+                />
               )}
             </span>
           </TooltipTrigger>
-          <TooltipContent>{absenceType === "krank" ? "Krank" : "Urlaub"}</TooltipContent>
+          <TooltipContent>{absenceType ? ABSENCE_LABEL[absenceType] : "Urlaub"}</TooltipContent>
         </Tooltip>
       ) : null}
       {hasWish ? (
@@ -888,12 +899,8 @@ function EmptyCell({
   isUnavailable: boolean;
   onSetUnavailable: () => void;
   onClearUnavailable: () => void;
-  absenceType: "urlaub" | "krank" | null;
-  onSetAbsenceRange: (
-    fromIso: string,
-    toIso: string,
-    type: "urlaub" | "krank",
-  ) => void | Promise<void>;
+  absenceType: AbsenceType | null;
+  onSetAbsenceRange: (fromIso: string, toIso: string, type: AbsenceType) => void | Promise<void>;
   onClearAbsence: () => void;
   defaultDate: string;
   staffShiftDates: string[];

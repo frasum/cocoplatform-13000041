@@ -29,6 +29,7 @@ import { PeriodNav } from "@/components/roster/PeriodNav";
 import { SkillFilterChips } from "@/components/roster/SkillFilterChips";
 import { RosterAreaBlock } from "@/components/roster/RosterAreaBlock";
 import { parseIso, todayIso } from "@/lib/format";
+import { type AbsenceType } from "@/lib/roster/absence-types";
 
 type GridArea = "kitchen" | "service";
 
@@ -139,7 +140,7 @@ export function PlanerRosterView({ bereich }: Props) {
     return s;
   }, [availabilityQ.data]);
   const absenceMap = useMemo(() => {
-    const m = new Map<string, "urlaub" | "krank">();
+    const m = new Map<string, AbsenceType>();
     for (const a of absenceQ.data ?? []) m.set(`${a.staffId}|${a.date}`, a.type);
     return m;
   }, [absenceQ.data]);

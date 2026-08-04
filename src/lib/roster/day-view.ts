@@ -6,6 +6,7 @@
 
 import type { RosterShift, RosterAbsence } from "@/lib/roster/roster.functions";
 import { serviceMarker } from "@/lib/roster/service-marker";
+import { absenceBlockingType } from "./absence-types";
 
 export type DayViewEntry = {
   shiftId: string;
@@ -54,9 +55,10 @@ function cmpEntry(a: DayViewEntry, b: DayViewEntry): number {
  * `locations` (typischerweise alphabetisch, wie von `listLocations`).
  */
 export function buildDayView(input: DayViewInput): DayViewGroup[] {
+  // UB1: unbezahlter Urlaub erscheint in der Tagesansicht wie Urlaub.
   const absenceMap = new Map<string, "urlaub" | "krank">();
   for (const a of input.absences) {
-    if (a.date === input.date) absenceMap.set(a.staffId, a.type);
+    if (a.date === input.date) absenceMap.set(a.staffId, absenceBlockingType(a.type));
   }
   const wishSet = new Set<string>();
   for (const w of input.wishes) {

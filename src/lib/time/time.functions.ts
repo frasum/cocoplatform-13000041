@@ -28,6 +28,11 @@ import { assertRealIdentity } from "@/lib/admin/impersonation";
 // IMP1b — loadStaffCaller/StaffCaller wohnen zentral in admin/staff-context.
 // Re-Export für bestehende Importpfade (Backwards-Kompatibilität).
 import { loadStaffCaller, type StaffCaller } from "@/lib/admin/staff-context";
+import {
+  ABSENCE_TYPE_FILTER,
+  absenceBlockingType,
+  normalizeAbsenceType,
+} from "@/lib/roster/absence-types";
 export { loadStaffCaller, type StaffCaller };
 
 export async function loadOpenEntry(
@@ -244,11 +249,13 @@ export const clockIn = createServerFn({ method: "POST" })
       .eq("organization_id", caller.organizationId)
       .eq("staff_id", caller.staffId)
       .eq("date", businessDate)
-      .in("type", ["urlaub", "krank"])
+      .in("type", ABSENCE_TYPE_FILTER)
       .limit(1);
     if (absenceErr) throw absenceErr;
+    // UB1: unbezahlter Urlaub warnt beim Stempeln wie Urlaub.
+    const rawAbsence = absenceRows?.[0]?.type;
     const absenceType: AbsenceType | null =
-      (absenceRows?.[0]?.type as AbsenceType | undefined) ?? null;
+      rawAbsence == null ? null : absenceBlockingType(normalizeAbsenceType(rawAbsence));
     const warn = shouldWarnAbsenceClockIn({
       absenceToday: absenceType,
       confirmed: data.confirmAbsence === true,

@@ -6,7 +6,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { aggregateSfnPeriod } from "./lohn-period.functions";
-import { workRate, estimateWorkdays } from "./urlaub-krank-core";
+import { workRate, estimateWorkdays, splitAbsenceCalDays } from "./urlaub-krank-core";
+import { ABSENCE_TYPE_FILTER } from "@/lib/roster/absence-types";
 
 function addDaysIso(isoDate: string, delta: number): string {
   const d = new Date(`${isoDate}T00:00:00Z`);
@@ -17,6 +18,8 @@ function addDaysIso(isoDate: string, delta: number): string {
 export interface UrlaubKrankDiagnose {
   urlaubTage: number;
   krankTage: number;
+  /** UB1 — unbezahlter Urlaub: separat ausgewiesen, NICHT fortzahlungsrelevant. */
+  urlaubUnbezahltTage: number;
   avgStdTag: number;
   avgSfnTagCent: number;
   absCalDays: number;
@@ -48,7 +51,9 @@ export async function computeUrlaubKrankDiagnose(
     .eq("organization_id", args.organizationId)
     .gte("date", refFrom)
     .lte("date", refTo)
-    .in("type", ["urlaub", "krank"]);
+    // UB1: unbezahlte Tage zählen im Referenzfenster wie bisherige
+    // Abwesenheitstage — die Durchschnittsbildung ändert sich nicht.
+    .in("type", ABSENCE_TYPE_FILTER);
   if (refAbsErr) throw refAbsErr;
   const refAbsenceDays = (refAbsences ?? []).length;
   const refWorkedDays = refAgg.workdayCount;
@@ -64,19 +69,17 @@ export async function computeUrlaubKrankDiagnose(
     .eq("organization_id", args.organizationId)
     .gte("date", args.fromDate)
     .lte("date", args.toDate)
-    .in("type", ["urlaub", "krank"]);
+    .in("type", ABSENCE_TYPE_FILTER);
   if (absErr) throw absErr;
 
-  let urlaubCalDays = 0;
-  let krankCalDays = 0;
-  for (const a of absences ?? []) {
-    if (a.type === "urlaub") urlaubCalDays += 1;
-    else if (a.type === "krank") krankCalDays += 1;
-  }
+  const split = splitAbsenceCalDays(absences ?? []);
+  const urlaubCalDays = split.urlaub;
+  const krankCalDays = split.krank;
 
   return {
     urlaubTage: estimateWorkdays(urlaubCalDays, rate),
     krankTage: estimateWorkdays(krankCalDays, rate),
+    urlaubUnbezahltTage: estimateWorkdays(split.urlaubUnbezahlt, rate),
     avgStdTag: args.sollHoursPerDay,
     avgSfnTagCent,
     absCalDays: urlaubCalDays + krankCalDays,

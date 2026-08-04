@@ -3,6 +3,12 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import {
+  ABSENCE_TYPES,
+  ABSENCE_TYPE_FILTER,
+  normalizeAbsenceType,
+  type AbsenceType,
+} from "./absence-types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { loadAdminCaller } from "@/lib/admin/admin-context";
 import { runWithPermission, assertPermission } from "@/lib/admin/admin-call";
@@ -181,7 +187,7 @@ export type RosterAvailability = {
 export type RosterAbsence = {
   staffId: string;
   date: string;
-  type: "urlaub" | "krank";
+  type: AbsenceType;
 };
 
 export const getRosterShifts = createServerFn({ method: "GET" })
@@ -394,7 +400,7 @@ export const getMyReleaseHorizon = createServerFn({ method: "GET" })
 // UA1 — Self-Service: eigene Abwesenheits-Ranges im Zeitfenster.
 // Read-only, expandierte roster_absence-Zeilen werden pro Typ zu
 // aufeinanderfolgenden Balken zusammengefasst.
-export type MyAbsenceRange = AbsenceRange & { type: "urlaub" | "krank" };
+export type MyAbsenceRange = AbsenceRange & { type: AbsenceType };
 
 export const getMyAbsences = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -414,13 +420,13 @@ export const getMyAbsences = createServerFn({ method: "GET" })
       .select("date, type")
       .eq("organization_id", caller.organizationId)
       .eq("staff_id", caller.staffId)
-      .in("type", ["urlaub", "krank"])
+      .in("type", ABSENCE_TYPE_FILTER)
       .gte("date", data.from)
       .lte("date", data.to);
     if (error) throw error;
-    const byType = new Map<"urlaub" | "krank", string[]>();
+    const byType = new Map<AbsenceType, string[]>();
     for (const r of rows ?? []) {
-      const t = r.type as "urlaub" | "krank";
+      const t = normalizeAbsenceType(r.type);
       const arr = byType.get(t) ?? [];
       arr.push(r.date as string);
       byType.set(t, arr);
@@ -1201,7 +1207,7 @@ export const getAbsences = createServerFn({ method: "GET" })
     return (rows ?? []).map((r) => ({
       staffId: r.staff_id as string,
       date: r.date as string,
-      type: ((r.type as "urlaub" | "krank") ?? "urlaub") as "urlaub" | "krank",
+      type: normalizeAbsenceType(r.type),
     }));
   });
 
@@ -1212,7 +1218,7 @@ export const setAbsence = createServerFn({ method: "POST" })
       .object({
         staffId: z.string().uuid(),
         date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        type: z.enum(["urlaub", "krank"]).optional().default("urlaub"),
+        type: z.enum(ABSENCE_TYPES).optional().default("urlaub"),
       })
       .parse(input),
   )
@@ -1321,7 +1327,7 @@ export const setAbsenceRange = createServerFn({ method: "POST" })
         staffId: z.string().uuid(),
         fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
         toDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-        type: z.enum(["urlaub", "krank"]),
+        type: z.enum(ABSENCE_TYPES),
       })
       .refine((v) => v.toDate >= v.fromDate, { message: "toDate muss >= fromDate sein" })
       .parse(input),

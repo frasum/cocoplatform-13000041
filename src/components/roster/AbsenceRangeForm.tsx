@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { formatShortDate } from "@/lib/format-date";
 import { countStaffShiftsInRange } from "@/lib/roster/roster.functions";
+import { ABSENCE_LABEL, type AbsenceType } from "@/lib/roster/absence-types";
 
 function isoFromDate(d: Date): string {
   // lokale Tagesgrenze beibehalten — der Picker liefert Tage in lokaler Zeitzone.
@@ -34,7 +35,7 @@ function countShiftsInRange(staffShiftDates: string[], fromIso: string, toIso: s
 }
 
 type Props = {
-  type: "urlaub" | "krank";
+  type: AbsenceType;
   defaultDate: string;
   staffShiftDates: string[];
   /** Wenn gesetzt, wird die Konfliktzahl serverseitig über die volle
@@ -76,9 +77,9 @@ export function AbsenceRangeForm({
   const countLoading =
     Boolean(staffId) && serverCountQ.isFetching && serverCountQ.data === undefined;
 
-  const label = type === "urlaub" ? "Urlaub eintragen" : "Krank eintragen";
-  const Icon = type === "urlaub" ? Umbrella : HeartPulse;
-  const iconColor = type === "urlaub" ? "text-green-600" : "text-red-600";
+  const label = `${ABSENCE_LABEL[type]} eintragen`;
+  const Icon = type === "krank" ? HeartPulse : Umbrella;
+  const iconColor = type === "krank" ? "text-red-600" : "text-green-600";
 
   return (
     <div className="space-y-2">

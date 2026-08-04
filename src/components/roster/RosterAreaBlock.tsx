@@ -42,6 +42,7 @@ import {
   type RosterCrossBooking,
 } from "@/lib/roster/roster.functions";
 import type { ServicePeriod } from "@/lib/roster/cross-booking";
+import { ABSENCE_LABEL, type AbsenceType } from "@/lib/roster/absence-types";
 
 type GridArea = "kitchen" | "service";
 
@@ -61,7 +62,7 @@ type Props = {
   allSkills: RosterSkill[];
   crossBookings: RosterCrossBooking[];
   unavailableSet: Set<string>;
-  absenceMap: Map<string, "urlaub" | "krank">;
+  absenceMap: Map<string, AbsenceType>;
   wishMap: Map<string, string | null>;
   /** SP1 — Standort hat Tagesbetrieb aktiv. Nur dann wird der Mittag/Abend-Umschalter angezeigt. */
   dayServiceEnabled?: boolean;
@@ -266,7 +267,7 @@ export function RosterAreaBlock({
     staffId: string,
     fromIso: string,
     toIso: string,
-    type: "urlaub" | "krank",
+    type: AbsenceType,
   ) {
     if (!canEdit) return;
     setBusy(true);
@@ -276,7 +277,7 @@ export function RosterAreaBlock({
       });
       qc.invalidateQueries({ queryKey: ["roster-absence"] });
       qc.invalidateQueries({ queryKey: ["roster-shifts"] });
-      const label = type === "urlaub" ? "Urlaub" : "Krank";
+      const label = ABSENCE_LABEL[type];
       const daysCount = res.daysCount;
       const del = res.deletedShiftCount;
       toast.success(

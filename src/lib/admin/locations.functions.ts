@@ -9,6 +9,7 @@ import { loadAdminCaller } from "./admin-context";
 import { runGuarded } from "./admin-call";
 import { makeAuditWriter } from "./audit";
 import { expectMaybe, expectOk, expectVoid } from "@/lib/supabase/expect-ok";
+import { SESSION_FIELD_KEYS } from "@/lib/cash/session-fields";
 
 // Optionales Freitext-Feld: leere Strings → null, sonst getrimmt.
 const optText = (max: number) =>

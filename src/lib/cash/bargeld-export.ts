@@ -39,7 +39,9 @@ const COLUMNS: readonly ColumnSpec[] = [
   { header: "SoUse", channelKind: "delivery_souse", sign: -1, value: (r) => r.deliverySouseCents },
   { header: "Wolt", channelKind: "delivery_wolt", sign: -1, value: (r) => r.deliveryWoltCents },
   { header: "gutscheine", sign: -1, value: (r) => r.vouchersRedeemedCents },
-  { header: "FineDine", channelKind: "finedine", sign: -1, value: (r) => r.finedineCents },
+  // EX2-c-Entscheid (04.08.): FineDine ist KEIN Katalog-Kanal (Erfassung als
+  // Session-Feld) — die Spalte bleibt vorerst Struktur-Spalte auf jedem Blatt.
+  { header: "FineDine", sign: -1, value: (r) => r.finedineCents },
   { header: "Gutscheine VK", sign: 1, value: (r) => r.vouchersSoldCents },
   { header: "einladung gäste", sign: -1, value: (r) => r.einladungCents },
   { header: "offene rechnungen", sign: -1, value: (r) => r.openInvoicesCents },

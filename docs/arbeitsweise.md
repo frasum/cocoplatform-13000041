@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 04.08.2026 (§136: A0 eröffnet; UB1/UB2 unbezahlter Urlaub; TG4/TG5 Telegram; DB-CI entdeckt; ZS1-Nachtaufräumen; §135: SM1 Sourcemaps, ZS1 Overlap-Guard, Lohnbüro-Antworten)
+Stand: 04.08.2026 (§137: Export-Reifung EX2-b/c; SE1 Einnahmen-Positionen; FS1 Feld-Sichtbarkeit; WG1/KA2)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -5062,3 +5062,23 @@ PB3 · KM1 · TB1 · 034/035 · AV1b/c-Rest · Stk/BE · DL1 · AP1 · Kanal-/Te
 **ICS-Direktrunden (gesichtet, gut):** Abwesenheits-Typfilter zentralisiert (`ABSENCE_TYPE_FILTER`), `buildAbsenceIcsEvents` ausgelagert und getestet, UID-Verifizierung, E2E — ohne diese Zentralisierung wäre `urlaub_unbezahlt` im Abo-Kalender unsichtbar geblieben.
 
 **Offene Merkposten:** wie §135, **MINUS** Telegram-Transient (zu), **PLUS** A0-Engpass LAM/NET-Aufteilung + Lohnbüro-Mail · JOYs AU-Frage · LAM/NET-Kalendertage auf `urlaub_unbezahlt` umstellen (nach Aufteilung) · UK2-Bestätigung je Person · ZS1-UI-Löschfrage · WG1 (Wechselgeld-Differenz signed, bei Lovable) · TG5-Sichtprüfung („Jetzt senden").
+
+## §137 — Abend-Stapel: Export-Reifung und Kassen-Symmetrie (04.08., abends)
+
+**Abnahme-Anker:** HEAD `34c1b452` — vier Gates grün (tsc 0 · eslint 0 · prettier clean · vitest 2495, 0 Skips; +17). Migrations-Verbleib diesmal VOR der Gate-Messung geprüft (UB1-Lehre) — beide Dateien lagen vor.
+
+**Formeltreue-Fund (20:09, Konsole):** Erster Juli-Export nach EX2 scheiterte KORREKT am Wächter: „Formeltreue verletzt (YUM, 27.07.): 37407 ≠ 40407 Cent" — Ursache 30,00 € „Sonstige Einnahme" (Session-Feld ohne Export-Spalte). Kein Zählfehler; der Export hatte eine Lücke. Nebenbefund: 15 stille Fehlversuche — der Fehler-Toast verschwand zu schnell.
+
+**EX2-b (Bauherren-Entscheid Herkunftstrennung):** Bargeld-Spalte je Tag = Betriebs-Bargeld OHNE sonstige Einnahmen; unter der Summenzeile Block „sonstige einnahmen" (je Vorkommen Datum · Betrag, ab SE1 auch Beschreibung) + „einzahlung gesamt" als lebende Formel (nichts geht verloren — der Cent wechselt die Zeile). Wächter prüft gegen die bereinigte Größe (27.07.-Fixture). Export-UX: Spinner/disabled, Fehler-Toast ≥ 10 s. **SICHTPRÜFUNG BESTANDEN** (YUM-Blatt 21:23): 27.07. = 374,07 · Block 30,00 · einzahlung gesamt 9.953,06 ✓. Hinweis dokumentiert: Export liefert IMMER beide Blätter (eine Mappe, Vorlagen-Treue) — der Standort-Filter der Saldo-Seite steuert nur die Anzeige. Lovable-Preview blockt Downloads (403 `export/download`) — Datei-Tests gehören auf die Produktions-Domain.
+
+**EX2-c + FineDine-Klärung:** Blatt zeigt nur die KANÄLE seines Standorts (kanalbasiert, nicht wertbasiert — Layout-Stabilität). Lovables §104-Rückfrage deckte Namensverwirrung auf: FineDine ist **SESSION-FELD** (`sessions.finedine_vouchers_cents`), KEIN Katalog-Kanal — Entscheid Option b (Struktur-Spalte), AUSDRÜCKLICH kein Pseudo-Kanaleintrag (KGL: keine zweite Wahrheit).
+
+**SE1 (`41a6540f`/`b6b70309` + Migration `20260804191000`):** Sonstige Einnahmen als Positionsliste nach `session_expenses`-Muster (Beschreibung PFLICHT, CHECK > 0, RLS); Karte zwischen Ausgaben und Vorschüssen; linkes Betragsfeld entfällt. Migration mit Bestandsübernahme (27.07. ⇒ Position „Übernahme Alt-Erfassung") UND Altfeld-NULLUNG (Doppelzählungs-Schutz für Alt-Leser; Spalte bleibt, Entfernung späterer Schritt). Erster Test „Klick tut nichts" = fehlende Tabelle vor Migrations-Ausführung; Sichtprüfung nach Vollzug [Button-Text „Einnahme hinzufügen" bestätigt / Label-Fix offen].
+
+**FS1 (`8bc07773` + Migration `20260804200000`):** `locations.disabled_session_fields` (CHECK-Whitelist `'finedine'`), Schalter-Gruppe „Kassenfelder" (Audit, `cash_enabled`-Muster); Maske rendert deaktivierte Felder nicht und **LÄSST SIE IM UPDATE-PAYLOAD WEG** (Prüfer-Auflage: „fehlt" = „nicht anfassen" — historische Werte können nie durch spätere Speichervorgänge genullt werden; expliziter Wert ≠ 0 wird abgelehnt). Export/Druck/PDF folgen der Feld-Sichtbarkeit; historischer Wert im Zeitraum ⇒ Spalte erscheint doch (kein Geld verstecken). 17 Tests.
+
+**WG1 (`239160b6`):** Wechselgeld-Differenz beidseitig (`diffToTargetSignedCents` ungekappt; Bestands-Kappung/Tresor-Zeile unverändert) — Überschuss +X grün, Unterdeckung −X rot. **KA2 (`4203a20b` + Bauherren-Rundungsrunden `034ce44c`/`e478fb88`):** Kassen-Kachel „Umsatz/Arbeitsstunde" neben Ø/Gast (halbe Breiten); GESAMTUMSATZ-Klarstellung des Bauherrn: €/Std rechnet ÜBERALL auf Haus+Außer-Haus (eine Formelwahrheit `revenue-core`/`derivedKpis`, verifiziert) — Ø/Gast bleibt bewusst die einzige Haus-Kennzahl. Ehrliche Leerzustände („keine Stunden erfasst").
+
+**Produktions-Vollzug:** SE1- und FS1-Migration ausgeführt (Beleg: Kontroll-Resultset `disabled_session_fields`, 22:21); YUM-Schalter FineDine [gesetzt / ausstehend].
+
+**Offene Merkposten:** wie §136, **PLUS** SE1-Button-Label prüfen · YUM-FineDine-Schalter (falls ausstehend) · `sessions.sonstige_einnahme_cents`-Spalten-Entfernung (später, eigener Schritt). Der **A0-Engpass** (LAM/NET-Aufteilung, JOY-AU) bleibt der kritische Pfad.

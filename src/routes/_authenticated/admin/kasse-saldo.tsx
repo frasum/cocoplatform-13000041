@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCashDailyBreakdown, type CashDailyRow } from "@/lib/cash/cash.functions";
+import { listRevenueChannels } from "@/lib/cash/cash.functions";
 import {
   buildBargeldXlsx,
   betriebsBargeldCents,
@@ -186,10 +187,17 @@ function KasseSaldoPage() {
       // EX2 — eine Mappe, ein Blatt je Kassen-Standort (wie die Vorlage).
       const sheets: BargeldSheet[] = [];
       for (const loc of cashLocations) {
-        const locRows = await fetchBreakdown({
-          data: { fromDate, toDate, locationId: loc.id },
+        const [locRows, channels] = await Promise.all([
+          fetchBreakdown({ data: { fromDate, toDate, locationId: loc.id } }),
+          fetchChannels({ data: { locationId: loc.id } }),
+        ]);
+        // EX2-c: Kanal-Spalten folgen dem Kanalkatalog des Standorts
+        // (aktiv UND inaktiv) — nicht den Monatswerten.
+        sheets.push({
+          locationName: loc.name,
+          rows: locRows,
+          channelKinds: new Set(channels.map((c) => c.kind)),
         });
-        sheets.push({ locationName: loc.name, rows: locRows });
       }
       if (sheets.length === 0) {
         toast.error("Keine Kassen-Standorte vorhanden.");

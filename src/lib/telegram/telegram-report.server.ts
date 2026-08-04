@@ -223,7 +223,6 @@ async function loadReportInputForOrg(
         vouchers_redeemed_cents: sess.vouchers_redeemed_cents,
         finedine_vouchers_cents: sess.finedine_vouchers_cents,
         einladung_cents: sess.einladung_cents,
-        sonstige_einnahme_cents: sess.sonstige_einnahme_cents,
         vorschuss_cents: sess.vorschuss_cents,
       },
       {
@@ -233,6 +232,8 @@ async function loadReportInputForOrg(
         openInvoicesCents: active.map((s) => Number(s.open_invoices_cents)),
         expensesCents: ov.expenses.map((e) => e.amountCents),
         advancesCents: ov.advances.map((a) => a.amountCents),
+        // SE1: sonstige Einnahmen als Positionsliste.
+        otherIncomesCents: ov.otherIncomes.map((o) => o.amountCents),
       },
     );
     const tagesBargeldCents = computeDailyCash(dayInput);

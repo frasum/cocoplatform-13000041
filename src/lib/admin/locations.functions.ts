@@ -55,13 +55,18 @@ export const listLocations = createServerFn({ method: "GET" })
       .eq("organization_id", caller.organizationId)
       .order("name");
     if (!includeInactive) query = query.eq("is_active", true);
-    const [rowsRes, orgRes] = await Promise.all([
+    const { loadDisabledSessionFieldsByLocation } = await import(
+      "@/lib/cash/session-fields-access"
+    );
+    const [rowsRes, orgRes, disabledByLoc] = await Promise.all([
       query,
       supabaseAdmin
         .from("organizations")
         .select("cash_balance_target_cents")
         .eq("id", caller.organizationId)
         .maybeSingle(),
+      // FS1: Session-Feld-Sichtbarkeit je Standort (Shim bis Typ-Regeneration).
+      loadDisabledSessionFieldsByLocation(supabaseAdmin, caller.organizationId),
     ]);
     if (rowsRes.error) {
       console.error("[listLocations.rows] Supabase:", rowsRes.error);
@@ -81,6 +86,8 @@ export const listLocations = createServerFn({ method: "GET" })
         isActive: row.is_active !== false,
         // LS1: false = reiner Planungs-Standort (Dienstplan/Zeit ohne Kasse).
         cashEnabled: row.cash_enabled !== false,
+        // FS1: am Standort deaktivierte Session-Felder der Kassenmaske.
+        disabledSessionFields: disabledByLoc.get(row.id) ?? [],
         cashBalanceTargetCents: raw,
         cashBalanceTargetResolvedCents: raw ?? orgTarget,
       };

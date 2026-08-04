@@ -3300,6 +3300,11 @@ export type CashDailyRow = {
   vorschussCents: number;
   expensesCents: number;
   sonstigeEinnahmeCents: number;
+  /**
+   * SE1: Einzelpositionen der sonstigen Einnahmen (Datum · Beschreibung ·
+   * Betrag im Export). `sonstigeEinnahmeCents` bleibt ihre Summe.
+   */
+  otherIncomes: Array<{ description: string; amountCents: number }>;
   bargeldCents: number;
   /**
    * Trinkgeld-Rest des Tages (kitchen + service). Selbe Quelle wie
@@ -3357,6 +3362,7 @@ export async function getCashDailyBreakdownCore(
       vorschussCents: effectiveVorschussCents(day),
       expensesCents: a.expenses.reduce((s, x) => s + x, 0),
       sonstigeEinnahmeCents: a.sonstige,
+      otherIncomes: a.otherIncomes,
       bargeldCents: computeDailyCash(day),
       tipRemainderCents: tipByDate.get(date) ?? 0,
     };
@@ -3874,7 +3880,7 @@ export async function getPreviousOperativeDeficitCore(
 
   const sessionIds = sessions.map((s) => s.id);
 
-  const [chRes, tmRes, wsRes, expRes, advRes, chanRes] = await Promise.all([
+  const [chRes, tmRes, wsRes, expRes, advRes, chanRes, oiRes] = await Promise.all([
     supabaseAdmin
       .from("session_channel_amounts")
       .select("session_id, channel_id, amount_cents")
@@ -3905,6 +3911,11 @@ export async function getPreviousOperativeDeficitCore(
       .select("id, kind")
       .eq("organization_id", caller.organizationId)
       .eq("location_id", data.locationId),
+    // SE1: sonstige Einnahmen als Positionsliste.
+    otherIncomesTable(supabaseAdmin)
+      .select("session_id, amount_cents")
+      .eq("organization_id", caller.organizationId)
+      .in("session_id", sessionIds),
   ]);
   if (chRes.error) throw chRes.error;
   if (tmRes.error) throw tmRes.error;
@@ -3912,6 +3923,7 @@ export async function getPreviousOperativeDeficitCore(
   if (expRes.error) throw expRes.error;
   if (advRes.error) throw advRes.error;
   if (chanRes.error) throw chanRes.error;
+  if (oiRes.error) throw oiRes.error;
 
   const channelKindById = new Map<string, string>(
     (chanRes.data ?? []).map((c) => [c.id, c.kind as string]),
@@ -3924,6 +3936,7 @@ export async function getPreviousOperativeDeficitCore(
     openInvoicesCents: number[];
     expensesCents: number[];
     advancesCents: number[];
+    otherIncomesCents: number[];
   };
   const bySession = new Map<string, Bucket>();
   const ensure = (id: string): Bucket => {
@@ -3936,6 +3949,7 @@ export async function getPreviousOperativeDeficitCore(
         openInvoicesCents: [],
         expensesCents: [],
         advancesCents: [],
+        otherIncomesCents: [],
       };
       bySession.set(id, b);
     }
@@ -3965,6 +3979,9 @@ export async function getPreviousOperativeDeficitCore(
   for (const r of advRes.data ?? []) {
     ensure(r.session_id).advancesCents.push(Number(r.amount_cents));
   }
+  for (const r of oiRes.data ?? []) {
+    ensure(r.session_id).otherIncomesCents.push(Number(r.amount_cents));
+  }
 
   // rawBargeld pro Session in chronologischer Reihenfolge sammeln — Endsaldo
   // kommt aus der getesteten Helper-Funktion, für sourceDate wird derselbe
@@ -3981,7 +3998,6 @@ export async function getPreviousOperativeDeficitCore(
         vouchers_redeemed_cents: sess.vouchers_redeemed_cents,
         finedine_vouchers_cents: sess.finedine_vouchers_cents,
         einladung_cents: sess.einladung_cents,
-        sonstige_einnahme_cents: sess.sonstige_einnahme_cents,
         vorschuss_cents: sess.vorschuss_cents,
       },
       {
@@ -3991,6 +4007,7 @@ export async function getPreviousOperativeDeficitCore(
         openInvoicesCents: b.openInvoicesCents,
         expensesCents: b.expensesCents,
         advancesCents: b.advancesCents,
+        otherIncomesCents: b.otherIncomesCents,
       },
     );
     rawByDay.push(computeDailyCash(dayInput));

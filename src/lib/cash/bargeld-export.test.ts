@@ -119,9 +119,7 @@ describe("buildBargeldXlsx", () => {
 
   it("EX2-c: Wächter rechnet nur mit den vorhandenen Spalten", () => {
     const noWolt: CashDailyRow = { ...july01, deliveryWoltCents: 0, bargeldCents: -38423 + 21000 };
-    expect(bargeldFromRowCents(noWolt, YUM_KINDS)).toBe(
-      bargeldFromRowCents(noWolt, SPICERY_KINDS),
-    );
+    expect(bargeldFromRowCents(noWolt, YUM_KINDS)).toBe(bargeldFromRowCents(noWolt, SPICERY_KINDS));
     expect(() => assertBargeldFormula([noWolt], "YUM", YUM_KINDS)).not.toThrow();
     expect(() => assertBargeldFormula([july01], "spicery", SPICERY_KINDS)).not.toThrow();
   });

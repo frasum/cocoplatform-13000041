@@ -371,6 +371,12 @@ export type E2EUnpaidLeaveSeed = {
    * Zahlenlage). Wirft, wenn die Änderung nicht gespeichert werden kann.
    */
   setAbsenceType: (date: string, type: "urlaub" | "krank" | "urlaub_unbezahlt") => Promise<void>;
+  /**
+   * Erzeugt ein aktives `calendar_feed`-Token für die Seed-Person und liefert
+   * Klartext + Feed-Pfad (nur der SHA-256-Hash landet in der DB — wie in der
+   * App).
+   */
+  createCalendarFeedToken: () => Promise<{ token: string; feedPath: string }>;
   cleanup: () => Promise<void>;
 };
 

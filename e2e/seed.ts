@@ -334,6 +334,15 @@ export async function findPoolWarningAuditRow(
 // `roster_absence.type` noch nicht migriert), bricht der Seed mit klarer
 // Ursache ab — kein stiller Grün-Lauf.
 
+/**
+ * Erwartete Klartext-Ursache, wenn `urlaub_unbezahlt` nicht speicherbar ist.
+ * Der E2E-Test prüft genau diesen Text — so ist eine fehlende Migration
+ * eindeutig als solche erkennbar und nicht als UB1-Regressionsfehler.
+ */
+export const UB1_MIGRATION_HINT =
+  "UB1-Migration (docs/ub1-roster-absence-urlaub-unbezahlt.sql) nicht angewendet: " +
+  "roster_absence lehnt den Typ 'urlaub_unbezahlt' ab";
+
 export type E2EUnpaidLeaveSeed = {
   orgId: string;
   locationId: string;

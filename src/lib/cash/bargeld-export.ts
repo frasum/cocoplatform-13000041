@@ -165,7 +165,7 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
 
   for (const sheet of sheets) {
     assertBargeldFormula(sheet.rows, sheet.locationName, sheet.channelKinds);
-    const cols = columnsForSheet(sheet.channelKinds);
+    const cols = columnsForSheet(sheet.channelKinds, sheet.disabledSessionFields ?? [], sheet.rows);
     const headers = ["datum", ...cols.map((c) => c.header)];
     const ws = wb.addWorksheet(sheet.locationName.slice(0, 31) || "Standort");
 

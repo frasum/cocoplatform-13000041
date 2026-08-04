@@ -364,6 +364,8 @@ export type E2EUnpaidLeaveSeed = {
   unpaidLeaveSupported: boolean;
   /** Klartext-Fehlermeldung des abgelehnten Inserts (sonst null). */
   migrationError: string | null;
+  /** Zählt die tatsächlich gespeicherten `urlaub_unbezahlt`-Tage dieser Org. */
+  countStoredUnpaidDays: () => Promise<{ count: number; error: string | null }>;
   cleanup: () => Promise<void>;
 };
 
@@ -540,6 +542,19 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
   const unpaidLeaveSupported = !unpaidErr;
   const migrationError = unpaidErr ? `${UB1_MIGRATION_HINT} (${unpaidErr.message})` : null;
 
+  const countStoredUnpaidDays = async (): Promise<{ count: number; error: string | null }> => {
+    const { count, error } = await svc
+      .from("roster_absence")
+      .select("date", { count: "exact", head: true })
+      .eq("organization_id", orgId)
+      .eq("staff_id", worker.staffId)
+      .eq("type", "urlaub_unbezahlt");
+    // Ohne Migration kann bereits der Filter scheitern — dann ist "0 Tage
+    // gespeichert" die wahre Aussage, aber der Fehler wird mitgemeldet.
+    if (error) return { count: 0, error: error.message };
+    return { count: count ?? 0, error: null };
+  };
+
   const cleanup = async () => {
     await svc.from("audit_log").delete().eq("organization_id", orgId);
     await svc.from("roster_absence").delete().eq("organization_id", orgId);
@@ -573,6 +588,7 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
     unpaidDays,
     unpaidLeaveSupported,
     migrationError,
+    countStoredUnpaidDays,
     cleanup,
   };
 }

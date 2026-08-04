@@ -15,6 +15,13 @@ import { sumNonGlTerminalCents } from "@/lib/cash/session-channels";
 import { sendTelegramToStaff } from "./telegram.functions";
 import { decideReportGate } from "./report-gate";
 import {
+  describeNetworkFailure,
+  formatFailures,
+  maskChatId,
+  normalizeSendReason,
+  type DeliveryFailure,
+} from "./delivery-failures";
+import {
   buildDailyReport,
   DEFAULT_REPORT_FLAGS,
   type ReportFlags,
@@ -34,6 +41,8 @@ export type OrgReportResult =
       recipientsDelivered: number;
       recipientsFailed: number;
       locationsTotal: number;
+      /** TG4 — je Empfänger der Fehlergrund (Chat-ID maskiert). */
+      failures: DeliveryFailure[];
     };
 
 function berlinDateISO(now: Date = new Date()): string {

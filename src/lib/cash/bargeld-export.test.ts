@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { buildBargeldXlsx, bargeldFromRowCents, assertBargeldFormula } from "./bargeld-export";
+import {
+  buildBargeldXlsx,
+  bargeldFromRowCents,
+  assertBargeldFormula,
+  columnsForSheet,
+  ALL_CHANNEL_KINDS,
+} from "./bargeld-export";
 import type { CashDailyRow } from "./cash.functions";
+
+// EX2-c — Kanal-Zuordnung je Blatt (Kanalkatalog).
+const SPICERY_KINDS = new Set(["delivery_souse", "delivery_wolt", "finedine"]);
+const YUM_KINDS = new Set(["delivery_souse", "delivery_wolt"]);
 
 // EX2 — Fixture mit echten Juli-Beispielwerten (01.07. ⇒ −384,23 €).
 const july01: CashDailyRow = {
@@ -51,8 +61,8 @@ describe("buildBargeldXlsx", () => {
 
   it("erzeugt einen nicht-leeren Blob mit einem Blatt je Standort", async () => {
     const blob = await buildBargeldXlsx([
-      { locationName: "spicery", rows: [july01, july02] },
-      { locationName: "YUM", rows: [july01] },
+      { locationName: "spicery", rows: [july01, july02], channelKinds: SPICERY_KINDS },
+      { locationName: "YUM", rows: [july01], channelKinds: YUM_KINDS },
     ]);
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.size).toBeGreaterThan(0);
@@ -76,8 +86,47 @@ describe("buildBargeldXlsx", () => {
   });
 
   it("EX2-b: Blatt mit sonstiger Einnahme wird erzeugt", async () => {
-    const blob = await buildBargeldXlsx([{ locationName: "YUM", rows: [july27] }]);
+    const blob = await buildBargeldXlsx([
+      { locationName: "YUM", rows: [july27], channelKinds: YUM_KINDS },
+    ]);
     expect(blob.size).toBeGreaterThan(0);
+  });
+
+  it("EX2-c: Kanal-Spalten folgen dem Katalog, Struktur-Spalten bleiben", () => {
+    const yum = columnsForSheet(YUM_KINDS).map((c) => c.header);
+    const spicery = columnsForSheet(SPICERY_KINDS).map((c) => c.header);
+    expect(yum).not.toContain("FineDine");
+    expect(spicery).toContain("FineDine");
+    for (const h of [
+      "tagesumsatz",
+      "kreditkarten",
+      "gutscheine",
+      "Gutscheine VK",
+      "einladung gäste",
+      "offene rechnungen",
+      "personal",
+      "barausgaben",
+      "bargeld",
+    ]) {
+      expect(yum).toContain(h);
+    }
+    // Kanalbasiert, nicht wertbasiert: umsatzloser Kanal behält seine Spalte.
+    expect(yum).toContain("Wolt");
+  });
+
+  it("EX2-c: Wächter rechnet nur mit den vorhandenen Spalten", () => {
+    expect(bargeldFromRowCents(july01, YUM_KINDS)).toBe(bargeldFromRowCents(july01, SPICERY_KINDS));
+    expect(() => assertBargeldFormula([july01], "YUM", YUM_KINDS)).not.toThrow();
+  });
+
+  it("EX2-c: standortfremder Kanal mit Betrag ist ein Datenfehler", () => {
+    const row: CashDailyRow = { ...july01, finedineCents: 1000, bargeldCents: -38423 - 1000 };
+    expect(() => assertBargeldFormula([row], "YUM", YUM_KINDS)).toThrow(/Datenfehler/);
+    expect(() => assertBargeldFormula([row], "spicery", SPICERY_KINDS)).not.toThrow();
+  });
+
+  it("EX2-c: Default-Kanalsatz enthält alle Kanal-Spalten", () => {
+    expect([...ALL_CHANNEL_KINDS].sort()).toEqual(["delivery_souse", "delivery_wolt", "finedine"]);
   });
 
   it("SE1: Positions-Summe ergibt die ausgewiesene Summe (mehrere Positionen)", () => {

@@ -9,23 +9,49 @@
 
 import type { CashDailyRow } from "@/lib/cash/cash.functions";
 
-export type BargeldSheet = { locationName: string; rows: CashDailyRow[] };
+/**
+ * EX2-c — Kanal-Spalten je Blatt.
+ *
+ * `channelKinds` ist die Kanal-Zuordnung des Standorts aus dem KANALKATALOG
+ * (`revenue_channels.kind`, aktiv UND inaktiv). Die Auswahl ist bewusst
+ * KANALBASIERT, nicht wertbasiert: ein umsatzloser Monat behält seine Spalte,
+ * das Blatt-Layout bleibt über Monate stabil.
+ */
+export type BargeldSheet = {
+  locationName: string;
+  rows: CashDailyRow[];
+  channelKinds: ReadonlySet<string>;
+};
 
-const HEADERS = [
-  "datum",
-  "tagesumsatz",
-  "kreditkarten",
-  "SoUse",
-  "Wolt",
-  "gutscheine",
-  "FineDine",
-  "Gutscheine VK",
-  "einladung gäste",
-  "offene rechnungen",
-  "personal",
-  "barausgaben",
-  "bargeld",
+/** Spalten-Bauplan: Reihenfolge exakt wie die Bankeinzahlungs-Vorlage. */
+type ColumnSpec = {
+  header: string;
+  /** Kanal-Spalte: nur auf Blättern mit dieser Kanal-Zuordnung. */
+  channelKind?: string;
+  /** Vorzeichen in der Bargeld-Formel (0 = keine Rechengröße). */
+  sign: -1 | 0 | 1;
+  value: (r: CashDailyRow) => number;
+};
+
+const COLUMNS: readonly ColumnSpec[] = [
+  { header: "tagesumsatz", sign: 1, value: (r) => r.tagesumsatzCents },
+  { header: "kreditkarten", sign: -1, value: (r) => r.kreditkartenCents },
+  { header: "SoUse", channelKind: "delivery_souse", sign: -1, value: (r) => r.deliverySouseCents },
+  { header: "Wolt", channelKind: "delivery_wolt", sign: -1, value: (r) => r.deliveryWoltCents },
+  { header: "gutscheine", sign: -1, value: (r) => r.vouchersRedeemedCents },
+  { header: "FineDine", channelKind: "finedine", sign: -1, value: (r) => r.finedineCents },
+  { header: "Gutscheine VK", sign: 1, value: (r) => r.vouchersSoldCents },
+  { header: "einladung gäste", sign: -1, value: (r) => r.einladungCents },
+  { header: "offene rechnungen", sign: -1, value: (r) => r.openInvoicesCents },
+  { header: "personal", sign: -1, value: (r) => r.vorschussCents },
+  { header: "barausgaben", sign: -1, value: (r) => r.expensesCents },
+  { header: "bargeld", sign: 0, value: (r) => betriebsBargeldCents(r) },
 ] as const;
+
+/** Spalten dieses Blatts: Struktur-Spalten immer, Kanal-Spalten nach Katalog. */
+export function columnsForSheet(channelKinds: ReadonlySet<string>): readonly ColumnSpec[] {
+  return COLUMNS.filter((c) => c.channelKind === undefined || channelKinds.has(c.channelKind));
+}
 
 /**
  * Formeltreue-Selbsttest (blockierend): die Bargeld-Spalte muss exakt der
@@ -38,30 +64,45 @@ const HEADERS = [
  * BETRIEBS-Bargeld gezeigt: bargeld − sonstige Einnahmen. Sonstige Einnahmen
  * erscheinen unten als eigener Block.
  */
-export function bargeldFromRowCents(r: CashDailyRow): number {
-  return (
-    r.tagesumsatzCents -
-    r.kreditkartenCents -
-    r.deliverySouseCents -
-    r.deliveryWoltCents -
-    r.vouchersRedeemedCents -
-    r.finedineCents +
-    r.vouchersSoldCents -
-    r.einladungCents -
-    r.openInvoicesCents -
-    r.vorschussCents -
-    r.expensesCents
-  );
+export function bargeldFromRowCents(
+  r: CashDailyRow,
+  channelKinds: ReadonlySet<string> = ALL_CHANNEL_KINDS,
+): number {
+  let sum = 0;
+  for (const c of columnsForSheet(channelKinds)) {
+    if (c.sign !== 0) sum += c.sign * c.value(r);
+  }
+  return sum;
 }
+
+/** Alle in COLUMNS geführten Kanal-Arten (Default: nichts wird weggelassen). */
+export const ALL_CHANNEL_KINDS: ReadonlySet<string> = new Set(
+  COLUMNS.flatMap((c) => (c.channelKind ? [c.channelKind] : [])),
+);
 
 /** Betriebs-Bargeld der Tageszeile (ohne sonstige Einnahmen). */
 export function betriebsBargeldCents(r: CashDailyRow): number {
   return r.bargeldCents - r.sonstigeEinnahmeCents;
 }
 
-export function assertBargeldFormula(rows: CashDailyRow[], sheetName: string): void {
+export function assertBargeldFormula(
+  rows: CashDailyRow[],
+  sheetName: string,
+  channelKinds: ReadonlySet<string> = ALL_CHANNEL_KINDS,
+): void {
   for (const r of rows) {
-    const expected = bargeldFromRowCents(r);
+    // EX2-c: Ein standortfremder Kanal kann per Konstruktion keinen Betrag
+    // tragen. Taucht doch einer auf, ist das ein Datenfehler — werfen, nicht
+    // stillschweigend aus der Rechnung fallen lassen.
+    for (const c of COLUMNS) {
+      if (c.channelKind && !channelKinds.has(c.channelKind) && c.value(r) !== 0) {
+        throw new Error(
+          `Datenfehler (${sheetName}, ${r.businessDate}): Kanal „${c.header}" ist dem Standort ` +
+            `nicht zugeordnet, trägt aber ${c.value(r)} Cent.`,
+        );
+      }
+    }
+    const expected = bargeldFromRowCents(r, channelKinds);
     const actual = betriebsBargeldCents(r);
     if (expected !== actual) {
       throw new Error(
@@ -95,38 +136,26 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
   const money = (c: number) => c / 100;
 
   for (const sheet of sheets) {
-    assertBargeldFormula(sheet.rows, sheet.locationName);
+    assertBargeldFormula(sheet.rows, sheet.locationName, sheet.channelKinds);
+    const cols = columnsForSheet(sheet.channelKinds);
+    const headers = ["datum", ...cols.map((c) => c.header)];
     const ws = wb.addWorksheet(sheet.locationName.slice(0, 31) || "Standort");
 
     ws.addRow([sheet.locationName]);
     ws.getRow(1).font = { bold: true };
-    ws.addRow([...HEADERS]);
+    ws.addRow(headers);
     ws.getRow(2).font = { bold: true };
 
     const firstDataRow = 3;
     for (const r of sheet.rows) {
-      ws.addRow([
-        isoToDate(r.businessDate),
-        money(r.tagesumsatzCents),
-        money(r.kreditkartenCents),
-        money(r.deliverySouseCents),
-        money(r.deliveryWoltCents),
-        money(r.vouchersRedeemedCents),
-        money(r.finedineCents),
-        money(r.vouchersSoldCents),
-        money(r.einladungCents),
-        money(r.openInvoicesCents),
-        money(r.vorschussCents),
-        money(r.expensesCents),
-        money(betriebsBargeldCents(r)),
-      ]);
+      ws.addRow([isoToDate(r.businessDate), ...cols.map((c) => money(c.value(r)))]);
     }
     const lastDataRow = firstDataRow + sheet.rows.length - 1;
 
     const sumRow = ws.addRow(["summe"]);
     const sumRowNumber = sumRow.number;
     if (sheet.rows.length > 0) {
-      for (let col = 2; col <= HEADERS.length; col++) {
+      for (let col = 2; col <= headers.length; col++) {
         const letter = ws.getColumn(col).letter;
         sumRow.getCell(col).value = {
           formula: `SUM(${letter}${firstDataRow}:${letter}${lastDataRow})`,
@@ -137,7 +166,7 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
 
     // EX2-b/SE1 — Herkunftstrennung: sonstige Einnahmen unten extra
     // ausgewiesen, je POSITION eine Zeile (Datum · Beschreibung · Betrag).
-    const bargeldLetter = ws.getColumn(HEADERS.length).letter;
+    const bargeldLetter = ws.getColumn(headers.length).letter;
     const sonstige = sheet.rows.flatMap((r) =>
       r.otherIncomes.map((o) => ({ businessDate: r.businessDate, ...o })),
     );
@@ -147,11 +176,11 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
     const firstSonstigeRow = blockHeader.number + 1;
     for (const p of sonstige) {
       const row = ws.addRow([isoToDate(p.businessDate), p.description]);
-      row.getCell(HEADERS.length).value = money(p.amountCents);
+      row.getCell(headers.length).value = money(p.amountCents);
     }
     const lastSonstigeRow = firstSonstigeRow + sonstige.length - 1;
     const sonstigeSumRow = ws.addRow(["summe sonstige einnahmen"]);
-    sonstigeSumRow.getCell(HEADERS.length).value =
+    sonstigeSumRow.getCell(headers.length).value =
       sonstige.length > 0
         ? {
             formula: `SUM(${bargeldLetter}${firstSonstigeRow}:${bargeldLetter}${lastSonstigeRow})`,
@@ -160,12 +189,12 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
     sonstigeSumRow.font = { bold: true };
 
     const totalRow = ws.addRow(["einzahlung gesamt"]);
-    totalRow.getCell(HEADERS.length).value = {
+    totalRow.getCell(headers.length).value = {
       formula: `${bargeldLetter}${sumRowNumber}+${bargeldLetter}${sonstigeSumRow.number}`,
     };
     totalRow.font = { bold: true };
 
-    for (let col = 2; col <= HEADERS.length; col++) {
+    for (let col = 2; col <= headers.length; col++) {
       ws.getColumn(col).numFmt = '#,##0.00 "€"';
       ws.getColumn(col).width = 13;
     }

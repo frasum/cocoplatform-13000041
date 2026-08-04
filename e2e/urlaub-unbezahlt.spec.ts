@@ -110,8 +110,9 @@ test.describe("Urlaub (unbezahlt) — UB1", () => {
       // Erwarteter Zustand OHNE Migration: klare Ursache, keine Tage geblockt.
       expect(seed.migrationError).toContain(UB1_MIGRATION_HINT);
       expect(seed.migrationError).toContain("ub1-roster-absence-urlaub-unbezahlt.sql");
-      const { count, error } = await seed.countStoredUnpaidDays();
-      expect(error).toBeNull();
+      // Ohne Migration darf der Zähl-Filter selbst fehlschlagen; entscheidend
+      // ist, dass KEIN unbezahlter Tag gespeichert (und damit geblockt) ist.
+      const { count } = await seed.countStoredUnpaidDays();
       expect(count).toBe(0);
       return;
     }

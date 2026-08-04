@@ -33,6 +33,10 @@ import {
   berechneLohnUebersicht,
 } from "@/lib/lohn/lohn-rechner.functions";
 import { saveAbsenceDays } from "@/lib/lohn/lohn-absence.functions";
+import {
+  applyVacationSplit,
+  getVacationBalanceProposal,
+} from "@/lib/lohn/vacation-balance.functions";
 import { MAX_ABSENCE_TAGE } from "@/lib/lohn/absence-days";
 import { useAuth } from "@/hooks/use-auth";
 import { buildLohnFileName, buildLohnXlsx, downloadBlob } from "@/lib/lohn/lohn-excel-export";
@@ -506,6 +510,7 @@ export function LohnrechnerPanel() {
             <AbsenceDaysCard
               staffId={staffId}
               periodStart={fromDate}
+              periodEnd={toDate}
               usedUrlaubTage={result.usedUrlaubTage}
               usedKrankTage={result.usedKrankTage}
               estUrlaubTage={result.diagnose.urlaubTage}
@@ -587,6 +592,7 @@ function KV({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
 function AbsenceDaysCard({
   staffId,
   periodStart,
+  periodEnd,
   usedUrlaubTage,
   usedKrankTage,
   estUrlaubTage,
@@ -595,6 +601,7 @@ function AbsenceDaysCard({
 }: {
   staffId: string;
   periodStart: string;
+  periodEnd: string;
   usedUrlaubTage: number;
   usedKrankTage: number;
   estUrlaubTage: number;
@@ -678,7 +685,89 @@ function AbsenceDaysCard({
         </Button>
         <span>0 / 0 speichern entfernt die Vorgabe.</span>
       </div>
+      <VacationBalanceBlock
+        staffId={staffId}
+        fromDate={periodStart}
+        toDate={periodEnd}
+        onApplied={onSaved}
+      />
     </Card>
+  );
+}
+
+/**
+ * UB2 — Urlaubskonto-VORSCHLAG. Zeigt Anspruch, beantragte Arbeitstage und die
+ * vorgeschlagene Aufteilung bezahlt/unbezahlt. Die Übernahme in den Kalender
+ * ist explizit (Knopf) — es wird nichts still umgebucht. Ist das Konto im
+ * Stammblatt nicht gepflegt (null), erscheint ein Hinweis statt einer Zahl.
+ */
+function VacationBalanceBlock({
+  staffId,
+  fromDate,
+  toDate,
+  onApplied,
+}: {
+  staffId: string;
+  fromDate: string;
+  toDate: string;
+  onApplied: () => void;
+}) {
+  const qc = useQueryClient();
+  const proposalFn = useServerFn(getVacationBalanceProposal);
+  const applyFn = useServerFn(applyVacationSplit);
+
+  const q = useQuery({
+    queryKey: ["vacation-balance", staffId, fromDate, toDate],
+    queryFn: () => proposalFn({ data: { staffId, fromDate, toDate } }),
+  });
+
+  const apply = useMutation({
+    mutationFn: () => applyFn({ data: { staffId, fromDate, toDate } }),
+    onSuccess: (res) => {
+      toast.success(
+        res.changed > 0
+          ? `${res.changed} Tag(e) auf „Urlaub (unbezahlt)" umgestellt.`
+          : "Keine Änderung nötig — Anspruch deckt den Zeitraum.",
+      );
+      void qc.invalidateQueries({ queryKey: ["vacation-balance", staffId, fromDate, toDate] });
+      onApplied();
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Übernahme fehlgeschlagen."),
+  });
+
+  if (q.isPending) {
+    return <p className="text-xs text-muted-foreground">Urlaubskonto wird geladen …</p>;
+  }
+  if (q.isError || !q.data) {
+    return <p className="text-xs text-muted-foreground">Urlaubskonto nicht lesbar.</p>;
+  }
+  const p = q.data;
+  if (p.available == null) {
+    return (
+      <p className="text-xs text-amber-600">
+        Urlaubskonto im Stammblatt nicht gepflegt — keine automatische Aufteilung.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t border-border/40 pt-2 text-xs">
+      <span className="text-muted-foreground">
+        Anspruch verfügbar: {p.available} Tage · beantragt: {p.requestedWorkdays} Arbeitstage ⇒{" "}
+        {p.paidDates.length} bezahlt, {p.unpaidDates.length} unbezahlt
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={apply.isPending || p.unpaidDates.length === 0}
+        onClick={() => apply.mutate()}
+      >
+        {apply.isPending ? "Übernehme…" : "Aufteilung übernehmen"}
+      </Button>
+      <span className="text-muted-foreground">
+        Vorschlag — führend bleibt edlohn; Wochenend-/Feiertage bleiben unangetastet.
+      </span>
+    </div>
   );
 }
 

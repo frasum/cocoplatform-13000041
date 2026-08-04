@@ -8,6 +8,8 @@ import { fmtEuroPerHour } from "./revenue-per-hour";
 
 export type ReportFlags = {
   umsatz: boolean;
+  /** TG5-b — steuert ausschließlich die Kennzahl „€/Arbeitsstunde". */
+  umsatzStd: boolean;
   gaeste: boolean;
   kontrolle: boolean;
   kellner: boolean;
@@ -18,6 +20,7 @@ export type ReportFlags = {
 
 export const DEFAULT_REPORT_FLAGS: ReportFlags = {
   umsatz: true,
+  umsatzStd: true,
   gaeste: true,
   kontrolle: true,
   kellner: true,
@@ -145,14 +148,15 @@ function renderLocation(loc: ReportLocationInput, flags: ReportFlags): string {
 
   const lines: string[] = [title];
 
+  // TG5-b — die Kennzahl ist eine eigene Inhalts-Option: mit Umsatzblock als
+  // Suffix, ohne Umsatzblock als eigene kompakte Zeile.
+  const showPerHour = flags.umsatzStd && loc.revenuePerWorkHourCents !== undefined;
+  const perHourText = showPerHour ? escapeHtml(fmtEuroPerHour(loc.revenuePerWorkHourCents)) : "";
   if (flags.umsatz && loc.vectronCents !== undefined) {
-    // TG5 — Umsatz je Arbeitsstunde direkt an der Umsatzzeile; Wert kommt
-    // fertig aus der Statistik-Kennzahl (keine Rechnung hier).
-    const perHour =
-      loc.revenuePerWorkHourCents === undefined
-        ? ""
-        : ` · ${escapeHtml(fmtEuroPerHour(loc.revenuePerWorkHourCents))}`;
+    const perHour = showPerHour ? ` · ${perHourText}` : "";
     lines.push(`Vectron: ${escapeHtml(fmtCents(loc.vectronCents))}${perHour}`);
+  } else if (showPerHour) {
+    lines.push(`Umsatz/Std: ${perHourText}`);
   }
   if (flags.gaeste && (loc.guestCount ?? 0) > 0) {
     const avg = (loc.vectronCents ?? 0) / (loc.guestCount ?? 1);

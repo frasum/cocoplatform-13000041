@@ -724,7 +724,12 @@ function KassePage() {
               terminals={terminalsQ.data ?? []}
               writable={writable}
               cashBalanceTargetCents={cashBalanceTargetResolvedCents}
-              locationName={currentLocation?.name}
+              // FS1: Feld-Sichtbarkeit folgt der Standort-Konfiguration
+              // (nicht mehr dem Standortnamen).
+              disabledSessionFields={
+                (currentLocation as { disabledSessionFields?: string[] } | undefined)
+                  ?.disabledSessionFields
+              }
               tipRemainderCents={
                 (poolQ.data?.kitchenRemainder ?? 0) + (poolQ.data?.serviceRemainder ?? 0)
               }

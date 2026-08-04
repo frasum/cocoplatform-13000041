@@ -26,6 +26,11 @@ import {
   type PtShift,
   type PtStaff,
 } from "@/lib/trmnl/planungstafel";
+import {
+  buildWeatherRow,
+  type PtWeatherCell,
+  type PtWeatherRow,
+} from "@/lib/trmnl/planungstafel-weather";
 
 // EP2 — vier Tage. Der vierte Tag trägt den Wochentagsnamen (siehe
 // dayHeader in @/lib/trmnl/planungstafel). Spalten sind gleich breit.
@@ -211,7 +216,20 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
           releases,
         });
 
-        const html = renderPage({ blocks, days, todayIso: today, now: new Date() });
+        // WX3-b — Wetterzeile. Ein Fehler hier darf die Tafel NICHT stürzen
+        // lassen: der Dienstplan ist wichtiger als das Wetter, bei Fehler
+        // zeigt die Zeile durchgehend „—".
+        const { data: wxRows, error: wxErr } = await supabaseAdmin
+          .from("weather_days")
+          .select("business_date, temp_max_c, temp_min_c, precipitation_mm, weather_code")
+          .eq("organization_id", orgId)
+          .in("business_date", days);
+        const weather = buildWeatherRow(
+          days,
+          wxErr ? [] : ((wxRows ?? []) as unknown as PtWeatherRow[]),
+        );
+
+        const html = renderPage({ blocks, days, weather, todayIso: today, now: new Date() });
         return new Response(html, {
           status: 200,
           headers: {

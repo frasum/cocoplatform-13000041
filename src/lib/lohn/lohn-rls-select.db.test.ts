@@ -1,8 +1,11 @@
 // DB-Integrationstest: SELECT-Härtung der Lohn-Tabellen
-// (`lohn_absence_days`, `lohn_recurring_zeilen`) — nur manager+ dürfen lesen.
+// (`lohn_absence_days`, `lohn_recurring_zeilen`) — nur admin und payroll
+// dürfen lesen; manager ist BEWUSST ausgeschlossen.
 //
-// Verankert den Zustand aus Migration 20260703083757 (Nachzug des Live-Fixes
-// vom 03.07.2026). Läuft NUR in CI mit lokalem `supabase start`
+// Geltende Beschlusslage: ZT1 / §134, Migration 20260803124143 (Verengung des
+// Lohn-Lesezugriffs auf admin+payroll). Die frühere §42-Regel „manager+ darf
+// lesen" ist damit überholt — dieser Test folgt der Produktion, nicht der
+// Historie. Läuft NUR in CI mit lokalem `supabase start`
 // (`SUPABASE_DB_TESTS=1`). Muster: `m4-payroll-permissions.db.test`.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -16,15 +19,16 @@ import {
 
 type RoleKey = "admin" | "manager" | "staff" | "payroll";
 
-// Sichtbarkeit nach §42: manager+ darf lesen, staff nicht.
+// Sichtbarkeit nach ZT1/§134: admin und payroll dürfen lesen; manager und
+// staff nicht.
 const CAN_SELECT: Record<RoleKey, boolean> = {
   admin: true,
-  manager: true,
+  manager: false,
   payroll: true,
   staff: false,
 };
 
-describe.skipIf(!dbTestsEnabled)("lohn SELECT-RLS — manager+ (§42)", () => {
+describe.skipIf(!dbTestsEnabled)("lohn SELECT-RLS — admin+payroll (ZT1/§134)", () => {
   let org!: SeededOrg;
   let users!: Record<RoleKey, SeededUser>;
   let targetStaffId!: string;

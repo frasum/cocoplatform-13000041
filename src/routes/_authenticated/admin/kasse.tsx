@@ -219,6 +219,16 @@ function KassePage() {
   });
   const staffQ = useQuery({ queryKey: ["admin-staff"], queryFn: () => fetchStaff() });
 
+  // KA2: Netto-Arbeitsstunden des Geschäftstags am Standort — gemeinsame
+  // Statistik-Quelle, gleiche Query-Mechanik wie die Nachbarkacheln
+  // (Live-Stand über den ["cash"]-Invalidate).
+  const fetchDayWorkMinutes = useServerFn(getCashDayWorkMinutes);
+  const workMinutesQ = useQuery({
+    queryKey: ["cash", "work-minutes", businessDate, locationId],
+    queryFn: () => fetchDayWorkMinutes({ data: { businessDate, locationId } }),
+    enabled: locationId !== "",
+  });
+
   // EV1-R2/R3: Event-Hinweise (heute/morgen) und Wetter. Die Server-Functions
   // liefern für staff/payroll ohnehin leer; die UI rendert zusätzlich nur für
   // admin, manager und planer.
@@ -763,6 +773,28 @@ function KassePage() {
                   inHouseCents != null && guests > 0 && inHouseCents > 0
                     ? Math.round(inHouseCents / guests)
                     : null;
+                // KA2: GESAMTUMSATZ (Haus + Takeaway) ÷ Netto-Arbeitsstunden.
+                // Formelwahrheit = derivedKpis (STAT2/TG5), keine Zweitformel.
+                // Die Haus-Konvention der Gast-Kachel gilt hier bewusst NICHT.
+                const totalCents = channelsLoaded
+                  ? decomposeRevenue({
+                      vectronCents: vectronTotal,
+                      channels: (ovQ.data.channelAmounts ?? []).map((c) => ({
+                        kind: resolveChannelKind(channelKindById, c.channelId),
+                        amountCents: c.amountCents,
+                      })),
+                    }).totalCents
+                  : null;
+                const workMinutes = workMinutesQ.data?.workMinutes ?? 0;
+                const perHour =
+                  totalCents == null
+                    ? null
+                    : derivedKpis({
+                        houseCents: 0,
+                        totalCents,
+                        guestCount: 0,
+                        workMinutes,
+                      });
                 return (
                   <div className="space-y-3">
                     <Card className="p-4">
@@ -777,17 +809,34 @@ function KassePage() {
                         {inHouseCents == null ? "–" : fmtCents(inHouseCents)}
                       </div>
                     </Card>
-                    <Card className="p-4">
-                      <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Ø Umsatz / Gast
-                      </div>
-                      <div className="mt-1 font-mono text-2xl font-semibold">
-                        {perGuestCents == null ? "–" : fmtCents(perGuestCents)}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {guests > 0 ? `${guests} Gäste` : "Gästeanzahl fehlt"}
-                      </div>
-                    </Card>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Card className="p-4">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Ø Umsatz / Gast
+                        </div>
+                        <div className="mt-1 font-mono text-2xl font-semibold">
+                          {perGuestCents == null ? "–" : fmtCents(perGuestCents)}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {guests > 0 ? `${guests} Gäste` : "Gästeanzahl fehlt"}
+                        </div>
+                      </Card>
+                      <Card className="p-4">
+                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                          Umsatz / Arbeitsstunde
+                        </div>
+                        <div className="mt-1 font-mono text-2xl font-semibold">
+                          {perHour?.revenuePerWorkHourCents == null
+                            ? "—"
+                            : fmtCents(perHour.revenuePerWorkHourCents)}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {workMinutes > 0
+                            ? `${(workMinutes / 60).toFixed(1).replace(".", ",")} h erfasst`
+                            : "keine Stunden erfasst"}
+                        </div>
+                      </Card>
+                    </div>
                   </div>
                 );
               })()}

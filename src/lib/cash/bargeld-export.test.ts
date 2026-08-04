@@ -24,6 +24,19 @@ const july01: CashDailyRow = {
 
 const july02: CashDailyRow = { ...july01, businessDate: "2026-07-02" };
 
+// EX2-b — 27.07. (YUM): 30,00 € sonstige Einnahme; Spalten ergeben 374,07,
+// gespeichertes Tages-Bargeld 404,07.
+const july27: CashDailyRow = {
+  ...july01,
+  businessDate: "2026-07-27",
+  tagesumsatzCents: 37407,
+  kreditkartenCents: 0,
+  deliveryWoltCents: 0,
+  expensesCents: 0,
+  sonstigeEinnahmeCents: 3000,
+  bargeldCents: 40407,
+};
+
 describe("buildBargeldXlsx", () => {
   // XL1 — `buildBargeldXlsx` lädt exceljs per dynamischem Import erst beim
   // Aufruf. Das erstmalige Auflösen des Pakets dauert in langsamen Sandboxes
@@ -53,5 +66,15 @@ describe("buildBargeldXlsx", () => {
     expect(() => assertBargeldFormula([{ ...july01, bargeldCents: 0 }], "spicery")).toThrow(
       /Formeltreue verletzt/,
     );
+  });
+
+  it("EX2-b: sonstige Einnahmen sind aus der Bargeld-Spalte herausgerechnet", () => {
+    expect(bargeldFromRowCents(july27)).toBe(37407);
+    expect(() => assertBargeldFormula([july27], "YUM")).not.toThrow();
+  });
+
+  it("EX2-b: Blatt mit sonstiger Einnahme wird erzeugt", async () => {
+    const blob = await buildBargeldXlsx([{ locationName: "YUM", rows: [july27] }]);
+    expect(blob.size).toBeGreaterThan(0);
   });
 });

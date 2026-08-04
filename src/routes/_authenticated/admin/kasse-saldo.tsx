@@ -24,7 +24,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCashDailyBreakdown, type CashDailyRow } from "@/lib/cash/cash.functions";
-import { buildBargeldXlsx, type BargeldSheet } from "@/lib/cash/bargeld-export";
+import {
+  buildBargeldXlsx,
+  betriebsBargeldCents,
+  type BargeldSheet,
+} from "@/lib/cash/bargeld-export";
 import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { downloadBlob } from "@/lib/time/weekly-export";
 import { formatShortDate } from "@/lib/format-date";
@@ -98,6 +102,7 @@ function KasseSaldoPage() {
   const months = useMemo(() => buildMonthOptions(now), [now]);
   const [monthKey, setMonthKey] = useState<string>(months[0].key);
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const selected = months.find((m) => m.key === monthKey) ?? months[0];
   const { fromDate, toDate } = monthRange(selected.year, selected.month);
@@ -151,6 +156,8 @@ function KasseSaldoPage() {
       expenses: 0,
       bargeld: 0,
       tipRemainder: 0,
+      sonstige: 0,
+      sonstigeTage: 0,
     };
     for (const r of rows) {
       t.tagesumsatz += r.tagesumsatzCents;
@@ -165,13 +172,16 @@ function KasseSaldoPage() {
       t.openInvoices += r.openInvoicesCents;
       t.vorschuss += r.vorschussCents;
       t.expenses += r.expensesCents;
-      t.bargeld += r.bargeldCents;
+      t.bargeld += betriebsBargeldCents(r);
       t.tipRemainder += r.tipRemainderCents;
+      t.sonstige += r.sonstigeEinnahmeCents;
+      if (r.sonstigeEinnahmeCents !== 0) t.sonstigeTage += 1;
     }
     return t;
   }, [rows]);
 
   async function handleExport() {
+    setExporting(true);
     try {
       // EX2 — eine Mappe, ein Blatt je Kassen-Standort (wie die Vorlage).
       const sheets: BargeldSheet[] = [];
@@ -187,9 +197,13 @@ function KasseSaldoPage() {
       }
       const blob = await buildBargeldXlsx(sheets);
       downloadBlob(blob, `bankeinzahlung_${fromDate}_bis_${toDate}.xlsx`);
+      toast.success("Excel-Export erstellt.");
     } catch (e) {
       console.error("Excel-Export fehlgeschlagen", e);
-      toast.error("Excel-Export fehlgeschlagen: " + (e as Error).message);
+      // EX2-b — Formeltreue-Diagnosen müssen lesbar stehen bleiben.
+      toast.error("Excel-Export fehlgeschlagen: " + (e as Error).message, { duration: 15000 });
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -228,8 +242,12 @@ function KasseSaldoPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" disabled={rows.length === 0} onClick={handleExport}>
-            Export Excel
+          <Button
+            variant="outline"
+            disabled={rows.length === 0 || exporting}
+            onClick={handleExport}
+          >
+            {exporting ? "Exportiere…" : "Export Excel"}
           </Button>
         </div>
       </div>
@@ -266,7 +284,12 @@ function KasseSaldoPage() {
                   <TableHead className="text-right px-2 py-2 text-xs">Off. RE</TableHead>
                   <TableHead className="text-right px-2 py-2 text-xs">Vorsch.</TableHead>
                   <TableHead className="text-right px-2 py-2 text-xs">Ausg.</TableHead>
-                  <TableHead className="text-right px-2 py-2 text-xs">Bargeld</TableHead>
+                  <TableHead
+                    className="text-right px-2 py-2 text-xs"
+                    title="Betriebs-Bargeld ohne sonstige Einnahmen (diese werden unterhalb der Tabelle separat ausgewiesen). Die Kassen-Kontrolle zeigt bewusst inkl. sonstiger Einnahmen."
+                  >
+                    Bargeld (o. sonst. Einn.)
+                  </TableHead>
                   <TableHead className="text-right px-2 py-2 text-xs">TG-Rest</TableHead>
                 </TableRow>
               </TableHeader>
@@ -314,8 +337,8 @@ function KasseSaldoPage() {
                     <TableCell className="text-right tabular-nums whitespace-nowrap px-2 py-1.5 text-xs">
                       {fmtEuro(r.expensesCents)}
                     </TableCell>
-                    <TableCell className={bargeldClass(r.bargeldCents)}>
-                      {fmtEuro(r.bargeldCents)}
+                    <TableCell className={bargeldClass(betriebsBargeldCents(r))}>
+                      {fmtEuro(betriebsBargeldCents(r))}
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap px-2 py-1.5 text-xs">
                       {fmtEuro(r.tipRemainderCents)}
@@ -373,6 +396,13 @@ function KasseSaldoPage() {
                 </TableRow>
               </TableFooter>
             </Table>
+            <div className="border-t px-2 py-3 text-xs text-muted-foreground">
+              Sonstige Einnahmen: {fmtEuro(totals.sonstige)} ({totals.sonstigeTage}{" "}
+              {totals.sonstigeTage === 1 ? "Tag" : "Tage"}) — nicht in der Bargeld-Spalte enthalten;
+              die Kassen-Kontrolle zeigt sie bewusst inklusive.
+              <br />
+              Einzahlung gesamt: {fmtEuro(totals.bargeld + totals.sonstige)}
+            </div>
           </div>
         )}
       </Card>

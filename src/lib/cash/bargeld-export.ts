@@ -32,6 +32,11 @@ const HEADERS = [
  * Vorlagen-Formel über die eigenen Zeilenspalten entsprechen. Keine neue
  * Rechenlogik — nur Absicherung, dass Spaltenauswahl und Bargeld
  * zusammenpassen.
+ *
+ * EX2-b (04.08.) — Sonstige Einnahmen sind bar und im gespeicherten Tages-
+ * Bargeld enthalten (Tagesabrechnung bleibt so). Für Bank/Export wird das
+ * BETRIEBS-Bargeld gezeigt: bargeld − sonstige Einnahmen. Sonstige Einnahmen
+ * erscheinen unten als eigener Block.
  */
 export function bargeldFromRowCents(r: CashDailyRow): number {
   return (
@@ -49,13 +54,20 @@ export function bargeldFromRowCents(r: CashDailyRow): number {
   );
 }
 
+/** Betriebs-Bargeld der Tageszeile (ohne sonstige Einnahmen). */
+export function betriebsBargeldCents(r: CashDailyRow): number {
+  return r.bargeldCents - r.sonstigeEinnahmeCents;
+}
+
 export function assertBargeldFormula(rows: CashDailyRow[], sheetName: string): void {
   for (const r of rows) {
     const expected = bargeldFromRowCents(r);
-    if (expected !== r.bargeldCents) {
+    const actual = betriebsBargeldCents(r);
+    if (expected !== actual) {
       throw new Error(
         `Formeltreue verletzt (${sheetName}, ${r.businessDate}): Spalten ergeben ${expected} Cent, ` +
-          `Bargeld ist ${r.bargeldCents} Cent.`,
+          `Betriebs-Bargeld ist ${actual} Cent (Bargeld ${r.bargeldCents} − sonstige Einnahmen ` +
+          `${r.sonstigeEinnahmeCents}).`,
       );
     }
   }
@@ -97,12 +109,13 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
         money(r.openInvoicesCents),
         money(r.vorschussCents),
         money(r.expensesCents),
-        money(r.bargeldCents),
+        money(betriebsBargeldCents(r)),
       ]);
     }
     const lastDataRow = firstDataRow + sheet.rows.length - 1;
 
     const sumRow = ws.addRow(["summe"]);
+    const sumRowNumber = sumRow.number;
     if (sheet.rows.length > 0) {
       for (let col = 2; col <= HEADERS.length; col++) {
         const letter = ws.getColumn(col).letter;
@@ -112,6 +125,33 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
       }
     }
     sumRow.font = { bold: true };
+
+    // EX2-b — Herkunftstrennung: sonstige Einnahmen unten extra ausgewiesen.
+    const bargeldLetter = ws.getColumn(HEADERS.length).letter;
+    const sonstige = sheet.rows.filter((r) => r.sonstigeEinnahmeCents !== 0);
+    ws.addRow([]);
+    const blockHeader = ws.addRow(["sonstige einnahmen"]);
+    blockHeader.font = { bold: true };
+    const firstSonstigeRow = blockHeader.number + 1;
+    for (const r of sonstige) {
+      const row = ws.addRow([isoToDate(r.businessDate)]);
+      row.getCell(HEADERS.length).value = money(r.sonstigeEinnahmeCents);
+    }
+    const lastSonstigeRow = firstSonstigeRow + sonstige.length - 1;
+    const sonstigeSumRow = ws.addRow(["summe sonstige einnahmen"]);
+    sonstigeSumRow.getCell(HEADERS.length).value =
+      sonstige.length > 0
+        ? {
+            formula: `SUM(${bargeldLetter}${firstSonstigeRow}:${bargeldLetter}${lastSonstigeRow})`,
+          }
+        : 0;
+    sonstigeSumRow.font = { bold: true };
+
+    const totalRow = ws.addRow(["einzahlung gesamt"]);
+    totalRow.getCell(HEADERS.length).value = {
+      formula: `${bargeldLetter}${sumRowNumber}+${bargeldLetter}${sonstigeSumRow.number}`,
+    };
+    totalRow.font = { bold: true };
 
     for (let col = 2; col <= HEADERS.length; col++) {
       ws.getColumn(col).numFmt = '#,##0.00 "€"';

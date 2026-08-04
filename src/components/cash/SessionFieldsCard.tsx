@@ -12,6 +12,7 @@ import { AdvanceForm } from "./AdvanceForm";
 import { ExpenseForm } from "./ExpenseForm";
 import { CashSummaryBlock } from "./CashSummaryBlock";
 import { ExcelSectionHeader, ExcelInputRow, ExcelReadonlyRow } from "./ExcelRows";
+import { isSessionFieldEnabled } from "@/lib/cash/session-fields";
 
 type UpdatePayload = {
   channelAmounts: { channelId: string; amountCents: number }[];
@@ -140,6 +141,8 @@ export function SessionFieldsCard({
   };
 
   const [chRows, setChRows] = useState<Row[]>(initialChannels);
+  // FS1: Feld-Sichtbarkeit am Standort — eine Wahrheit für Maske und Payload.
+  const finedineEnabled = isSessionFieldEnabled("finedine", disabledSessionFields);
   const [tmRows, setTmRows] = useState<TerminalRow[]>(initialTerminals);
   const [misc, setMisc] = useState<Misc>(initialMisc);
   const [saving, setSaving] = useState(false);
@@ -198,12 +201,11 @@ export function SessionFieldsCard({
       gcParsed < 0
     )
       return null;
-    return {
+    const payload: UpdatePayload = {
       channelAmounts: chAmts,
       terminalAmounts: tmAmts,
       vouchersSoldCents: vs,
       vouchersRedeemedCents: vr,
-      finedineVouchersCents: fv,
       vorschussCents: vo,
       einladungCents: ei,
       vectronDailyTotalCents: ve,
@@ -211,6 +213,10 @@ export function SessionFieldsCard({
       guestCount: gcParsed,
       notes: misc.notes.trim() === "" ? null : misc.notes,
     };
+    // FS1: deaktiviertes Feld wird WEGGELASSEN (nicht 0) — der Server lässt
+    // den Bestandswert unangetastet.
+    if (finedineEnabled) payload.finedineVouchersCents = fv;
+    return payload;
   }
 
   async function handleSave() {
@@ -463,7 +469,7 @@ export function SessionFieldsCard({
                 disabled={!writable}
                 onChange={(v) => setMisc({ ...misc, vouchersRedeemed: v })}
               />
-              {locationName !== "YUM" && (
+              {finedineEnabled && (
                 <ExcelInputRow
                   label="Finedine-Gutscheine"
                   value={misc.finedineVouchers}

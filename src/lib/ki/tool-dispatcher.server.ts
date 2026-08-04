@@ -750,7 +750,7 @@ async function kasseTagesabschluss(ctx: ToolContext, input: Record<string, unkno
   let sq = ctx.admin
     .from("sessions")
     .select(
-      "id, business_date, location_id, guest_count, vectron_daily_total_cents, vouchers_sold_cents, vouchers_redeemed_cents, einladung_cents, sonstige_einnahme_cents, opening_balance_cents, cash_actual_cents",
+      "id, business_date, location_id, guest_count, vectron_daily_total_cents, vouchers_sold_cents, vouchers_redeemed_cents, einladung_cents, opening_balance_cents, cash_actual_cents",
     )
     .eq("organization_id", ctx.organizationId)
     .gte("business_date", from)
@@ -801,15 +801,28 @@ async function kasseTagesabschluss(ctx: ToolContext, input: Record<string, unkno
   let vouchersSold = 0;
   let vouchersRedeemed = 0;
   let einladung = 0;
-  let sonstige = 0;
   for (const s of sessions) {
     guests += Number(s.guest_count ?? 0);
     vectron += Number(s.vectron_daily_total_cents ?? 0);
     vouchersSold += Number(s.vouchers_sold_cents ?? 0);
     vouchersRedeemed += Number(s.vouchers_redeemed_cents ?? 0);
     einladung += Number(s.einladung_cents ?? 0);
-    sonstige += Number(s.sonstige_einnahme_cents ?? 0);
   }
+  // SE1: sonstige Einnahmen kommen aus der Positionsliste, nicht mehr aus der
+  // Session-Spalte.
+  const otherIncomes = await (async () => {
+    if (ids.length === 0) return 0;
+    const { otherIncomesTable } = await import("@/lib/cash/other-incomes-access");
+    const { data, error: e } = await otherIncomesTable(ctx.admin)
+      .select("amount_cents")
+      .eq("organization_id", ctx.organizationId)
+      .in("session_id", ids);
+    if (e) throw new Error(e.message);
+    let total = 0;
+    for (const r of data ?? []) total += Number(r.amount_cents ?? 0);
+    return total;
+  })();
+  const sonstige = otherIncomes;
 
   return {
     range: { from, to },

@@ -7,14 +7,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash } from "node:crypto";
 import { buildRosterIcs, type RosterIcsEvent } from "@/lib/calendar/roster-ics";
+import { buildAbsenceIcsEvents } from "@/lib/calendar/absence-ics";
 import { poolLocalTimeToIso } from "@/lib/cash/pool-time-writeback";
 import { mergeAbsenceRanges } from "@/lib/roster/vacation-planner";
 import { todayIso } from "@/lib/format";
-import {
-  ABSENCE_TYPE_FILTER,
-  absenceBlockingType,
-  normalizeAbsenceType,
-} from "@/lib/roster/absence-types";
+import { ABSENCE_TYPE_FILTER } from "@/lib/roster/absence-types";
 
 function notFound(): Response {
   return new Response("Not found", {
@@ -165,28 +162,14 @@ export const Route = createFileRoute("/api/public/calendar/$token")({
           .gte("date", windowStart)
           .lte("date", windowEnd);
         if (absErr) return notFound();
-        // UB1: unbezahlter Urlaub erscheint im Feed als Urlaub.
-        const byType = new Map<"urlaub" | "krank", string[]>();
-        for (const a of absences ?? []) {
-          const t = absenceBlockingType(normalizeAbsenceType(a.type));
-          const arr = byType.get(t) ?? [];
-          arr.push(a.date as string);
-          byType.set(t, arr);
-        }
-        for (const [type, dates] of byType) {
-          const summary = type === "urlaub" ? "Urlaub" : "Krank";
-          for (const range of mergeAbsenceRanges(dates)) {
-            const endExclusive = shiftIso(range.end, 1);
-            events.push({
-              uid: `absence-${type}-${staffId}-${range.start}@coco`,
-              summary,
-              location: "",
-              allDay: true,
-              date: range.start,
-              endDateExclusive: endExclusive,
-            });
-          }
-        }
+        // UB1-ICS: je ECHTEM Typ ein Event — "Urlaub (unbezahlt)" ist im
+        // Feed über SUMMARY und CATEGORIES eindeutig erkennbar.
+        events.push(
+          ...buildAbsenceIcsEvents(
+            (absences ?? []).map((a) => ({ date: a.date as string, type: a.type })),
+            staffId,
+          ),
+        );
 
         const ics = buildRosterIcs({ calendarName: "COCO Dienstplan", events });
         return new Response(ics, {

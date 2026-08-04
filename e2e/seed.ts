@@ -22,6 +22,7 @@
 // aus der E2E-Suite ausgeschlossen (Lektion "thaitime").
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHash, randomBytes } from "node:crypto";
 
 const PASSWORD = process.env.E2E_PASSWORD ?? "Test-Password-123!";
 

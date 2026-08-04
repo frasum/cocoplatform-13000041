@@ -99,9 +99,10 @@ export function TelegramTagesberichtSection({ canEdit }: { canEdit: boolean }) {
       if ("skipped" in res) {
         setMsg(`Testbericht übersprungen: ${res.skipped}.`);
       } else {
-        setMsg(
-          `Testbericht: ${res.recipientsDelivered} von ${res.recipientsTotal} Empfängern zugestellt (${res.locationsTotal} Standorte, Bericht für ${res.businessDate}).`,
-        );
+        const base = `Testbericht: ${res.recipientsDelivered} von ${res.recipientsTotal} Empfängern zugestellt (${res.locationsTotal} Standorte, Bericht für ${res.businessDate}).`;
+        // TG4 — Ursache direkt im UI, damit der Grund ohne Sentry sichtbar ist.
+        const reasons = res.failures.map((f) => `${f.recipient}: ${f.reason}`).join("; ");
+        setMsg(reasons ? `${base} Zustellung fehlgeschlagen: ${reasons}` : base);
       }
       setErr(null);
     },

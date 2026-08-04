@@ -1425,7 +1425,9 @@ const updateSessionSchema = z.object({
   // Cutover-Mapping verifiziert (§88, N15b).
   vorschussCents: z.number().int().default(0),
   einladungCents: z.number().int().default(0),
-  sonstigeEinnahmeCents: z.number().int().default(0),
+  // SE1 (04.08.): „Sonstige Einnahme" ist kein Session-Feld mehr, sondern eine
+  // Positionsliste (session_other_incomes) wie Ausgaben/Vorschüsse. Die
+  // DB-Spalte `sessions.sonstige_einnahme_cents` wird nicht mehr beschrieben.
   vectronDailyTotalCents: z.number().int().optional(),
   cashActualCents: z.number().int().nullable().optional(),
   guestCount: z.number().int().nonnegative().default(0),
@@ -1478,7 +1480,6 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
         finedine_vouchers_cents: data.finedineVouchersCents,
         vorschuss_cents: data.vorschussCents,
         einladung_cents: data.einladungCents,
-        sonstige_einnahme_cents: data.sonstigeEinnahmeCents,
         vectron_daily_total_cents: data.vectronDailyTotalCents ?? 0,
         cash_actual_cents: data.cashActualCents ?? null,
         guest_count: data.guestCount,

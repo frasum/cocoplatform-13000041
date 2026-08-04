@@ -815,7 +815,10 @@ function KassePage() {
                           Ø Umsatz / Gast
                         </div>
                         <div className="mt-1 font-mono text-2xl font-semibold">
-                          {perGuestCents == null ? "–" : fmtCents(perGuestCents)}
+                          {perGuestCents == null
+                            ? "–"
+                            : // KA2: kaufmännisch auf ganze Euro gerundet (wie Umsatz/Std).
+                              Math.round(perGuestCents / 100).toLocaleString("de-DE")}
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
                           {guests > 0 ? `${guests} Gäste` : "Gästeanzahl fehlt"}

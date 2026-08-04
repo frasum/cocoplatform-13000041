@@ -1850,6 +1850,7 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           delivery_notes: string | null
+          disabled_session_fields: string[]
           enabled_service_periods: string[]
           geocoded_address: string | null
           geocoded_at: string | null
@@ -1883,6 +1884,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           delivery_notes?: string | null
+          disabled_session_fields?: string[]
           enabled_service_periods?: string[]
           geocoded_address?: string | null
           geocoded_at?: string | null
@@ -1916,6 +1918,7 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           delivery_notes?: string | null
+          disabled_session_fields?: string[]
           enabled_service_periods?: string[]
           geocoded_address?: string | null
           geocoded_at?: string | null
@@ -3838,6 +3841,48 @@ export type Database = {
           },
           {
             foreignKeyName: "session_expenses_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_other_incomes: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          description: string
+          id: string
+          organization_id: string
+          session_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          description: string
+          id?: string
+          organization_id: string
+          session_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          description?: string
+          id?: string
+          organization_id?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_other_incomes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_other_incomes_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"

@@ -9,7 +9,6 @@ import { createHash } from "node:crypto";
 import { buildRosterIcs, type RosterIcsEvent } from "@/lib/calendar/roster-ics";
 import { buildAbsenceIcsEvents } from "@/lib/calendar/absence-ics";
 import { poolLocalTimeToIso } from "@/lib/cash/pool-time-writeback";
-import { mergeAbsenceRanges } from "@/lib/roster/vacation-planner";
 import { todayIso } from "@/lib/format";
 import { ABSENCE_TYPE_FILTER } from "@/lib/roster/absence-types";
 

@@ -366,6 +366,11 @@ export type E2EUnpaidLeaveSeed = {
   migrationError: string | null;
   /** Zählt die tatsächlich gespeicherten `urlaub_unbezahlt`-Tage dieser Org. */
   countStoredUnpaidDays: () => Promise<{ count: number; error: string | null }>;
+  /**
+   * Ändert den Abwesenheitstyp EINES Tages (für Prüfungen bei geänderter
+   * Zahlenlage). Wirft, wenn die Änderung nicht gespeichert werden kann.
+   */
+  setAbsenceType: (date: string, type: "urlaub" | "krank" | "urlaub_unbezahlt") => Promise<void>;
   cleanup: () => Promise<void>;
 };
 
@@ -555,6 +560,19 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
     return { count: count ?? 0, error: null };
   };
 
+  const setAbsenceType = async (
+    date: string,
+    type: "urlaub" | "krank" | "urlaub_unbezahlt",
+  ): Promise<void> => {
+    const { error } = await svc
+      .from("roster_absence")
+      .update({ type })
+      .eq("organization_id", orgId)
+      .eq("staff_id", worker.staffId)
+      .eq("date", date);
+    if (error) throw new Error(`roster_absence update (${date} → ${type}) failed: ${error.message}`);
+  };
+
   const cleanup = async () => {
     await svc.from("audit_log").delete().eq("organization_id", orgId);
     await svc.from("roster_absence").delete().eq("organization_id", orgId);
@@ -589,6 +607,7 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
     unpaidLeaveSupported,
     migrationError,
     countStoredUnpaidDays,
+    setAbsenceType,
     cleanup,
   };
 }

@@ -570,7 +570,8 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
       .eq("organization_id", orgId)
       .eq("staff_id", worker.staffId)
       .eq("date", date);
-    if (error) throw new Error(`roster_absence update (${date} → ${type}) failed: ${error.message}`);
+    if (error)
+      throw new Error(`roster_absence update (${date} → ${type}) failed: ${error.message}`);
   };
 
   const cleanup = async () => {

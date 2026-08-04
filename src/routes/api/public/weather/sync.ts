@@ -27,9 +27,8 @@ export const Route = createFileRoute("/api/public/weather/sync")({
           return new Response("Unauthorized", { status: 401 });
         }
 
-        const { listAllOrganizationIds, runWeatherSyncForOrgs } = await import(
-          "@/lib/weather/weather-sync.server"
-        );
+        const { listAllOrganizationIds, runWeatherSyncForOrgs } =
+          await import("@/lib/weather/weather-sync.server");
         const orgIds = await listAllOrganizationIds();
         const results = await runWeatherSyncForOrgs(orgIds);
         return Response.json({ ok: true, results });

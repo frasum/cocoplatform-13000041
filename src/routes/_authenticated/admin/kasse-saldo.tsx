@@ -280,7 +280,12 @@ function KasseSaldoPage() {
                   <TableHead className="text-right px-2 py-2 text-xs">Off. RE</TableHead>
                   <TableHead className="text-right px-2 py-2 text-xs">Vorsch.</TableHead>
                   <TableHead className="text-right px-2 py-2 text-xs">Ausg.</TableHead>
-                  <TableHead className="text-right px-2 py-2 text-xs">Bargeld</TableHead>
+                  <TableHead
+                    className="text-right px-2 py-2 text-xs"
+                    title="Betriebs-Bargeld ohne sonstige Einnahmen (diese werden unterhalb der Tabelle separat ausgewiesen). Die Kassen-Kontrolle zeigt bewusst inkl. sonstiger Einnahmen."
+                  >
+                    Bargeld (o. sonst. Einn.)
+                  </TableHead>
                   <TableHead className="text-right px-2 py-2 text-xs">TG-Rest</TableHead>
                 </TableRow>
               </TableHeader>
@@ -328,8 +333,8 @@ function KasseSaldoPage() {
                     <TableCell className="text-right tabular-nums whitespace-nowrap px-2 py-1.5 text-xs">
                       {fmtEuro(r.expensesCents)}
                     </TableCell>
-                    <TableCell className={bargeldClass(r.bargeldCents)}>
-                      {fmtEuro(r.bargeldCents)}
+                    <TableCell className={bargeldClass(betriebsBargeldCents(r))}>
+                      {fmtEuro(betriebsBargeldCents(r))}
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap px-2 py-1.5 text-xs">
                       {fmtEuro(r.tipRemainderCents)}

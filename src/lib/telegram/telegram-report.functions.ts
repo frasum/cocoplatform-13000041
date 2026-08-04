@@ -24,6 +24,7 @@ export type TelegramReportSettings = {
   hour: number;
   flags: {
     umsatz: boolean;
+    umsatzStd: boolean;
     gaeste: boolean;
     kontrolle: boolean;
     kellner: boolean;
@@ -38,6 +39,8 @@ export type TelegramReportSettings = {
 
 const flagsSchema = z.object({
   umsatz: z.boolean(),
+  // TG5-b — fehlendes Flag ⇒ true (bestehende Konfigurationen behalten die Kennzahl).
+  umsatzStd: z.boolean().default(true),
   gaeste: z.boolean(),
   kontrolle: z.boolean(),
   kellner: z.boolean(),
@@ -82,6 +85,7 @@ export const getTelegramReportSettings = createServerFn({ method: "GET" })
     const rawFlags = (s?.telegram_report_flags ?? {}) as Record<string, unknown>;
     const flags = {
       umsatz: rawFlags.umsatz !== false,
+      umsatzStd: rawFlags.umsatzStd !== false,
       gaeste: rawFlags.gaeste !== false,
       kontrolle: rawFlags.kontrolle !== false,
       kellner: rawFlags.kellner !== false,

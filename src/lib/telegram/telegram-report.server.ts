@@ -85,7 +85,15 @@ function parseFlags(raw: unknown): ReportFlags {
   const flags: ReportFlags = { ...DEFAULT_REPORT_FLAGS, excludedLocationIds: [] };
   if (!raw || typeof raw !== "object") return flags;
   const r = raw as Record<string, unknown>;
-  for (const key of ["umsatz", "gaeste", "kontrolle", "kellner", "kueche", "notizen"] as const) {
+  for (const key of [
+    "umsatz",
+    "umsatzStd",
+    "gaeste",
+    "kontrolle",
+    "kellner",
+    "kueche",
+    "notizen",
+  ] as const) {
     if (typeof r[key] === "boolean") flags[key] = r[key] as boolean;
   }
   if (Array.isArray(r.excludedLocationIds)) {

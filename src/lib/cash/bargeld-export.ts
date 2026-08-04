@@ -70,6 +70,15 @@ export function assertBargeldFormula(rows: CashDailyRow[], sheetName: string): v
           `${r.sonstigeEinnahmeCents}).`,
       );
     }
+    // SE1: Die Positionsliste MUSS die ausgewiesene Summe ergeben — sonst
+    // stimmt der Block „sonstige einnahmen" nicht mit der Einzahlung überein.
+    const positionsSum = r.otherIncomes.reduce((s, o) => s + o.amountCents, 0);
+    if (positionsSum !== r.sonstigeEinnahmeCents) {
+      throw new Error(
+        `Formeltreue verletzt (${sheetName}, ${r.businessDate}): Positionen der sonstigen ` +
+          `Einnahmen ergeben ${positionsSum} Cent, ausgewiesen sind ${r.sonstigeEinnahmeCents} Cent.`,
+      );
+    }
   }
 }
 
@@ -126,16 +135,19 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
     }
     sumRow.font = { bold: true };
 
-    // EX2-b — Herkunftstrennung: sonstige Einnahmen unten extra ausgewiesen.
+    // EX2-b/SE1 — Herkunftstrennung: sonstige Einnahmen unten extra
+    // ausgewiesen, je POSITION eine Zeile (Datum · Beschreibung · Betrag).
     const bargeldLetter = ws.getColumn(HEADERS.length).letter;
-    const sonstige = sheet.rows.filter((r) => r.sonstigeEinnahmeCents !== 0);
+    const sonstige = sheet.rows.flatMap((r) =>
+      r.otherIncomes.map((o) => ({ businessDate: r.businessDate, ...o })),
+    );
     ws.addRow([]);
     const blockHeader = ws.addRow(["sonstige einnahmen"]);
     blockHeader.font = { bold: true };
     const firstSonstigeRow = blockHeader.number + 1;
-    for (const r of sonstige) {
-      const row = ws.addRow([isoToDate(r.businessDate)]);
-      row.getCell(HEADERS.length).value = money(r.sonstigeEinnahmeCents);
+    for (const p of sonstige) {
+      const row = ws.addRow([isoToDate(p.businessDate), p.description]);
+      row.getCell(HEADERS.length).value = money(p.amountCents);
     }
     const lastSonstigeRow = firstSonstigeRow + sonstige.length - 1;
     const sonstigeSumRow = ws.addRow(["summe sonstige einnahmen"]);

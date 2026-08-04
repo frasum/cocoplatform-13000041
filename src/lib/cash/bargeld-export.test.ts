@@ -63,7 +63,7 @@ describe("buildBargeldXlsx", () => {
   it("erzeugt einen nicht-leeren Blob mit einem Blatt je Standort", async () => {
     const blob = await buildBargeldXlsx([
       { locationName: "spicery", rows: [july01, july02], channelKinds: SPICERY_KINDS },
-      { locationName: "YUM", rows: [july01], channelKinds: YUM_KINDS },
+      { locationName: "YUM", rows: [july01], channelKinds: SPICERY_KINDS },
     ]);
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.size).toBeGreaterThan(0);

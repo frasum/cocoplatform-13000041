@@ -61,7 +61,12 @@ import { LocationPills } from "@/components/shared/LocationPills";
 import { parseEuroToCents } from "@/lib/cash/kasse-helpers";
 import { SettlementWarningsBanner } from "@/components/cash/SettlementWarningsBanner";
 import type { OpenInvoiceEntry } from "@/lib/cash/open-invoices";
-import { sessionHouseCentsFromKasse } from "@/lib/statistics/revenue-core";
+import {
+  decomposeRevenue,
+  derivedKpis,
+  sessionHouseCentsFromKasse,
+} from "@/lib/statistics/revenue-core";
+import { getCashDayWorkMinutes } from "@/lib/cash/day-work-minutes.functions";
 import { resolveChannelKind } from "@/lib/cash/session-channels";
 
 // Übersetzt die Roheingabe aus dem Korrektur-/Anlage-Dialog in

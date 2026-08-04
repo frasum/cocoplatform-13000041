@@ -613,7 +613,13 @@ export function SessionFieldsCard({
                   ))}
                 </ul>
               )}
-              {writable && <ExpenseForm writable={writable} onAdd={onAddOtherIncome} />}
+              {writable && (
+                <ExpenseForm
+                  writable={writable}
+                  onAdd={onAddOtherIncome}
+                  submitLabel="Einnahme hinzufügen"
+                />
+              )}
             </div>
           </div>
 

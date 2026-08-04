@@ -54,16 +54,25 @@ export function rollOperativeDeficitCents(rawBargeldByDayCents: number[]): numbe
  * - diff = TagesBargeld + min(0, Vortagsdefizit)
  * - Tresor = max(0, diff)
  * - Wechselgeldbestand = Soll + min(0, diff)
+ * - diffToTargetSignedCents = UNGEKAPPTE, vorzeichenbehaftete Differenz zum
+ *   Soll-Bestand (WG1). Die Bestands-Kappung bleibt unverändert (Überschuss
+ *   wandert in den Tresor); nur die Anzeige-Differenz ist beidseitig ehrlich.
  */
 export function computeWechselgeld(args: {
   tagesBargeldCents: number;
   previousDeficitCents: number;
   cashTargetCents: number;
-}): { diffCents: number; tresorCents: number; wechselgeldbestandCents: number } {
+}): {
+  diffCents: number;
+  tresorCents: number;
+  wechselgeldbestandCents: number;
+  diffToTargetSignedCents: number;
+} {
   const diff = args.tagesBargeldCents + Math.min(0, args.previousDeficitCents);
   return {
     diffCents: diff,
     tresorCents: Math.max(0, diff),
     wechselgeldbestandCents: args.cashTargetCents + Math.min(0, diff),
+    diffToTargetSignedCents: diff,
   };
 }

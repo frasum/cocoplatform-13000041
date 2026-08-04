@@ -327,6 +327,9 @@ export function PersonalDetailsTab({ staffId, canEdit, canEditVacation }: Props)
             },
             { key: "vacation_days_taken", label: "Urlaub genommen", type: "number" },
           ],
+          // UB2 — Stand-Hinweis: die Kontofelder sind Grundlage des
+          // Aufteilungs-Vorschlags (bezahlt/unbezahlt), aber nicht führend.
+          note: "Urlaubskonto wird manuell gepflegt — führend ist edlohn.",
         },
       ] as const,
     [],

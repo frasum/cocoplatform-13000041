@@ -201,6 +201,10 @@ function KasseSaldoPage() {
           locationName: loc.name,
           rows: locRows,
           channelKinds: new Set(channels.map((c) => c.kind)),
+          // FS1: Session-Feld-Spalten folgen der Standort-Konfiguration
+          // (historische Werte erscheinen weiterhin).
+          disabledSessionFields:
+            (loc as { disabledSessionFields?: string[] }).disabledSessionFields ?? [],
         });
       }
       if (sheets.length === 0) {

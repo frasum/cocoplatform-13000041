@@ -55,7 +55,6 @@ export function SessionFieldsCard({
   kpiSlot,
   previousDeficitCents,
   previousDeficitSourceDate,
-  locationName,
   tipRemainderCents,
   disabledSessionFields,
 }: {
@@ -97,7 +96,6 @@ export function SessionFieldsCard({
   kpiSlot?: React.ReactNode;
   previousDeficitCents: number;
   previousDeficitSourceDate: string | null;
-  locationName?: string;
   tipRemainderCents: number;
   /** FS1: am Standort deaktivierte Session-Felder (heute: 'finedine'). */
   disabledSessionFields?: string[];

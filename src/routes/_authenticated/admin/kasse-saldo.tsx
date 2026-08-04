@@ -23,8 +23,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getCashDailyBreakdown, type CashDailyRow } from "@/lib/cash/cash.functions";
-import { listRevenueChannels } from "@/lib/cash/cash.functions";
+import {
+  getCashDailyBreakdown,
+  listRevenueChannels,
+  type CashDailyRow,
+} from "@/lib/cash/cash.functions";
 import {
   buildBargeldXlsx,
   betriebsBargeldCents,
@@ -131,6 +134,7 @@ function KasseSaldoPage() {
   const hideFineDine = locationName.trim().toLowerCase() === "yum";
 
   const fetchBreakdown = useServerFn(getCashDailyBreakdown);
+  const fetchChannels = useServerFn(listRevenueChannels);
   const q = useQuery({
     queryKey: ["cash-daily-breakdown", fromDate, toDate, locationId],
     queryFn: () =>

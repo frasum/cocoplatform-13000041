@@ -68,8 +68,6 @@ async function readDiagnoseSplit(
   };
 }
 
-async function loginAsAdmin(page: Page, seed: E2EUnpaidLeaveSeed): Promise<void> {
-
 /** ICS-Zeilen entfalten (RFC 5545: Fortsetzung beginnt mit Space/Tab). */
 function unfoldIcs(raw: string): string[] {
   const lines = raw.split(/\r?\n/);

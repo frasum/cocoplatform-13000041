@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 04.08.2026 (§135: SM1 Sourcemaps; ZS1 Overlap-Guard + Plan-Abgleich; Lohnbüro-Antworten Ursula/TSB; §134: Merkposten-Statusliste mit Status je Punkt)
+Stand: 04.08.2026 (§136: A0 eröffnet; UB1/UB2 unbezahlter Urlaub; TG4/TG5 Telegram; DB-CI entdeckt; ZS1-Nachtaufräumen; §135: SM1 Sourcemaps, ZS1 Overlap-Guard, Lohnbüro-Antworten)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -5040,3 +5040,25 @@ PB3 · KM1 · TB1 · 034/035 · AV1b/c-Rest · Stk/BE · DL1 · AP1 · Kanal-/Te
 **Offene Merkposten:** wie §134, **MINUS** Ursula-Export-Frage, **MINUS** TSB-Personalgestellung, **PLUS** GERARD-Auflösung (drei Fragen) · Sentry-Build-Secrets (falls ausstehend) · Aufräum-Nachweis EH-Duplikat
 
 **SUMITR-Eintrag** (Bauherr, Zeit-Übersicht). **Kritischer Pfad:** August-Export **Block A0** — Abwesenheiten August erfassen, Export-Entwurf an den Prüfer.
+
+## §136 — Block A0, Urlaubs-Systematik, Telegram-Ausbau (04.08.)
+
+**Nachzug-Situation:** wie §135 — dieses Dokument enthält keinen §137-Abschnitt, daher steht §136 hier nach §135 am Dateiende.
+
+**Abnahme-Anker:** `90bb6a20` (vier Gates grün, vitest 2474) und `26bbb751` (vier Gates grün, vitest 2478, 0 Skips).
+
+**Nacht-Aufräumen (Fall-1-SQL, Rest-Check belegt):** EH #101-Duplikat (zwei identische 15:00–23:30 am 03.08.) und SUMITR #109-Geistereintrag per SQL entfernt — jüngere Zeile, Schutzbedingung `source <> 'clock'`; Rest-Check exakt eine verbleibende EH-Zeile. Der ZS1-Guard verhindert Neuauflagen; **OFFEN:** warum die UI das Löschen verweigerte (Bauherren-Antwort ausstehend — ein Wort: Knopf fehlt / ausgegraut / Fehler). Telegram-Tagesbericht 07:05 „keine einzige Zustellung": manuelles „Jetzt senden" funktionierte ⇒ transient; Fall zu.
+
+**Block A0 ERÖFFNET (August-Export-Sichtkontrolle):** Kalender-Befund (CSV): EUROPE 01.–03.08. U · JOY 02.08. K (1 Tag — AU-Frage offen) · LAM #320 und NET #27 je GANZER August U · SAA 10.–15.08. U. Bauherr bestätigt: Liste **VOLLSTÄNDIG** (kein Sumit-Nachtrag). LAM/NET sind **TEILWEISE UNBEZAHLT** — die Aufteilung bezahlt/unbezahlt je Person ist der **A0-Engpass** (Stammblatt-Konto oder Lohnbüro; danach Mail ans Lohnbüro mit den unbezahlten Zeiträumen). `lohn_absence_days` August/Juli LEER = **kein Fehler**: UK2-Bestätigung ist der A0-Arbeitsschritt; Juli lief ohne (Δ 0,00 gegen edlohn, keine Rückwärts-Befüllung). **Datenfluss dokumentiert:** `roster_absence` (Kalender) → 13-Wochen-Diagnose (Vorschlag) → `lohn_absence_days` (bestätigte Zähltage).
+
+**UB1 (`9abc8ed3` + Migration `20260804090228`) — Typ `urlaub_unbezahlt`:** Kalender-Option, eigenes Badge, Dienstplan blockt wie Urlaub, Diagnose zählt ihn **NICHT** als bezahlte U-Tage (separater Ausweis). **§119-BLOCKER dokumentiert:** Die Migrationsdatei fehlte in der Erstlieferung (Code scharf, DB-CHECK alt — Constraint-Fehler bei Nutzung); Prüfer stoppte die Freigabe, UB1-b lieferte die Datei nach (wortgleich, idempotent, Constraint-Kommentar), Bauherr führte aus — `pg_get_constraintdef`-Beleg: `urlaub_unbezahlt` im CHECK. **Lehre verstärkt:** Schemaänderung ist erst **mit DATEI** fertig; Prüfer checkt Migrations-Verbleib künftig VOR der Gate-Messung.
+
+**UB2 (`a7cade6f`) — Urlaubskonto-Vorschlag:** `vacation-balance.ts` (`available = previous + current − taken`, `null` bei ungepflegtem Konto — kein 0-Fake) + `splitVacationProposal`; UK2-Maske zeigt „X bezahlt / Y unbezahlt", Ein-Klick-Übernahme stellt Kalendertage um (admin/payroll, Audit). **Kein Auto-Lauf**; edlohn führt das offizielle Konto. Stammblatt-Konto (`vacation_days_*`) als Datenbasis, manuell gepflegt.
+
+**TG4 (`d6653204`):** Zustellfehler je Empfänger mit Ursache (HTTP-Status + description, Chat-IDs maskiert) — Sentry-Kontext + UI-Anzeige beim manuellen Senden; Teilausfälle als Warnung. **TG5 (`4224bcbe`) + TG5-b (`26bbb751`):** €/Arbeitsstunde je Standort im Tagesbericht — **EINE Formelwahrheit** mit der Statistik-KPI (revenue-per-hour pure, 133 Testzeilen; Stunden 0 ⇒ „—"); eigene Inhalts-Checkbox „Umsatz/Std", Default AN auch für Bestand, serverseitig respektiert.
+
+**DB-Integrations-CI ENTDECKT:** GitHub-Actions-Job „db-integration" (229 DB-Tests gegen echte Supabase) — zusätzliche Prüfebene neben den vier Gates. **Rot-Fall aufgeklärt:** `lohn-rls-select.db.test` erwartete den ALTEN §42-Stand (manager liest Lohn); die bewusste §134-Verengung machte den Test veraltet — ZT1-c (`73ce9af9`) dreht die Erwartungen auf 0 Zeilen und aktualisiert die §-Referenzen. **Lehre:** RLS-Änderungen ziehen `db.tests` mit.
+
+**ICS-Direktrunden (gesichtet, gut):** Abwesenheits-Typfilter zentralisiert (`ABSENCE_TYPE_FILTER`), `buildAbsenceIcsEvents` ausgelagert und getestet, UID-Verifizierung, E2E — ohne diese Zentralisierung wäre `urlaub_unbezahlt` im Abo-Kalender unsichtbar geblieben.
+
+**Offene Merkposten:** wie §135, **MINUS** Telegram-Transient (zu), **PLUS** A0-Engpass LAM/NET-Aufteilung + Lohnbüro-Mail · JOYs AU-Frage · LAM/NET-Kalendertage auf `urlaub_unbezahlt` umstellen (nach Aufteilung) · UK2-Bestätigung je Person · ZS1-UI-Löschfrage · WG1 (Wechselgeld-Differenz signed, bei Lovable) · TG5-Sichtprüfung („Jetzt senden").

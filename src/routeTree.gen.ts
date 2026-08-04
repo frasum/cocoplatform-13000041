@@ -9,89 +9,83 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as DisplayLocationIdRouteImport } from './routes/display.$locationId'
-import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
-import { Route as AuthenticatedPasswortAendernRouteImport } from './routes/_authenticated/passwort-aendern'
-import { Route as AuthenticatedLohnRouteImport } from './routes/_authenticated/lohn'
-import { Route as AuthenticatedEasyorderRouteImport } from './routes/_authenticated/easyorder'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
-import { Route as AuthenticatedZeitIndexRouteImport } from './routes/_authenticated/zeit/index'
+import { Route as AuthenticatedEasyorderRouteImport } from './routes/_authenticated/easyorder'
+import { Route as AuthenticatedLohnRouteImport } from './routes/_authenticated/lohn'
+import { Route as AuthenticatedPasswortAendernRouteImport } from './routes/_authenticated/passwort-aendern'
+import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
+import { Route as DisplayLocationIdRouteImport } from './routes/display.$locationId'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
-import { Route as ApiExportDownloadRouteImport } from './routes/api/export/download'
-import { Route as AuthenticatedZeitWuenscheRouteImport } from './routes/_authenticated/zeit/wuensche'
-import { Route as AuthenticatedZeitUrlaubRouteImport } from './routes/_authenticated/zeit/urlaub'
-import { Route as AuthenticatedZeitTauschRouteImport } from './routes/_authenticated/zeit/tausch'
-import { Route as AuthenticatedZeitStundenRouteImport } from './routes/_authenticated/zeit/stunden'
-import { Route as AuthenticatedZeitStempelnRouteImport } from './routes/_authenticated/zeit/stempeln'
-import { Route as AuthenticatedZeitSchichtenRouteImport } from './routes/_authenticated/zeit/schichten'
-import { Route as AuthenticatedZeitKalenderRouteImport } from './routes/_authenticated/zeit/kalender'
-import { Route as AuthenticatedZeitAufgabenRouteImport } from './routes/_authenticated/zeit/aufgaben'
-import { Route as AuthenticatedZeitAbrechnungRouteImport } from './routes/_authenticated/zeit/abrechnung'
-import { Route as AuthenticatedAdminZeitUebersichtRouteImport } from './routes/_authenticated/admin/zeit-uebersicht'
-import { Route as AuthenticatedAdminWeinQuizRouteImport } from './routes/_authenticated/admin/wein-quiz'
-import { Route as AuthenticatedAdminWeinRouteImport } from './routes/_authenticated/admin/wein'
-import { Route as AuthenticatedAdminVerkaufsartikelRouteImport } from './routes/_authenticated/admin/verkaufsartikel'
-import { Route as AuthenticatedAdminUrlaubRouteImport } from './routes/_authenticated/admin/urlaub'
-import { Route as AuthenticatedAdminTrinkgeldRestRouteImport } from './routes/_authenticated/admin/trinkgeld-rest'
-import { Route as AuthenticatedAdminStatistikRouteImport } from './routes/_authenticated/admin/statistik'
-import { Route as AuthenticatedAdminStandortzeitenRouteImport } from './routes/_authenticated/admin/standortzeiten'
-import { Route as AuthenticatedAdminStaffRouteImport } from './routes/_authenticated/admin/staff'
-import { Route as AuthenticatedAdminPosVerkaufRouteImport } from './routes/_authenticated/admin/pos-verkauf'
-import { Route as AuthenticatedAdminPosStundenberichtRouteImport } from './routes/_authenticated/admin/pos-stundenbericht'
-import { Route as AuthenticatedAdminPosRennerPennerRouteImport } from './routes/_authenticated/admin/pos-renner-penner'
-import { Route as AuthenticatedAdminPersonalAntraegeRouteImport } from './routes/_authenticated/admin/personal-antraege'
-import { Route as AuthenticatedAdminMigrationRouteImport } from './routes/_authenticated/admin/migration'
-import { Route as AuthenticatedAdminLohnVerteilungRouteImport } from './routes/_authenticated/admin/lohn-verteilung'
-import { Route as AuthenticatedAdminLocationsRouteImport } from './routes/_authenticated/admin/locations'
-import { Route as AuthenticatedAdminKasseSaldoRouteImport } from './routes/_authenticated/admin/kasse-saldo'
-import { Route as AuthenticatedAdminKasseRouteImport } from './routes/_authenticated/admin/kasse'
-import { Route as AuthenticatedAdminImportZuordnungenRouteImport } from './routes/_authenticated/admin/import-zuordnungen'
-import { Route as AuthenticatedAdminImpersonateRouteImport } from './routes/_authenticated/admin/impersonate'
-import { Route as AuthenticatedAdminFragCocoRouteImport } from './routes/_authenticated/admin/frag-coco'
-import { Route as AuthenticatedAdminEinstellungenRouteImport } from './routes/_authenticated/admin/einstellungen'
-import { Route as AuthenticatedAdminDokumenteRouteImport } from './routes/_authenticated/admin/dokumente'
-import { Route as AuthenticatedAdminDienstplanRouteImport } from './routes/_authenticated/admin/dienstplan'
-import { Route as AuthenticatedAdminConfigCheckRouteImport } from './routes/_authenticated/admin/config-check'
-import { Route as AuthenticatedAdminBwaRouteImport } from './routes/_authenticated/admin/bwa'
-import { Route as AuthenticatedAdminBilanzRouteImport } from './routes/_authenticated/admin/bilanz'
-import { Route as AuthenticatedAdminBestellungRouteImport } from './routes/_authenticated/admin/bestellung'
-import { Route as AuthenticatedAdminBankkontoRouteImport } from './routes/_authenticated/admin/bankkonto'
-import { Route as AuthenticatedAdminAufgabenDisplayRouteImport } from './routes/_authenticated/admin/aufgaben-display'
 import { Route as AuthenticatedAdminAufgabenRouteImport } from './routes/_authenticated/admin/aufgaben'
-import { Route as AuthenticatedAdminStaffIndexRouteImport } from './routes/_authenticated/admin/staff.index'
-import { Route as AuthenticatedAdminEinstellungenIndexRouteImport } from './routes/_authenticated/admin/einstellungen.index'
+import { Route as AuthenticatedAdminAufgabenDisplayRouteImport } from './routes/_authenticated/admin/aufgaben-display'
+import { Route as AuthenticatedAdminBankkontoRouteImport } from './routes/_authenticated/admin/bankkonto'
+import { Route as AuthenticatedAdminBestellungRouteImport } from './routes/_authenticated/admin/bestellung'
+import { Route as AuthenticatedAdminBilanzRouteImport } from './routes/_authenticated/admin/bilanz'
+import { Route as AuthenticatedAdminBwaRouteImport } from './routes/_authenticated/admin/bwa'
+import { Route as AuthenticatedAdminConfigCheckRouteImport } from './routes/_authenticated/admin/config-check'
+import { Route as AuthenticatedAdminDienstplanRouteImport } from './routes/_authenticated/admin/dienstplan'
+import { Route as AuthenticatedAdminDokumenteRouteImport } from './routes/_authenticated/admin/dokumente'
+import { Route as AuthenticatedAdminEinstellungenRouteImport } from './routes/_authenticated/admin/einstellungen'
+import { Route as AuthenticatedAdminFragCocoRouteImport } from './routes/_authenticated/admin/frag-coco'
+import { Route as AuthenticatedAdminImpersonateRouteImport } from './routes/_authenticated/admin/impersonate'
+import { Route as AuthenticatedAdminImportZuordnungenRouteImport } from './routes/_authenticated/admin/import-zuordnungen'
+import { Route as AuthenticatedAdminKasseRouteImport } from './routes/_authenticated/admin/kasse'
+import { Route as AuthenticatedAdminKasseSaldoRouteImport } from './routes/_authenticated/admin/kasse-saldo'
+import { Route as AuthenticatedAdminLocationsRouteImport } from './routes/_authenticated/admin/locations'
+import { Route as AuthenticatedAdminLohnVerteilungRouteImport } from './routes/_authenticated/admin/lohn-verteilung'
+import { Route as AuthenticatedAdminMigrationRouteImport } from './routes/_authenticated/admin/migration'
+import { Route as AuthenticatedAdminPersonalAntraegeRouteImport } from './routes/_authenticated/admin/personal-antraege'
+import { Route as AuthenticatedAdminPosRennerPennerRouteImport } from './routes/_authenticated/admin/pos-renner-penner'
+import { Route as AuthenticatedAdminPosStundenberichtRouteImport } from './routes/_authenticated/admin/pos-stundenbericht'
+import { Route as AuthenticatedAdminPosVerkaufRouteImport } from './routes/_authenticated/admin/pos-verkauf'
+import { Route as AuthenticatedAdminStaffRouteImport } from './routes/_authenticated/admin/staff'
+import { Route as AuthenticatedAdminStandortzeitenRouteImport } from './routes/_authenticated/admin/standortzeiten'
+import { Route as AuthenticatedAdminStatistikRouteImport } from './routes/_authenticated/admin/statistik'
+import { Route as AuthenticatedAdminTrinkgeldRestRouteImport } from './routes/_authenticated/admin/trinkgeld-rest'
+import { Route as AuthenticatedAdminUrlaubRouteImport } from './routes/_authenticated/admin/urlaub'
+import { Route as AuthenticatedAdminVerkaufsartikelRouteImport } from './routes/_authenticated/admin/verkaufsartikel'
+import { Route as AuthenticatedAdminWeinRouteImport } from './routes/_authenticated/admin/wein'
+import { Route as AuthenticatedAdminWeinQuizRouteImport } from './routes/_authenticated/admin/wein-quiz'
+import { Route as AuthenticatedAdminZeitUebersichtRouteImport } from './routes/_authenticated/admin/zeit-uebersicht'
+import { Route as AuthenticatedZeitIndexRouteImport } from './routes/_authenticated/zeit/index'
+import { Route as AuthenticatedZeitAbrechnungRouteImport } from './routes/_authenticated/zeit/abrechnung'
+import { Route as AuthenticatedZeitAufgabenRouteImport } from './routes/_authenticated/zeit/aufgaben'
+import { Route as AuthenticatedZeitKalenderRouteImport } from './routes/_authenticated/zeit/kalender'
+import { Route as AuthenticatedZeitSchichtenRouteImport } from './routes/_authenticated/zeit/schichten'
+import { Route as AuthenticatedZeitStempelnRouteImport } from './routes/_authenticated/zeit/stempeln'
+import { Route as AuthenticatedZeitStundenRouteImport } from './routes/_authenticated/zeit/stunden'
+import { Route as AuthenticatedZeitTauschRouteImport } from './routes/_authenticated/zeit/tausch'
+import { Route as AuthenticatedZeitUrlaubRouteImport } from './routes/_authenticated/zeit/urlaub'
+import { Route as AuthenticatedZeitWuenscheRouteImport } from './routes/_authenticated/zeit/wuensche'
+import { Route as ApiExportDownloadRouteImport } from './routes/api/export/download'
 import { Route as AuthenticatedAdminBestellungIndexRouteImport } from './routes/_authenticated/admin/bestellung.index'
-import { Route as ApiPublicTrmnlTasksTokenRouteImport } from './routes/api/public/trmnl-tasks.$token'
-import { Route as ApiPublicTrmnlPlanungstafelTokenRouteImport } from './routes/api/public/trmnl-planungstafel.$token'
-import { Route as ApiPublicTrmnlDienstplanTokenRouteImport } from './routes/api/public/trmnl-dienstplan.$token'
-import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
-import { Route as ApiPublicTelegramDailyReportRouteImport } from './routes/api/public/telegram/daily-report'
-import { Route as ApiPublicMailersendWebhookRouteImport } from './routes/api/public/mailersend/webhook'
-import { Route as ApiPublicDisplayLocationIdRouteImport } from './routes/api/public/display.$locationId'
-import { Route as ApiPublicCalendarTokenRouteImport } from './routes/api/public/calendar.$token'
-import { Route as ApiPublicBankSyncSpiceryRouteImport } from './routes/api/public/bank/sync-spicery'
-import { Route as AuthenticatedAdminStaffNewRouteImport } from './routes/_authenticated/admin/staff.new'
-import { Route as AuthenticatedAdminStaffStaffIdRouteImport } from './routes/_authenticated/admin/staff.$staffId'
-import { Route as AuthenticatedAdminEinstellungenVeranstaltungenRouteImport } from './routes/_authenticated/admin/einstellungen.veranstaltungen'
-import { Route as AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport } from './routes/_authenticated/admin/einstellungen.easyorder-verwaltung'
-import { Route as AuthenticatedAdminBestellungUnzugeordnetRouteImport } from './routes/_authenticated/admin/bestellung.unzugeordnet'
-import { Route as AuthenticatedAdminBestellungLieferantenRouteImport } from './routes/_authenticated/admin/bestellung.lieferanten'
-import { Route as AuthenticatedAdminBestellungInventurRouteImport } from './routes/_authenticated/admin/bestellung.inventur'
 import { Route as AuthenticatedAdminBestellungBestellungenRouteImport } from './routes/_authenticated/admin/bestellung.bestellungen'
+import { Route as AuthenticatedAdminBestellungInventurRouteImport } from './routes/_authenticated/admin/bestellung.inventur'
+import { Route as AuthenticatedAdminBestellungLieferantenRouteImport } from './routes/_authenticated/admin/bestellung.lieferanten'
+import { Route as AuthenticatedAdminBestellungUnzugeordnetRouteImport } from './routes/_authenticated/admin/bestellung.unzugeordnet'
+import { Route as AuthenticatedAdminEinstellungenIndexRouteImport } from './routes/_authenticated/admin/einstellungen.index'
+import { Route as AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport } from './routes/_authenticated/admin/einstellungen.easyorder-verwaltung'
+import { Route as AuthenticatedAdminEinstellungenVeranstaltungenRouteImport } from './routes/_authenticated/admin/einstellungen.veranstaltungen'
+import { Route as AuthenticatedAdminStaffIndexRouteImport } from './routes/_authenticated/admin/staff.index'
+import { Route as AuthenticatedAdminStaffStaffIdRouteImport } from './routes/_authenticated/admin/staff.$staffId'
+import { Route as AuthenticatedAdminStaffNewRouteImport } from './routes/_authenticated/admin/staff.new'
+import { Route as ApiPublicBankSyncSpiceryRouteImport } from './routes/api/public/bank/sync-spicery'
+import { Route as ApiPublicCalendarTokenRouteImport } from './routes/api/public/calendar.$token'
+import { Route as ApiPublicDisplayLocationIdRouteImport } from './routes/api/public/display.$locationId'
+import { Route as ApiPublicMailersendWebhookRouteImport } from './routes/api/public/mailersend/webhook'
+import { Route as ApiPublicTelegramDailyReportRouteImport } from './routes/api/public/telegram/daily-report'
+import { Route as ApiPublicTelegramWebhookRouteImport } from './routes/api/public/telegram/webhook'
+import { Route as ApiPublicTrmnlDienstplanTokenRouteImport } from './routes/api/public/trmnl-dienstplan.$token'
+import { Route as ApiPublicTrmnlPlanungstafelTokenRouteImport } from './routes/api/public/trmnl-planungstafel.$token'
+import { Route as ApiPublicTrmnlTasksTokenRouteImport } from './routes/api/public/trmnl-tasks.$token'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -99,8 +93,14 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -108,14 +108,19 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const DisplayLocationIdRoute = DisplayLocationIdRouteImport.update({
-  id: '/display/$locationId',
-  path: '/display/$locationId',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
-  id: '/profil',
-  path: '/profil',
+const AuthenticatedEasyorderRoute = AuthenticatedEasyorderRouteImport.update({
+  id: '/easyorder',
+  path: '/easyorder',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLohnRoute = AuthenticatedLohnRouteImport.update({
+  id: '/lohn',
+  path: '/lohn',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPasswortAendernRoute =
@@ -124,256 +129,25 @@ const AuthenticatedPasswortAendernRoute =
     path: '/passwort-aendern',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedLohnRoute = AuthenticatedLohnRouteImport.update({
-  id: '/lohn',
-  path: '/lohn',
+const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedEasyorderRoute = AuthenticatedEasyorderRouteImport.update({
-  id: '/easyorder',
-  path: '/easyorder',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAdminRouteRoute = AuthenticatedAdminRouteRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedZeitIndexRoute = AuthenticatedZeitIndexRouteImport.update({
-  id: '/zeit/',
-  path: '/zeit/',
-  getParentRoute: () => AuthenticatedRouteRoute,
+const DisplayLocationIdRoute = DisplayLocationIdRouteImport.update({
+  id: '/display/$locationId',
+  path: '/display/$locationId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminIndexRoute = AuthenticatedAdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAdminRouteRoute,
 } as any)
-const ApiExportDownloadRoute = ApiExportDownloadRouteImport.update({
-  id: '/api/export/download',
-  path: '/api/export/download',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedZeitWuenscheRoute =
-  AuthenticatedZeitWuenscheRouteImport.update({
-    id: '/zeit/wuensche',
-    path: '/zeit/wuensche',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedZeitUrlaubRoute = AuthenticatedZeitUrlaubRouteImport.update({
-  id: '/zeit/urlaub',
-  path: '/zeit/urlaub',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedZeitTauschRoute = AuthenticatedZeitTauschRouteImport.update({
-  id: '/zeit/tausch',
-  path: '/zeit/tausch',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedZeitStundenRoute =
-  AuthenticatedZeitStundenRouteImport.update({
-    id: '/zeit/stunden',
-    path: '/zeit/stunden',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedZeitStempelnRoute =
-  AuthenticatedZeitStempelnRouteImport.update({
-    id: '/zeit/stempeln',
-    path: '/zeit/stempeln',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedZeitSchichtenRoute =
-  AuthenticatedZeitSchichtenRouteImport.update({
-    id: '/zeit/schichten',
-    path: '/zeit/schichten',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedZeitKalenderRoute =
-  AuthenticatedZeitKalenderRouteImport.update({
-    id: '/zeit/kalender',
-    path: '/zeit/kalender',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedZeitAufgabenRoute =
-  AuthenticatedZeitAufgabenRouteImport.update({
-    id: '/zeit/aufgaben',
-    path: '/zeit/aufgaben',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedZeitAbrechnungRoute =
-  AuthenticatedZeitAbrechnungRouteImport.update({
-    id: '/zeit/abrechnung',
-    path: '/zeit/abrechnung',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAdminZeitUebersichtRoute =
-  AuthenticatedAdminZeitUebersichtRouteImport.update({
-    id: '/zeit-uebersicht',
-    path: '/zeit-uebersicht',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminWeinQuizRoute =
-  AuthenticatedAdminWeinQuizRouteImport.update({
-    id: '/wein-quiz',
-    path: '/wein-quiz',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminWeinRoute = AuthenticatedAdminWeinRouteImport.update({
-  id: '/wein',
-  path: '/wein',
-  getParentRoute: () => AuthenticatedAdminRouteRoute,
-} as any)
-const AuthenticatedAdminVerkaufsartikelRoute =
-  AuthenticatedAdminVerkaufsartikelRouteImport.update({
-    id: '/verkaufsartikel',
-    path: '/verkaufsartikel',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminUrlaubRoute =
-  AuthenticatedAdminUrlaubRouteImport.update({
-    id: '/urlaub',
-    path: '/urlaub',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminTrinkgeldRestRoute =
-  AuthenticatedAdminTrinkgeldRestRouteImport.update({
-    id: '/trinkgeld-rest',
-    path: '/trinkgeld-rest',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminStatistikRoute =
-  AuthenticatedAdminStatistikRouteImport.update({
-    id: '/statistik',
-    path: '/statistik',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminStandortzeitenRoute =
-  AuthenticatedAdminStandortzeitenRouteImport.update({
-    id: '/standortzeiten',
-    path: '/standortzeiten',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminStaffRoute = AuthenticatedAdminStaffRouteImport.update({
-  id: '/staff',
-  path: '/staff',
-  getParentRoute: () => AuthenticatedAdminRouteRoute,
-} as any)
-const AuthenticatedAdminPosVerkaufRoute =
-  AuthenticatedAdminPosVerkaufRouteImport.update({
-    id: '/pos-verkauf',
-    path: '/pos-verkauf',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminPosStundenberichtRoute =
-  AuthenticatedAdminPosStundenberichtRouteImport.update({
-    id: '/pos-stundenbericht',
-    path: '/pos-stundenbericht',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminPosRennerPennerRoute =
-  AuthenticatedAdminPosRennerPennerRouteImport.update({
-    id: '/pos-renner-penner',
-    path: '/pos-renner-penner',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminPersonalAntraegeRoute =
-  AuthenticatedAdminPersonalAntraegeRouteImport.update({
-    id: '/personal-antraege',
-    path: '/personal-antraege',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminMigrationRoute =
-  AuthenticatedAdminMigrationRouteImport.update({
-    id: '/migration',
-    path: '/migration',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminLohnVerteilungRoute =
-  AuthenticatedAdminLohnVerteilungRouteImport.update({
-    id: '/lohn-verteilung',
-    path: '/lohn-verteilung',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminLocationsRoute =
-  AuthenticatedAdminLocationsRouteImport.update({
-    id: '/locations',
-    path: '/locations',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminKasseSaldoRoute =
-  AuthenticatedAdminKasseSaldoRouteImport.update({
-    id: '/kasse-saldo',
-    path: '/kasse-saldo',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminKasseRoute = AuthenticatedAdminKasseRouteImport.update({
-  id: '/kasse',
-  path: '/kasse',
-  getParentRoute: () => AuthenticatedAdminRouteRoute,
-} as any)
-const AuthenticatedAdminImportZuordnungenRoute =
-  AuthenticatedAdminImportZuordnungenRouteImport.update({
-    id: '/import-zuordnungen',
-    path: '/import-zuordnungen',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminImpersonateRoute =
-  AuthenticatedAdminImpersonateRouteImport.update({
-    id: '/impersonate',
-    path: '/impersonate',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminFragCocoRoute =
-  AuthenticatedAdminFragCocoRouteImport.update({
-    id: '/frag-coco',
-    path: '/frag-coco',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminEinstellungenRoute =
-  AuthenticatedAdminEinstellungenRouteImport.update({
-    id: '/einstellungen',
-    path: '/einstellungen',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminDokumenteRoute =
-  AuthenticatedAdminDokumenteRouteImport.update({
-    id: '/dokumente',
-    path: '/dokumente',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminDienstplanRoute =
-  AuthenticatedAdminDienstplanRouteImport.update({
-    id: '/dienstplan',
-    path: '/dienstplan',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminConfigCheckRoute =
-  AuthenticatedAdminConfigCheckRouteImport.update({
-    id: '/config-check',
-    path: '/config-check',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminBwaRoute = AuthenticatedAdminBwaRouteImport.update({
-  id: '/bwa',
-  path: '/bwa',
-  getParentRoute: () => AuthenticatedAdminRouteRoute,
-} as any)
-const AuthenticatedAdminBilanzRoute =
-  AuthenticatedAdminBilanzRouteImport.update({
-    id: '/bilanz',
-    path: '/bilanz',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminBestellungRoute =
-  AuthenticatedAdminBestellungRouteImport.update({
-    id: '/bestellung',
-    path: '/bestellung',
-    getParentRoute: () => AuthenticatedAdminRouteRoute,
-  } as any)
-const AuthenticatedAdminBankkontoRoute =
-  AuthenticatedAdminBankkontoRouteImport.update({
-    id: '/bankkonto',
-    path: '/bankkonto',
+const AuthenticatedAdminAufgabenRoute =
+  AuthenticatedAdminAufgabenRouteImport.update({
+    id: '/aufgaben',
+    path: '/aufgaben',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminAufgabenDisplayRoute =
@@ -382,117 +156,248 @@ const AuthenticatedAdminAufgabenDisplayRoute =
     path: '/aufgaben-display',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
-const AuthenticatedAdminAufgabenRoute =
-  AuthenticatedAdminAufgabenRouteImport.update({
-    id: '/aufgaben',
-    path: '/aufgaben',
+const AuthenticatedAdminBankkontoRoute =
+  AuthenticatedAdminBankkontoRouteImport.update({
+    id: '/bankkonto',
+    path: '/bankkonto',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
-const AuthenticatedAdminStaffIndexRoute =
-  AuthenticatedAdminStaffIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAdminStaffRoute,
+const AuthenticatedAdminBestellungRoute =
+  AuthenticatedAdminBestellungRouteImport.update({
+    id: '/bestellung',
+    path: '/bestellung',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
-const AuthenticatedAdminEinstellungenIndexRoute =
-  AuthenticatedAdminEinstellungenIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
+const AuthenticatedAdminBilanzRoute =
+  AuthenticatedAdminBilanzRouteImport.update({
+    id: '/bilanz',
+    path: '/bilanz',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
+const AuthenticatedAdminBwaRoute = AuthenticatedAdminBwaRouteImport.update({
+  id: '/bwa',
+  path: '/bwa',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
+const AuthenticatedAdminConfigCheckRoute =
+  AuthenticatedAdminConfigCheckRouteImport.update({
+    id: '/config-check',
+    path: '/config-check',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminDienstplanRoute =
+  AuthenticatedAdminDienstplanRouteImport.update({
+    id: '/dienstplan',
+    path: '/dienstplan',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminDokumenteRoute =
+  AuthenticatedAdminDokumenteRouteImport.update({
+    id: '/dokumente',
+    path: '/dokumente',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminEinstellungenRoute =
+  AuthenticatedAdminEinstellungenRouteImport.update({
+    id: '/einstellungen',
+    path: '/einstellungen',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminFragCocoRoute =
+  AuthenticatedAdminFragCocoRouteImport.update({
+    id: '/frag-coco',
+    path: '/frag-coco',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminImpersonateRoute =
+  AuthenticatedAdminImpersonateRouteImport.update({
+    id: '/impersonate',
+    path: '/impersonate',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminImportZuordnungenRoute =
+  AuthenticatedAdminImportZuordnungenRouteImport.update({
+    id: '/import-zuordnungen',
+    path: '/import-zuordnungen',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminKasseRoute = AuthenticatedAdminKasseRouteImport.update({
+  id: '/kasse',
+  path: '/kasse',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
+const AuthenticatedAdminKasseSaldoRoute =
+  AuthenticatedAdminKasseSaldoRouteImport.update({
+    id: '/kasse-saldo',
+    path: '/kasse-saldo',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminLocationsRoute =
+  AuthenticatedAdminLocationsRouteImport.update({
+    id: '/locations',
+    path: '/locations',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminLohnVerteilungRoute =
+  AuthenticatedAdminLohnVerteilungRouteImport.update({
+    id: '/lohn-verteilung',
+    path: '/lohn-verteilung',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminMigrationRoute =
+  AuthenticatedAdminMigrationRouteImport.update({
+    id: '/migration',
+    path: '/migration',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminPersonalAntraegeRoute =
+  AuthenticatedAdminPersonalAntraegeRouteImport.update({
+    id: '/personal-antraege',
+    path: '/personal-antraege',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminPosRennerPennerRoute =
+  AuthenticatedAdminPosRennerPennerRouteImport.update({
+    id: '/pos-renner-penner',
+    path: '/pos-renner-penner',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminPosStundenberichtRoute =
+  AuthenticatedAdminPosStundenberichtRouteImport.update({
+    id: '/pos-stundenbericht',
+    path: '/pos-stundenbericht',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminPosVerkaufRoute =
+  AuthenticatedAdminPosVerkaufRouteImport.update({
+    id: '/pos-verkauf',
+    path: '/pos-verkauf',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminStaffRoute = AuthenticatedAdminStaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
+const AuthenticatedAdminStandortzeitenRoute =
+  AuthenticatedAdminStandortzeitenRouteImport.update({
+    id: '/standortzeiten',
+    path: '/standortzeiten',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminStatistikRoute =
+  AuthenticatedAdminStatistikRouteImport.update({
+    id: '/statistik',
+    path: '/statistik',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminTrinkgeldRestRoute =
+  AuthenticatedAdminTrinkgeldRestRouteImport.update({
+    id: '/trinkgeld-rest',
+    path: '/trinkgeld-rest',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminUrlaubRoute =
+  AuthenticatedAdminUrlaubRouteImport.update({
+    id: '/urlaub',
+    path: '/urlaub',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminVerkaufsartikelRoute =
+  AuthenticatedAdminVerkaufsartikelRouteImport.update({
+    id: '/verkaufsartikel',
+    path: '/verkaufsartikel',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminWeinRoute = AuthenticatedAdminWeinRouteImport.update({
+  id: '/wein',
+  path: '/wein',
+  getParentRoute: () => AuthenticatedAdminRouteRoute,
+} as any)
+const AuthenticatedAdminWeinQuizRoute =
+  AuthenticatedAdminWeinQuizRouteImport.update({
+    id: '/wein-quiz',
+    path: '/wein-quiz',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminZeitUebersichtRoute =
+  AuthenticatedAdminZeitUebersichtRouteImport.update({
+    id: '/zeit-uebersicht',
+    path: '/zeit-uebersicht',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedZeitIndexRoute = AuthenticatedZeitIndexRouteImport.update({
+  id: '/zeit/',
+  path: '/zeit/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedZeitAbrechnungRoute =
+  AuthenticatedZeitAbrechnungRouteImport.update({
+    id: '/zeit/abrechnung',
+    path: '/zeit/abrechnung',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedZeitAufgabenRoute =
+  AuthenticatedZeitAufgabenRouteImport.update({
+    id: '/zeit/aufgaben',
+    path: '/zeit/aufgaben',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedZeitKalenderRoute =
+  AuthenticatedZeitKalenderRouteImport.update({
+    id: '/zeit/kalender',
+    path: '/zeit/kalender',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedZeitSchichtenRoute =
+  AuthenticatedZeitSchichtenRouteImport.update({
+    id: '/zeit/schichten',
+    path: '/zeit/schichten',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedZeitStempelnRoute =
+  AuthenticatedZeitStempelnRouteImport.update({
+    id: '/zeit/stempeln',
+    path: '/zeit/stempeln',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedZeitStundenRoute =
+  AuthenticatedZeitStundenRouteImport.update({
+    id: '/zeit/stunden',
+    path: '/zeit/stunden',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedZeitTauschRoute = AuthenticatedZeitTauschRouteImport.update({
+  id: '/zeit/tausch',
+  path: '/zeit/tausch',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedZeitUrlaubRoute = AuthenticatedZeitUrlaubRouteImport.update({
+  id: '/zeit/urlaub',
+  path: '/zeit/urlaub',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedZeitWuenscheRoute =
+  AuthenticatedZeitWuenscheRouteImport.update({
+    id: '/zeit/wuensche',
+    path: '/zeit/wuensche',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiExportDownloadRoute = ApiExportDownloadRouteImport.update({
+  id: '/api/export/download',
+  path: '/api/export/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminBestellungIndexRoute =
   AuthenticatedAdminBestellungIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedAdminBestellungRoute,
   } as any)
-const ApiPublicTrmnlTasksTokenRoute =
-  ApiPublicTrmnlTasksTokenRouteImport.update({
-    id: '/api/public/trmnl-tasks/$token',
-    path: '/api/public/trmnl-tasks/$token',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTrmnlPlanungstafelTokenRoute =
-  ApiPublicTrmnlPlanungstafelTokenRouteImport.update({
-    id: '/api/public/trmnl-planungstafel/$token',
-    path: '/api/public/trmnl-planungstafel/$token',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTrmnlDienstplanTokenRoute =
-  ApiPublicTrmnlDienstplanTokenRouteImport.update({
-    id: '/api/public/trmnl-dienstplan/$token',
-    path: '/api/public/trmnl-dienstplan/$token',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTelegramWebhookRoute =
-  ApiPublicTelegramWebhookRouteImport.update({
-    id: '/api/public/telegram/webhook',
-    path: '/api/public/telegram/webhook',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicTelegramDailyReportRoute =
-  ApiPublicTelegramDailyReportRouteImport.update({
-    id: '/api/public/telegram/daily-report',
-    path: '/api/public/telegram/daily-report',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicMailersendWebhookRoute =
-  ApiPublicMailersendWebhookRouteImport.update({
-    id: '/api/public/mailersend/webhook',
-    path: '/api/public/mailersend/webhook',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicDisplayLocationIdRoute =
-  ApiPublicDisplayLocationIdRouteImport.update({
-    id: '/api/public/display/$locationId',
-    path: '/api/public/display/$locationId',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicCalendarTokenRoute = ApiPublicCalendarTokenRouteImport.update({
-  id: '/api/public/calendar/$token',
-  path: '/api/public/calendar/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicBankSyncSpiceryRoute =
-  ApiPublicBankSyncSpiceryRouteImport.update({
-    id: '/api/public/bank/sync-spicery',
-    path: '/api/public/bank/sync-spicery',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const AuthenticatedAdminStaffNewRoute =
-  AuthenticatedAdminStaffNewRouteImport.update({
-    id: '/new',
-    path: '/new',
-    getParentRoute: () => AuthenticatedAdminStaffRoute,
-  } as any)
-const AuthenticatedAdminStaffStaffIdRoute =
-  AuthenticatedAdminStaffStaffIdRouteImport.update({
-    id: '/$staffId',
-    path: '/$staffId',
-    getParentRoute: () => AuthenticatedAdminStaffRoute,
-  } as any)
-const AuthenticatedAdminEinstellungenVeranstaltungenRoute =
-  AuthenticatedAdminEinstellungenVeranstaltungenRouteImport.update({
-    id: '/veranstaltungen',
-    path: '/veranstaltungen',
-    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
-  } as any)
-const AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute =
-  AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport.update({
-    id: '/easyorder-verwaltung',
-    path: '/easyorder-verwaltung',
-    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
-  } as any)
-const AuthenticatedAdminBestellungUnzugeordnetRoute =
-  AuthenticatedAdminBestellungUnzugeordnetRouteImport.update({
-    id: '/unzugeordnet',
-    path: '/unzugeordnet',
-    getParentRoute: () => AuthenticatedAdminBestellungRoute,
-  } as any)
-const AuthenticatedAdminBestellungLieferantenRoute =
-  AuthenticatedAdminBestellungLieferantenRouteImport.update({
-    id: '/lieferanten',
-    path: '/lieferanten',
+const AuthenticatedAdminBestellungBestellungenRoute =
+  AuthenticatedAdminBestellungBestellungenRouteImport.update({
+    id: '/bestellungen',
+    path: '/bestellungen',
     getParentRoute: () => AuthenticatedAdminBestellungRoute,
   } as any)
 const AuthenticatedAdminBestellungInventurRoute =
@@ -501,11 +406,106 @@ const AuthenticatedAdminBestellungInventurRoute =
     path: '/inventur',
     getParentRoute: () => AuthenticatedAdminBestellungRoute,
   } as any)
-const AuthenticatedAdminBestellungBestellungenRoute =
-  AuthenticatedAdminBestellungBestellungenRouteImport.update({
-    id: '/bestellungen',
-    path: '/bestellungen',
+const AuthenticatedAdminBestellungLieferantenRoute =
+  AuthenticatedAdminBestellungLieferantenRouteImport.update({
+    id: '/lieferanten',
+    path: '/lieferanten',
     getParentRoute: () => AuthenticatedAdminBestellungRoute,
+  } as any)
+const AuthenticatedAdminBestellungUnzugeordnetRoute =
+  AuthenticatedAdminBestellungUnzugeordnetRouteImport.update({
+    id: '/unzugeordnet',
+    path: '/unzugeordnet',
+    getParentRoute: () => AuthenticatedAdminBestellungRoute,
+  } as any)
+const AuthenticatedAdminEinstellungenIndexRoute =
+  AuthenticatedAdminEinstellungenIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
+  } as any)
+const AuthenticatedAdminEinstellungenEasyorderVerwaltungRoute =
+  AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport.update({
+    id: '/easyorder-verwaltung',
+    path: '/easyorder-verwaltung',
+    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
+  } as any)
+const AuthenticatedAdminEinstellungenVeranstaltungenRoute =
+  AuthenticatedAdminEinstellungenVeranstaltungenRouteImport.update({
+    id: '/veranstaltungen',
+    path: '/veranstaltungen',
+    getParentRoute: () => AuthenticatedAdminEinstellungenRoute,
+  } as any)
+const AuthenticatedAdminStaffIndexRoute =
+  AuthenticatedAdminStaffIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAdminStaffRoute,
+  } as any)
+const AuthenticatedAdminStaffStaffIdRoute =
+  AuthenticatedAdminStaffStaffIdRouteImport.update({
+    id: '/$staffId',
+    path: '/$staffId',
+    getParentRoute: () => AuthenticatedAdminStaffRoute,
+  } as any)
+const AuthenticatedAdminStaffNewRoute =
+  AuthenticatedAdminStaffNewRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => AuthenticatedAdminStaffRoute,
+  } as any)
+const ApiPublicBankSyncSpiceryRoute =
+  ApiPublicBankSyncSpiceryRouteImport.update({
+    id: '/api/public/bank/sync-spicery',
+    path: '/api/public/bank/sync-spicery',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicCalendarTokenRoute = ApiPublicCalendarTokenRouteImport.update({
+  id: '/api/public/calendar/$token',
+  path: '/api/public/calendar/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDisplayLocationIdRoute =
+  ApiPublicDisplayLocationIdRouteImport.update({
+    id: '/api/public/display/$locationId',
+    path: '/api/public/display/$locationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicMailersendWebhookRoute =
+  ApiPublicMailersendWebhookRouteImport.update({
+    id: '/api/public/mailersend/webhook',
+    path: '/api/public/mailersend/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTelegramDailyReportRoute =
+  ApiPublicTelegramDailyReportRouteImport.update({
+    id: '/api/public/telegram/daily-report',
+    path: '/api/public/telegram/daily-report',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTelegramWebhookRoute =
+  ApiPublicTelegramWebhookRouteImport.update({
+    id: '/api/public/telegram/webhook',
+    path: '/api/public/telegram/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTrmnlDienstplanTokenRoute =
+  ApiPublicTrmnlDienstplanTokenRouteImport.update({
+    id: '/api/public/trmnl-dienstplan/$token',
+    path: '/api/public/trmnl-dienstplan/$token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTrmnlPlanungstafelTokenRoute =
+  ApiPublicTrmnlPlanungstafelTokenRouteImport.update({
+    id: '/api/public/trmnl-planungstafel/$token',
+    path: '/api/public/trmnl-planungstafel/$token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicTrmnlTasksTokenRoute =
+  ApiPublicTrmnlTasksTokenRouteImport.update({
+    id: '/api/public/trmnl-tasks/$token',
+    path: '/api/public/trmnl-tasks/$token',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -976,18 +976,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -997,11 +990,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -1011,32 +1011,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/display/$locationId': {
-      id: '/display/$locationId'
-      path: '/display/$locationId'
-      fullPath: '/display/$locationId'
-      preLoaderRoute: typeof DisplayLocationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/profil': {
-      id: '/_authenticated/profil'
-      path: '/profil'
-      fullPath: '/profil'
-      preLoaderRoute: typeof AuthenticatedProfilRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/passwort-aendern': {
-      id: '/_authenticated/passwort-aendern'
-      path: '/passwort-aendern'
-      fullPath: '/passwort-aendern'
-      preLoaderRoute: typeof AuthenticatedPasswortAendernRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/lohn': {
-      id: '/_authenticated/lohn'
-      path: '/lohn'
-      fullPath: '/lohn'
-      preLoaderRoute: typeof AuthenticatedLohnRouteImport
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/easyorder': {
@@ -1046,305 +1025,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEasyorderRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteRouteImport
+    '/_authenticated/lohn': {
+      id: '/_authenticated/lohn'
+      path: '/lohn'
+      fullPath: '/lohn'
+      preLoaderRoute: typeof AuthenticatedLohnRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/zeit/': {
-      id: '/_authenticated/zeit/'
-      path: '/zeit'
-      fullPath: '/zeit/'
-      preLoaderRoute: typeof AuthenticatedZeitIndexRouteImport
+    '/_authenticated/passwort-aendern': {
+      id: '/_authenticated/passwort-aendern'
+      path: '/passwort-aendern'
+      fullPath: '/passwort-aendern'
+      preLoaderRoute: typeof AuthenticatedPasswortAendernRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/profil': {
+      id: '/_authenticated/profil'
+      path: '/profil'
+      fullPath: '/profil'
+      preLoaderRoute: typeof AuthenticatedProfilRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/display/$locationId': {
+      id: '/display/$locationId'
+      path: '/display/$locationId'
+      fullPath: '/display/$locationId'
+      preLoaderRoute: typeof DisplayLocationIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/': {
       id: '/_authenticated/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AuthenticatedAdminIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/api/export/download': {
-      id: '/api/export/download'
-      path: '/api/export/download'
-      fullPath: '/api/export/download'
-      preLoaderRoute: typeof ApiExportDownloadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/zeit/wuensche': {
-      id: '/_authenticated/zeit/wuensche'
-      path: '/zeit/wuensche'
-      fullPath: '/zeit/wuensche'
-      preLoaderRoute: typeof AuthenticatedZeitWuenscheRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/urlaub': {
-      id: '/_authenticated/zeit/urlaub'
-      path: '/zeit/urlaub'
-      fullPath: '/zeit/urlaub'
-      preLoaderRoute: typeof AuthenticatedZeitUrlaubRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/tausch': {
-      id: '/_authenticated/zeit/tausch'
-      path: '/zeit/tausch'
-      fullPath: '/zeit/tausch'
-      preLoaderRoute: typeof AuthenticatedZeitTauschRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/stunden': {
-      id: '/_authenticated/zeit/stunden'
-      path: '/zeit/stunden'
-      fullPath: '/zeit/stunden'
-      preLoaderRoute: typeof AuthenticatedZeitStundenRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/stempeln': {
-      id: '/_authenticated/zeit/stempeln'
-      path: '/zeit/stempeln'
-      fullPath: '/zeit/stempeln'
-      preLoaderRoute: typeof AuthenticatedZeitStempelnRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/schichten': {
-      id: '/_authenticated/zeit/schichten'
-      path: '/zeit/schichten'
-      fullPath: '/zeit/schichten'
-      preLoaderRoute: typeof AuthenticatedZeitSchichtenRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/kalender': {
-      id: '/_authenticated/zeit/kalender'
-      path: '/zeit/kalender'
-      fullPath: '/zeit/kalender'
-      preLoaderRoute: typeof AuthenticatedZeitKalenderRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/aufgaben': {
-      id: '/_authenticated/zeit/aufgaben'
-      path: '/zeit/aufgaben'
-      fullPath: '/zeit/aufgaben'
-      preLoaderRoute: typeof AuthenticatedZeitAufgabenRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/zeit/abrechnung': {
-      id: '/_authenticated/zeit/abrechnung'
-      path: '/zeit/abrechnung'
-      fullPath: '/zeit/abrechnung'
-      preLoaderRoute: typeof AuthenticatedZeitAbrechnungRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin/zeit-uebersicht': {
-      id: '/_authenticated/admin/zeit-uebersicht'
-      path: '/zeit-uebersicht'
-      fullPath: '/admin/zeit-uebersicht'
-      preLoaderRoute: typeof AuthenticatedAdminZeitUebersichtRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/wein-quiz': {
-      id: '/_authenticated/admin/wein-quiz'
-      path: '/wein-quiz'
-      fullPath: '/admin/wein-quiz'
-      preLoaderRoute: typeof AuthenticatedAdminWeinQuizRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/wein': {
-      id: '/_authenticated/admin/wein'
-      path: '/wein'
-      fullPath: '/admin/wein'
-      preLoaderRoute: typeof AuthenticatedAdminWeinRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/verkaufsartikel': {
-      id: '/_authenticated/admin/verkaufsartikel'
-      path: '/verkaufsartikel'
-      fullPath: '/admin/verkaufsartikel'
-      preLoaderRoute: typeof AuthenticatedAdminVerkaufsartikelRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/urlaub': {
-      id: '/_authenticated/admin/urlaub'
-      path: '/urlaub'
-      fullPath: '/admin/urlaub'
-      preLoaderRoute: typeof AuthenticatedAdminUrlaubRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/trinkgeld-rest': {
-      id: '/_authenticated/admin/trinkgeld-rest'
-      path: '/trinkgeld-rest'
-      fullPath: '/admin/trinkgeld-rest'
-      preLoaderRoute: typeof AuthenticatedAdminTrinkgeldRestRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/statistik': {
-      id: '/_authenticated/admin/statistik'
-      path: '/statistik'
-      fullPath: '/admin/statistik'
-      preLoaderRoute: typeof AuthenticatedAdminStatistikRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/standortzeiten': {
-      id: '/_authenticated/admin/standortzeiten'
-      path: '/standortzeiten'
-      fullPath: '/admin/standortzeiten'
-      preLoaderRoute: typeof AuthenticatedAdminStandortzeitenRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/staff': {
-      id: '/_authenticated/admin/staff'
-      path: '/staff'
-      fullPath: '/admin/staff'
-      preLoaderRoute: typeof AuthenticatedAdminStaffRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/pos-verkauf': {
-      id: '/_authenticated/admin/pos-verkauf'
-      path: '/pos-verkauf'
-      fullPath: '/admin/pos-verkauf'
-      preLoaderRoute: typeof AuthenticatedAdminPosVerkaufRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/pos-stundenbericht': {
-      id: '/_authenticated/admin/pos-stundenbericht'
-      path: '/pos-stundenbericht'
-      fullPath: '/admin/pos-stundenbericht'
-      preLoaderRoute: typeof AuthenticatedAdminPosStundenberichtRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/pos-renner-penner': {
-      id: '/_authenticated/admin/pos-renner-penner'
-      path: '/pos-renner-penner'
-      fullPath: '/admin/pos-renner-penner'
-      preLoaderRoute: typeof AuthenticatedAdminPosRennerPennerRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/personal-antraege': {
-      id: '/_authenticated/admin/personal-antraege'
-      path: '/personal-antraege'
-      fullPath: '/admin/personal-antraege'
-      preLoaderRoute: typeof AuthenticatedAdminPersonalAntraegeRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/migration': {
-      id: '/_authenticated/admin/migration'
-      path: '/migration'
-      fullPath: '/admin/migration'
-      preLoaderRoute: typeof AuthenticatedAdminMigrationRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/lohn-verteilung': {
-      id: '/_authenticated/admin/lohn-verteilung'
-      path: '/lohn-verteilung'
-      fullPath: '/admin/lohn-verteilung'
-      preLoaderRoute: typeof AuthenticatedAdminLohnVerteilungRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/locations': {
-      id: '/_authenticated/admin/locations'
-      path: '/locations'
-      fullPath: '/admin/locations'
-      preLoaderRoute: typeof AuthenticatedAdminLocationsRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/kasse-saldo': {
-      id: '/_authenticated/admin/kasse-saldo'
-      path: '/kasse-saldo'
-      fullPath: '/admin/kasse-saldo'
-      preLoaderRoute: typeof AuthenticatedAdminKasseSaldoRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/kasse': {
-      id: '/_authenticated/admin/kasse'
-      path: '/kasse'
-      fullPath: '/admin/kasse'
-      preLoaderRoute: typeof AuthenticatedAdminKasseRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/import-zuordnungen': {
-      id: '/_authenticated/admin/import-zuordnungen'
-      path: '/import-zuordnungen'
-      fullPath: '/admin/import-zuordnungen'
-      preLoaderRoute: typeof AuthenticatedAdminImportZuordnungenRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/impersonate': {
-      id: '/_authenticated/admin/impersonate'
-      path: '/impersonate'
-      fullPath: '/admin/impersonate'
-      preLoaderRoute: typeof AuthenticatedAdminImpersonateRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/frag-coco': {
-      id: '/_authenticated/admin/frag-coco'
-      path: '/frag-coco'
-      fullPath: '/admin/frag-coco'
-      preLoaderRoute: typeof AuthenticatedAdminFragCocoRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/einstellungen': {
-      id: '/_authenticated/admin/einstellungen'
-      path: '/einstellungen'
-      fullPath: '/admin/einstellungen'
-      preLoaderRoute: typeof AuthenticatedAdminEinstellungenRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/dokumente': {
-      id: '/_authenticated/admin/dokumente'
-      path: '/dokumente'
-      fullPath: '/admin/dokumente'
-      preLoaderRoute: typeof AuthenticatedAdminDokumenteRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/dienstplan': {
-      id: '/_authenticated/admin/dienstplan'
-      path: '/dienstplan'
-      fullPath: '/admin/dienstplan'
-      preLoaderRoute: typeof AuthenticatedAdminDienstplanRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/config-check': {
-      id: '/_authenticated/admin/config-check'
-      path: '/config-check'
-      fullPath: '/admin/config-check'
-      preLoaderRoute: typeof AuthenticatedAdminConfigCheckRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/bwa': {
-      id: '/_authenticated/admin/bwa'
-      path: '/bwa'
-      fullPath: '/admin/bwa'
-      preLoaderRoute: typeof AuthenticatedAdminBwaRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/bilanz': {
-      id: '/_authenticated/admin/bilanz'
-      path: '/bilanz'
-      fullPath: '/admin/bilanz'
-      preLoaderRoute: typeof AuthenticatedAdminBilanzRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/bestellung': {
-      id: '/_authenticated/admin/bestellung'
-      path: '/bestellung'
-      fullPath: '/admin/bestellung'
-      preLoaderRoute: typeof AuthenticatedAdminBestellungRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/bankkonto': {
-      id: '/_authenticated/admin/bankkonto'
-      path: '/bankkonto'
-      fullPath: '/admin/bankkonto'
-      preLoaderRoute: typeof AuthenticatedAdminBankkontoRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/aufgaben-display': {
-      id: '/_authenticated/admin/aufgaben-display'
-      path: '/aufgaben-display'
-      fullPath: '/admin/aufgaben-display'
-      preLoaderRoute: typeof AuthenticatedAdminAufgabenDisplayRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/aufgaben': {
@@ -1354,19 +1067,292 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminAufgabenRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
-    '/_authenticated/admin/staff/': {
-      id: '/_authenticated/admin/staff/'
-      path: '/'
-      fullPath: '/admin/staff/'
-      preLoaderRoute: typeof AuthenticatedAdminStaffIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminStaffRoute
+    '/_authenticated/admin/aufgaben-display': {
+      id: '/_authenticated/admin/aufgaben-display'
+      path: '/aufgaben-display'
+      fullPath: '/admin/aufgaben-display'
+      preLoaderRoute: typeof AuthenticatedAdminAufgabenDisplayRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
     }
-    '/_authenticated/admin/einstellungen/': {
-      id: '/_authenticated/admin/einstellungen/'
-      path: '/'
-      fullPath: '/admin/einstellungen/'
-      preLoaderRoute: typeof AuthenticatedAdminEinstellungenIndexRouteImport
-      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
+    '/_authenticated/admin/bankkonto': {
+      id: '/_authenticated/admin/bankkonto'
+      path: '/bankkonto'
+      fullPath: '/admin/bankkonto'
+      preLoaderRoute: typeof AuthenticatedAdminBankkontoRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/bestellung': {
+      id: '/_authenticated/admin/bestellung'
+      path: '/bestellung'
+      fullPath: '/admin/bestellung'
+      preLoaderRoute: typeof AuthenticatedAdminBestellungRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/bilanz': {
+      id: '/_authenticated/admin/bilanz'
+      path: '/bilanz'
+      fullPath: '/admin/bilanz'
+      preLoaderRoute: typeof AuthenticatedAdminBilanzRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/bwa': {
+      id: '/_authenticated/admin/bwa'
+      path: '/bwa'
+      fullPath: '/admin/bwa'
+      preLoaderRoute: typeof AuthenticatedAdminBwaRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/config-check': {
+      id: '/_authenticated/admin/config-check'
+      path: '/config-check'
+      fullPath: '/admin/config-check'
+      preLoaderRoute: typeof AuthenticatedAdminConfigCheckRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/dienstplan': {
+      id: '/_authenticated/admin/dienstplan'
+      path: '/dienstplan'
+      fullPath: '/admin/dienstplan'
+      preLoaderRoute: typeof AuthenticatedAdminDienstplanRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/dokumente': {
+      id: '/_authenticated/admin/dokumente'
+      path: '/dokumente'
+      fullPath: '/admin/dokumente'
+      preLoaderRoute: typeof AuthenticatedAdminDokumenteRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/einstellungen': {
+      id: '/_authenticated/admin/einstellungen'
+      path: '/einstellungen'
+      fullPath: '/admin/einstellungen'
+      preLoaderRoute: typeof AuthenticatedAdminEinstellungenRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/frag-coco': {
+      id: '/_authenticated/admin/frag-coco'
+      path: '/frag-coco'
+      fullPath: '/admin/frag-coco'
+      preLoaderRoute: typeof AuthenticatedAdminFragCocoRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/impersonate': {
+      id: '/_authenticated/admin/impersonate'
+      path: '/impersonate'
+      fullPath: '/admin/impersonate'
+      preLoaderRoute: typeof AuthenticatedAdminImpersonateRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/import-zuordnungen': {
+      id: '/_authenticated/admin/import-zuordnungen'
+      path: '/import-zuordnungen'
+      fullPath: '/admin/import-zuordnungen'
+      preLoaderRoute: typeof AuthenticatedAdminImportZuordnungenRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/kasse': {
+      id: '/_authenticated/admin/kasse'
+      path: '/kasse'
+      fullPath: '/admin/kasse'
+      preLoaderRoute: typeof AuthenticatedAdminKasseRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/kasse-saldo': {
+      id: '/_authenticated/admin/kasse-saldo'
+      path: '/kasse-saldo'
+      fullPath: '/admin/kasse-saldo'
+      preLoaderRoute: typeof AuthenticatedAdminKasseSaldoRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/locations': {
+      id: '/_authenticated/admin/locations'
+      path: '/locations'
+      fullPath: '/admin/locations'
+      preLoaderRoute: typeof AuthenticatedAdminLocationsRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/lohn-verteilung': {
+      id: '/_authenticated/admin/lohn-verteilung'
+      path: '/lohn-verteilung'
+      fullPath: '/admin/lohn-verteilung'
+      preLoaderRoute: typeof AuthenticatedAdminLohnVerteilungRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/migration': {
+      id: '/_authenticated/admin/migration'
+      path: '/migration'
+      fullPath: '/admin/migration'
+      preLoaderRoute: typeof AuthenticatedAdminMigrationRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/personal-antraege': {
+      id: '/_authenticated/admin/personal-antraege'
+      path: '/personal-antraege'
+      fullPath: '/admin/personal-antraege'
+      preLoaderRoute: typeof AuthenticatedAdminPersonalAntraegeRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/pos-renner-penner': {
+      id: '/_authenticated/admin/pos-renner-penner'
+      path: '/pos-renner-penner'
+      fullPath: '/admin/pos-renner-penner'
+      preLoaderRoute: typeof AuthenticatedAdminPosRennerPennerRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/pos-stundenbericht': {
+      id: '/_authenticated/admin/pos-stundenbericht'
+      path: '/pos-stundenbericht'
+      fullPath: '/admin/pos-stundenbericht'
+      preLoaderRoute: typeof AuthenticatedAdminPosStundenberichtRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/pos-verkauf': {
+      id: '/_authenticated/admin/pos-verkauf'
+      path: '/pos-verkauf'
+      fullPath: '/admin/pos-verkauf'
+      preLoaderRoute: typeof AuthenticatedAdminPosVerkaufRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/staff': {
+      id: '/_authenticated/admin/staff'
+      path: '/staff'
+      fullPath: '/admin/staff'
+      preLoaderRoute: typeof AuthenticatedAdminStaffRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/standortzeiten': {
+      id: '/_authenticated/admin/standortzeiten'
+      path: '/standortzeiten'
+      fullPath: '/admin/standortzeiten'
+      preLoaderRoute: typeof AuthenticatedAdminStandortzeitenRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/statistik': {
+      id: '/_authenticated/admin/statistik'
+      path: '/statistik'
+      fullPath: '/admin/statistik'
+      preLoaderRoute: typeof AuthenticatedAdminStatistikRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/trinkgeld-rest': {
+      id: '/_authenticated/admin/trinkgeld-rest'
+      path: '/trinkgeld-rest'
+      fullPath: '/admin/trinkgeld-rest'
+      preLoaderRoute: typeof AuthenticatedAdminTrinkgeldRestRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/urlaub': {
+      id: '/_authenticated/admin/urlaub'
+      path: '/urlaub'
+      fullPath: '/admin/urlaub'
+      preLoaderRoute: typeof AuthenticatedAdminUrlaubRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/verkaufsartikel': {
+      id: '/_authenticated/admin/verkaufsartikel'
+      path: '/verkaufsartikel'
+      fullPath: '/admin/verkaufsartikel'
+      preLoaderRoute: typeof AuthenticatedAdminVerkaufsartikelRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/wein': {
+      id: '/_authenticated/admin/wein'
+      path: '/wein'
+      fullPath: '/admin/wein'
+      preLoaderRoute: typeof AuthenticatedAdminWeinRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/wein-quiz': {
+      id: '/_authenticated/admin/wein-quiz'
+      path: '/wein-quiz'
+      fullPath: '/admin/wein-quiz'
+      preLoaderRoute: typeof AuthenticatedAdminWeinQuizRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/zeit-uebersicht': {
+      id: '/_authenticated/admin/zeit-uebersicht'
+      path: '/zeit-uebersicht'
+      fullPath: '/admin/zeit-uebersicht'
+      preLoaderRoute: typeof AuthenticatedAdminZeitUebersichtRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/zeit/': {
+      id: '/_authenticated/zeit/'
+      path: '/zeit'
+      fullPath: '/zeit/'
+      preLoaderRoute: typeof AuthenticatedZeitIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/abrechnung': {
+      id: '/_authenticated/zeit/abrechnung'
+      path: '/zeit/abrechnung'
+      fullPath: '/zeit/abrechnung'
+      preLoaderRoute: typeof AuthenticatedZeitAbrechnungRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/aufgaben': {
+      id: '/_authenticated/zeit/aufgaben'
+      path: '/zeit/aufgaben'
+      fullPath: '/zeit/aufgaben'
+      preLoaderRoute: typeof AuthenticatedZeitAufgabenRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/kalender': {
+      id: '/_authenticated/zeit/kalender'
+      path: '/zeit/kalender'
+      fullPath: '/zeit/kalender'
+      preLoaderRoute: typeof AuthenticatedZeitKalenderRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/schichten': {
+      id: '/_authenticated/zeit/schichten'
+      path: '/zeit/schichten'
+      fullPath: '/zeit/schichten'
+      preLoaderRoute: typeof AuthenticatedZeitSchichtenRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/stempeln': {
+      id: '/_authenticated/zeit/stempeln'
+      path: '/zeit/stempeln'
+      fullPath: '/zeit/stempeln'
+      preLoaderRoute: typeof AuthenticatedZeitStempelnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/stunden': {
+      id: '/_authenticated/zeit/stunden'
+      path: '/zeit/stunden'
+      fullPath: '/zeit/stunden'
+      preLoaderRoute: typeof AuthenticatedZeitStundenRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/tausch': {
+      id: '/_authenticated/zeit/tausch'
+      path: '/zeit/tausch'
+      fullPath: '/zeit/tausch'
+      preLoaderRoute: typeof AuthenticatedZeitTauschRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/urlaub': {
+      id: '/_authenticated/zeit/urlaub'
+      path: '/zeit/urlaub'
+      fullPath: '/zeit/urlaub'
+      preLoaderRoute: typeof AuthenticatedZeitUrlaubRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/zeit/wuensche': {
+      id: '/_authenticated/zeit/wuensche'
+      path: '/zeit/wuensche'
+      fullPath: '/zeit/wuensche'
+      preLoaderRoute: typeof AuthenticatedZeitWuenscheRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/export/download': {
+      id: '/api/export/download'
+      path: '/api/export/download'
+      fullPath: '/api/export/download'
+      preLoaderRoute: typeof ApiExportDownloadRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/bestellung/': {
       id: '/_authenticated/admin/bestellung/'
@@ -1375,109 +1361,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminBestellungIndexRouteImport
       parentRoute: typeof AuthenticatedAdminBestellungRoute
     }
-    '/api/public/trmnl-tasks/$token': {
-      id: '/api/public/trmnl-tasks/$token'
-      path: '/api/public/trmnl-tasks/$token'
-      fullPath: '/api/public/trmnl-tasks/$token'
-      preLoaderRoute: typeof ApiPublicTrmnlTasksTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/trmnl-planungstafel/$token': {
-      id: '/api/public/trmnl-planungstafel/$token'
-      path: '/api/public/trmnl-planungstafel/$token'
-      fullPath: '/api/public/trmnl-planungstafel/$token'
-      preLoaderRoute: typeof ApiPublicTrmnlPlanungstafelTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/trmnl-dienstplan/$token': {
-      id: '/api/public/trmnl-dienstplan/$token'
-      path: '/api/public/trmnl-dienstplan/$token'
-      fullPath: '/api/public/trmnl-dienstplan/$token'
-      preLoaderRoute: typeof ApiPublicTrmnlDienstplanTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/telegram/webhook': {
-      id: '/api/public/telegram/webhook'
-      path: '/api/public/telegram/webhook'
-      fullPath: '/api/public/telegram/webhook'
-      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/telegram/daily-report': {
-      id: '/api/public/telegram/daily-report'
-      path: '/api/public/telegram/daily-report'
-      fullPath: '/api/public/telegram/daily-report'
-      preLoaderRoute: typeof ApiPublicTelegramDailyReportRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/mailersend/webhook': {
-      id: '/api/public/mailersend/webhook'
-      path: '/api/public/mailersend/webhook'
-      fullPath: '/api/public/mailersend/webhook'
-      preLoaderRoute: typeof ApiPublicMailersendWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/display/$locationId': {
-      id: '/api/public/display/$locationId'
-      path: '/api/public/display/$locationId'
-      fullPath: '/api/public/display/$locationId'
-      preLoaderRoute: typeof ApiPublicDisplayLocationIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/calendar/$token': {
-      id: '/api/public/calendar/$token'
-      path: '/api/public/calendar/$token'
-      fullPath: '/api/public/calendar/$token'
-      preLoaderRoute: typeof ApiPublicCalendarTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/bank/sync-spicery': {
-      id: '/api/public/bank/sync-spicery'
-      path: '/api/public/bank/sync-spicery'
-      fullPath: '/api/public/bank/sync-spicery'
-      preLoaderRoute: typeof ApiPublicBankSyncSpiceryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/admin/staff/new': {
-      id: '/_authenticated/admin/staff/new'
-      path: '/new'
-      fullPath: '/admin/staff/new'
-      preLoaderRoute: typeof AuthenticatedAdminStaffNewRouteImport
-      parentRoute: typeof AuthenticatedAdminStaffRoute
-    }
-    '/_authenticated/admin/staff/$staffId': {
-      id: '/_authenticated/admin/staff/$staffId'
-      path: '/$staffId'
-      fullPath: '/admin/staff/$staffId'
-      preLoaderRoute: typeof AuthenticatedAdminStaffStaffIdRouteImport
-      parentRoute: typeof AuthenticatedAdminStaffRoute
-    }
-    '/_authenticated/admin/einstellungen/veranstaltungen': {
-      id: '/_authenticated/admin/einstellungen/veranstaltungen'
-      path: '/veranstaltungen'
-      fullPath: '/admin/einstellungen/veranstaltungen'
-      preLoaderRoute: typeof AuthenticatedAdminEinstellungenVeranstaltungenRouteImport
-      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
-    }
-    '/_authenticated/admin/einstellungen/easyorder-verwaltung': {
-      id: '/_authenticated/admin/einstellungen/easyorder-verwaltung'
-      path: '/easyorder-verwaltung'
-      fullPath: '/admin/einstellungen/easyorder-verwaltung'
-      preLoaderRoute: typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport
-      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
-    }
-    '/_authenticated/admin/bestellung/unzugeordnet': {
-      id: '/_authenticated/admin/bestellung/unzugeordnet'
-      path: '/unzugeordnet'
-      fullPath: '/admin/bestellung/unzugeordnet'
-      preLoaderRoute: typeof AuthenticatedAdminBestellungUnzugeordnetRouteImport
-      parentRoute: typeof AuthenticatedAdminBestellungRoute
-    }
-    '/_authenticated/admin/bestellung/lieferanten': {
-      id: '/_authenticated/admin/bestellung/lieferanten'
-      path: '/lieferanten'
-      fullPath: '/admin/bestellung/lieferanten'
-      preLoaderRoute: typeof AuthenticatedAdminBestellungLieferantenRouteImport
+    '/_authenticated/admin/bestellung/bestellungen': {
+      id: '/_authenticated/admin/bestellung/bestellungen'
+      path: '/bestellungen'
+      fullPath: '/admin/bestellung/bestellungen'
+      preLoaderRoute: typeof AuthenticatedAdminBestellungBestellungenRouteImport
       parentRoute: typeof AuthenticatedAdminBestellungRoute
     }
     '/_authenticated/admin/bestellung/inventur': {
@@ -1487,12 +1375,124 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminBestellungInventurRouteImport
       parentRoute: typeof AuthenticatedAdminBestellungRoute
     }
-    '/_authenticated/admin/bestellung/bestellungen': {
-      id: '/_authenticated/admin/bestellung/bestellungen'
-      path: '/bestellungen'
-      fullPath: '/admin/bestellung/bestellungen'
-      preLoaderRoute: typeof AuthenticatedAdminBestellungBestellungenRouteImport
+    '/_authenticated/admin/bestellung/lieferanten': {
+      id: '/_authenticated/admin/bestellung/lieferanten'
+      path: '/lieferanten'
+      fullPath: '/admin/bestellung/lieferanten'
+      preLoaderRoute: typeof AuthenticatedAdminBestellungLieferantenRouteImport
       parentRoute: typeof AuthenticatedAdminBestellungRoute
+    }
+    '/_authenticated/admin/bestellung/unzugeordnet': {
+      id: '/_authenticated/admin/bestellung/unzugeordnet'
+      path: '/unzugeordnet'
+      fullPath: '/admin/bestellung/unzugeordnet'
+      preLoaderRoute: typeof AuthenticatedAdminBestellungUnzugeordnetRouteImport
+      parentRoute: typeof AuthenticatedAdminBestellungRoute
+    }
+    '/_authenticated/admin/einstellungen/': {
+      id: '/_authenticated/admin/einstellungen/'
+      path: '/'
+      fullPath: '/admin/einstellungen/'
+      preLoaderRoute: typeof AuthenticatedAdminEinstellungenIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
+    }
+    '/_authenticated/admin/einstellungen/easyorder-verwaltung': {
+      id: '/_authenticated/admin/einstellungen/easyorder-verwaltung'
+      path: '/easyorder-verwaltung'
+      fullPath: '/admin/einstellungen/easyorder-verwaltung'
+      preLoaderRoute: typeof AuthenticatedAdminEinstellungenEasyorderVerwaltungRouteImport
+      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
+    }
+    '/_authenticated/admin/einstellungen/veranstaltungen': {
+      id: '/_authenticated/admin/einstellungen/veranstaltungen'
+      path: '/veranstaltungen'
+      fullPath: '/admin/einstellungen/veranstaltungen'
+      preLoaderRoute: typeof AuthenticatedAdminEinstellungenVeranstaltungenRouteImport
+      parentRoute: typeof AuthenticatedAdminEinstellungenRoute
+    }
+    '/_authenticated/admin/staff/': {
+      id: '/_authenticated/admin/staff/'
+      path: '/'
+      fullPath: '/admin/staff/'
+      preLoaderRoute: typeof AuthenticatedAdminStaffIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminStaffRoute
+    }
+    '/_authenticated/admin/staff/$staffId': {
+      id: '/_authenticated/admin/staff/$staffId'
+      path: '/$staffId'
+      fullPath: '/admin/staff/$staffId'
+      preLoaderRoute: typeof AuthenticatedAdminStaffStaffIdRouteImport
+      parentRoute: typeof AuthenticatedAdminStaffRoute
+    }
+    '/_authenticated/admin/staff/new': {
+      id: '/_authenticated/admin/staff/new'
+      path: '/new'
+      fullPath: '/admin/staff/new'
+      preLoaderRoute: typeof AuthenticatedAdminStaffNewRouteImport
+      parentRoute: typeof AuthenticatedAdminStaffRoute
+    }
+    '/api/public/bank/sync-spicery': {
+      id: '/api/public/bank/sync-spicery'
+      path: '/api/public/bank/sync-spicery'
+      fullPath: '/api/public/bank/sync-spicery'
+      preLoaderRoute: typeof ApiPublicBankSyncSpiceryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/calendar/$token': {
+      id: '/api/public/calendar/$token'
+      path: '/api/public/calendar/$token'
+      fullPath: '/api/public/calendar/$token'
+      preLoaderRoute: typeof ApiPublicCalendarTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/display/$locationId': {
+      id: '/api/public/display/$locationId'
+      path: '/api/public/display/$locationId'
+      fullPath: '/api/public/display/$locationId'
+      preLoaderRoute: typeof ApiPublicDisplayLocationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/mailersend/webhook': {
+      id: '/api/public/mailersend/webhook'
+      path: '/api/public/mailersend/webhook'
+      fullPath: '/api/public/mailersend/webhook'
+      preLoaderRoute: typeof ApiPublicMailersendWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/telegram/daily-report': {
+      id: '/api/public/telegram/daily-report'
+      path: '/api/public/telegram/daily-report'
+      fullPath: '/api/public/telegram/daily-report'
+      preLoaderRoute: typeof ApiPublicTelegramDailyReportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/telegram/webhook': {
+      id: '/api/public/telegram/webhook'
+      path: '/api/public/telegram/webhook'
+      fullPath: '/api/public/telegram/webhook'
+      preLoaderRoute: typeof ApiPublicTelegramWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/trmnl-dienstplan/$token': {
+      id: '/api/public/trmnl-dienstplan/$token'
+      path: '/api/public/trmnl-dienstplan/$token'
+      fullPath: '/api/public/trmnl-dienstplan/$token'
+      preLoaderRoute: typeof ApiPublicTrmnlDienstplanTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/trmnl-planungstafel/$token': {
+      id: '/api/public/trmnl-planungstafel/$token'
+      path: '/api/public/trmnl-planungstafel/$token'
+      fullPath: '/api/public/trmnl-planungstafel/$token'
+      preLoaderRoute: typeof ApiPublicTrmnlPlanungstafelTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/trmnl-tasks/$token': {
+      id: '/api/public/trmnl-tasks/$token'
+      path: '/api/public/trmnl-tasks/$token'
+      fullPath: '/api/public/trmnl-tasks/$token'
+      preLoaderRoute: typeof ApiPublicTrmnlTasksTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -1711,3 +1711,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

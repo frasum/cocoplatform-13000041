@@ -17,7 +17,7 @@
 // geblockter Tage — eine fehlende Migration darf nicht als UB1-Regression
 // erscheinen, und ein grüner Lauf darf sie nicht verschweigen.
 
-import { test, expect, type Locator, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { seedUnpaidLeave, UB1_MIGRATION_HINT, type E2EUnpaidLeaveSeed } from "./seed";
 
 /**
@@ -66,6 +66,49 @@ async function readDiagnoseSplit(
     krank: Number(match![2]),
     unbezahlt: Number(match![3]),
   };
+}
+
+async function loginAsAdmin(page: Page, seed: E2EUnpaidLeaveSeed): Promise<void> {
+
+/** ICS-Zeilen entfalten (RFC 5545: Fortsetzung beginnt mit Space/Tab). */
+function unfoldIcs(raw: string): string[] {
+  const lines = raw.split(/\r?\n/);
+  const out: string[] = [];
+  for (const line of lines) {
+    if ((line.startsWith(" ") || line.startsWith("\t")) && out.length > 0) {
+      out[out.length - 1] += line.slice(1);
+    } else {
+      out.push(line);
+    }
+  }
+  return out;
+}
+
+/** Zerlegt den Feed in VEVENT-Blöcke als Property-Listen. */
+function parseIcsEvents(raw: string): Array<Record<string, string>> {
+  const events: Array<Record<string, string>> = [];
+  let current: Record<string, string> | null = null;
+  for (const line of unfoldIcs(raw)) {
+    if (line === "BEGIN:VEVENT") current = {};
+    else if (line === "END:VEVENT") {
+      if (current) events.push(current);
+      current = null;
+    } else if (current) {
+      const idx = line.indexOf(":");
+      if (idx <= 0) continue;
+      // Property-Name ohne Parameter (z. B. DTSTART;VALUE=DATE → DTSTART).
+      const name = line.slice(0, idx).split(";")[0]!;
+      current[name] = line.slice(idx + 1);
+    }
+  }
+  return events;
+}
+
+async function fetchIcsFeed(request: APIRequestContext, feedPath: string): Promise<string> {
+  const res = await request.get(feedPath);
+  expect(res.status(), "ICS-Feed muss ohne Login erreichbar sein").toBe(200);
+  expect(res.headers()["content-type"] ?? "").toContain("text/calendar");
+  return await res.text();
 }
 
 async function loginAsAdmin(page: Page, seed: E2EUnpaidLeaveSeed): Promise<void> {

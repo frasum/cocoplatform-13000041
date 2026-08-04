@@ -54,15 +54,29 @@ async function loadProposal(
 ): Promise<VacationBalanceProposal> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  // Urlaubskonto liegt im Stammblatt (staff_personal_details), nicht auf staff.
   const staffRes = await supabaseAdmin
     .from("staff")
-    .select("vacation_days_previous_year, vacation_days_current_year, vacation_days_taken")
+    .select("id")
     .eq("id", args.staffId)
     .eq("organization_id", organizationId)
     .maybeSingle();
   if (staffRes.error) throw new Error(staffRes.error.message);
-  const staff = staffRes.data as StaffAccountRow | null;
-  if (!staff) throw new Error("Mitarbeiter nicht in dieser Organisation.");
+  if (!staffRes.data) throw new Error("Mitarbeiter nicht in dieser Organisation.");
+
+  const detailsRes = await supabaseAdmin
+    .from("staff_personal_details")
+    .select("vacation_days_previous_year, vacation_days_current_year, vacation_days_taken")
+    .eq("staff_id", args.staffId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  if (detailsRes.error) throw new Error(detailsRes.error.message);
+  // Kein Stammblatt ⇒ Konto nicht gepflegt (null-Felder), kein Fehler.
+  const staff: StaffAccountRow = (detailsRes.data as StaffAccountRow | null) ?? {
+    vacation_days_previous_year: null,
+    vacation_days_current_year: null,
+    vacation_days_taken: null,
+  };
 
   // Bestätigte U-Tage des laufenden Jahres — die betrachtete Periode wird
   // ausgenommen, damit der eigene Antrag den eigenen Anspruch nicht kürzt.

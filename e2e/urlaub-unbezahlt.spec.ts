@@ -17,7 +17,7 @@
 // geblockter Tage — eine fehlende Migration darf nicht als UB1-Regression
 // erscheinen, und ein grüner Lauf darf sie nicht verschweigen.
 
-import { test, expect, type Locator, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { seedUnpaidLeave, UB1_MIGRATION_HINT, type E2EUnpaidLeaveSeed } from "./seed";
 
 /**
@@ -66,6 +66,47 @@ async function readDiagnoseSplit(
     krank: Number(match![2]),
     unbezahlt: Number(match![3]),
   };
+}
+
+/** ICS-Zeilen entfalten (RFC 5545: Fortsetzung beginnt mit Space/Tab). */
+function unfoldIcs(raw: string): string[] {
+  const lines = raw.split(/\r?\n/);
+  const out: string[] = [];
+  for (const line of lines) {
+    if ((line.startsWith(" ") || line.startsWith("\t")) && out.length > 0) {
+      out[out.length - 1] += line.slice(1);
+    } else {
+      out.push(line);
+    }
+  }
+  return out;
+}
+
+/** Zerlegt den Feed in VEVENT-Blöcke als Property-Listen. */
+function parseIcsEvents(raw: string): Array<Record<string, string>> {
+  const events: Array<Record<string, string>> = [];
+  let current: Record<string, string> | null = null;
+  for (const line of unfoldIcs(raw)) {
+    if (line === "BEGIN:VEVENT") current = {};
+    else if (line === "END:VEVENT") {
+      if (current) events.push(current);
+      current = null;
+    } else if (current) {
+      const idx = line.indexOf(":");
+      if (idx <= 0) continue;
+      // Property-Name ohne Parameter (z. B. DTSTART;VALUE=DATE → DTSTART).
+      const name = line.slice(0, idx).split(";")[0]!;
+      current[name] = line.slice(idx + 1);
+    }
+  }
+  return events;
+}
+
+async function fetchIcsFeed(request: APIRequestContext, feedPath: string): Promise<string> {
+  const res = await request.get(feedPath);
+  expect(res.status(), "ICS-Feed muss ohne Login erreichbar sein").toBe(200);
+  expect(res.headers()["content-type"] ?? "").toContain("text/calendar");
+  return await res.text();
 }
 
 async function loginAsAdmin(page: Page, seed: E2EUnpaidLeaveSeed): Promise<void> {
@@ -175,5 +216,33 @@ test.describe("Urlaub (unbezahlt) — UB1", () => {
     const { count, error } = await seed.countStoredUnpaidDays();
     expect(error).toBeNull();
     expect(count).toBe(seed.unpaidDays.length);
+  });
+
+  test("(5) ICS-Feed weist unbezahlten Urlaub eigenständig aus", async ({ request }) => {
+    seed = await seedUnpaidLeave("ub1-ics");
+    assertMigrationApplied(seed);
+
+    const { feedPath } = await seed.createCalendarFeedToken();
+    const events = parseIcsEvents(await fetchIcsFeed(request, feedPath));
+
+    const unpaid = events.filter((e) => e["SUMMARY"] === "Urlaub (unbezahlt)");
+    const paid = events.filter((e) => e["SUMMARY"] === "Urlaub");
+
+    // Unbezahlt: eigenes Event, eigene Kategorie — NICHT auf "Urlaub" gemappt.
+    expect(unpaid).toHaveLength(1);
+    expect(unpaid[0]!["CATEGORIES"]).toBe("URLAUB_UNBEZAHLT");
+    // Mi–Fr am Stück: DTSTART = erster unbezahlter Tag, DTEND exklusiv.
+    const lastPlusOne = new Date(`${seed.unpaidDays[seed.unpaidDays.length - 1]!}T00:00:00Z`);
+    lastPlusOne.setUTCDate(lastPlusOne.getUTCDate() + 1);
+    expect(unpaid[0]!["DTSTART"]).toBe(seed.unpaidDays[0]!.replace(/-/g, ""));
+    expect(unpaid[0]!["DTEND"]).toBe(lastPlusOne.toISOString().slice(0, 10).replace(/-/g, ""));
+
+    // Bezahlt bleibt getrennt und behält Label/Kategorie "URLAUB".
+    expect(paid).toHaveLength(1);
+    expect(paid[0]!["CATEGORIES"]).toBe("URLAUB");
+    expect(paid[0]!["DTSTART"]).toBe(seed.paidDays[0]!.replace(/-/g, ""));
+
+    // Genau ein Event trägt die unbezahlte Kategorie — keine Doppelausgabe.
+    expect(events.filter((e) => e["CATEGORIES"] === "URLAUB_UNBEZAHLT")).toHaveLength(1);
   });
 });

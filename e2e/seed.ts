@@ -22,6 +22,7 @@
 // aus der E2E-Suite ausgeschlossen (Lektion "thaitime").
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createHash, randomBytes } from "node:crypto";
 
 const PASSWORD = process.env.E2E_PASSWORD ?? "Test-Password-123!";
 
@@ -252,6 +253,7 @@ export async function seedKasseFinalize(
 
   const cleanup = async () => {
     await svc.from("audit_log").delete().eq("organization_id", orgId);
+    await svc.from("access_tokens").delete().eq("organization_id", orgId);
     await svc.from("sessions").delete().eq("organization_id", orgId);
     await svc.from("time_entries").delete().eq("organization_id", orgId);
     await svc.from("location_calendar_exceptions").delete().eq("location_id", locationId);
@@ -267,6 +269,20 @@ export async function seedKasseFinalize(
     for (const uid of createdUserIds) {
       await svc.auth.admin.deleteUser(uid).catch(() => undefined);
     }
+  };
+
+  // ICS-Feed: Token wie in der App — Klartext nur hier, in der DB nur der Hash.
+  const createCalendarFeedToken = async (): Promise<{ token: string; feedPath: string }> => {
+    const token = randomBytes(32).toString("base64url");
+    const { error } = await svc.from("access_tokens").insert({
+      organization_id: orgId,
+      staff_id: worker.staffId,
+      token_type: "calendar_feed",
+      token_hash: createHash("sha256").update(token).digest("hex"),
+      expires_at: null,
+    });
+    if (error) throw new Error(`access_tokens insert failed: ${error.message}`);
+    return { token, feedPath: `/api/public/calendar/${token}.ics` };
   };
 
   return {
@@ -371,6 +387,12 @@ export type E2EUnpaidLeaveSeed = {
    * Zahlenlage). Wirft, wenn die Änderung nicht gespeichert werden kann.
    */
   setAbsenceType: (date: string, type: "urlaub" | "krank" | "urlaub_unbezahlt") => Promise<void>;
+  /**
+   * Erzeugt ein aktives `calendar_feed`-Token für die Seed-Person und liefert
+   * Klartext + Feed-Pfad (nur der SHA-256-Hash landet in der DB — wie in der
+   * App).
+   */
+  createCalendarFeedToken: () => Promise<{ token: string; feedPath: string }>;
   cleanup: () => Promise<void>;
 };
 
@@ -609,6 +631,7 @@ export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed
     migrationError,
     countStoredUnpaidDays,
     setAbsenceType,
+    createCalendarFeedToken,
     cleanup,
   };
 }

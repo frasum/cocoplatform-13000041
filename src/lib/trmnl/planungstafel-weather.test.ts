@@ -32,36 +32,41 @@ describe("buildWeatherRow", () => {
   });
 
   it("rundet Temperaturen ganzzahlig", () => {
-    const [cell] = buildWeatherRow(["2026-08-05"], [
-      row({ business_date: "2026-08-05", temp_max_c: 23.6, temp_min_c: 12.4 }),
-    ]);
+    const [cell] = buildWeatherRow(
+      ["2026-08-05"],
+      [row({ business_date: "2026-08-05", temp_max_c: 23.6, temp_min_c: 12.4 })],
+    );
     expect(cell?.tempMaxC).toBe(24);
     expect(cell?.tempMinC).toBe(12);
   });
 
   it("0 mm Regen wird null, 0.4 mm bleibt 0.4", () => {
-    const [zero] = buildWeatherRow(["2026-08-05"], [
-      row({ business_date: "2026-08-05", precipitation_mm: 0 }),
-    ]);
+    const [zero] = buildWeatherRow(
+      ["2026-08-05"],
+      [row({ business_date: "2026-08-05", precipitation_mm: 0 })],
+    );
     expect(zero?.rainMm).toBeNull();
-    const [some] = buildWeatherRow(["2026-08-05"], [
-      row({ business_date: "2026-08-05", precipitation_mm: 0.4 }),
-    ]);
+    const [some] = buildWeatherRow(
+      ["2026-08-05"],
+      [row({ business_date: "2026-08-05", precipitation_mm: 0.4 })],
+    );
     expect(some?.rainMm).toBe(0.4);
   });
 
   it("fehlender Wettercode wird nicht geraten (Label „—“)", () => {
-    const [cell] = buildWeatherRow(["2026-08-05"], [
-      row({ business_date: "2026-08-05", weather_code: null }),
-    ]);
+    const [cell] = buildWeatherRow(
+      ["2026-08-05"],
+      [row({ business_date: "2026-08-05", weather_code: null })],
+    );
     expect(cell?.label).toBe("—");
     expect(cell?.tempMaxC).toBe(20);
   });
 
   it("nutzt das Kurzlabel aus weatherSymbol", () => {
-    const [cell] = buildWeatherRow(["2026-08-05"], [
-      row({ business_date: "2026-08-05", weather_code: 63 }),
-    ]);
+    const [cell] = buildWeatherRow(
+      ["2026-08-05"],
+      [row({ business_date: "2026-08-05", weather_code: 63 })],
+    );
     expect(cell?.label).toBe("Regen");
   });
 

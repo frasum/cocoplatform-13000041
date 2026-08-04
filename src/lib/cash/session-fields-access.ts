@@ -14,6 +14,7 @@ import { parseDisabledSessionFields, type SessionFieldKey } from "./session-fiel
 type LocationFieldsRow = {
   id: string;
   name: string;
+  organization_id: string;
   disabled_session_fields: string[] | null;
 };
 

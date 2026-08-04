@@ -32,7 +32,7 @@ describe("FS1 — Session-Feld-Sichtbarkeit", () => {
     );
   });
 
-  it("Schreibpfad: 0 und „fehlt" sind erlaubt (Bestandswert bleibt)", () => {
+  it("Schreibpfad: 0 und fehlendes Feld sind erlaubt (Bestandswert bleibt)", () => {
     expect(() => assertSessionFieldWritable("finedine", ["finedine"], 0)).not.toThrow();
     expect(() => assertSessionFieldWritable("finedine", ["finedine"], undefined)).not.toThrow();
     expect(() => assertSessionFieldWritable("finedine", [], 1500)).not.toThrow();

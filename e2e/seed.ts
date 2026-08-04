@@ -347,6 +347,14 @@ export type E2EUnpaidLeaveSeed = {
   paidDays: string[];
   /** Mi+Do+Fr — unbezahlter Urlaub. */
   unpaidDays: string[];
+  /**
+   * UB1-Migration auf diesem Stack vorhanden? Wenn nein, ist
+   * `urlaub_unbezahlt` nicht speicherbar — dann steht der Grund in
+   * `migrationError` und die unbezahlten Tage sind NICHT geblockt.
+   */
+  unpaidLeaveSupported: boolean;
+  /** Klartext-Fehlermeldung des abgelehnten Inserts (sonst null). */
+  migrationError: string | null;
   cleanup: () => Promise<void>;
 };
 

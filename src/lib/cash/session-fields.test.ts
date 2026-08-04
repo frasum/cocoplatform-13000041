@@ -27,9 +27,7 @@ describe("FS1 — Session-Feld-Sichtbarkeit", () => {
   });
 
   it("Schreibpfad: expliziter Wert ≠ 0 auf deaktiviertem Feld wird abgelehnt", () => {
-    expect(() => assertSessionFieldWritable("finedine", ["finedine"], 1500)).toThrow(
-      /deaktiviert/,
-    );
+    expect(() => assertSessionFieldWritable("finedine", ["finedine"], 1500)).toThrow(/deaktiviert/);
   });
 
   it("Schreibpfad: 0 und fehlendes Feld sind erlaubt (Bestandswert bleibt)", () => {

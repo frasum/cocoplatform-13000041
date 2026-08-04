@@ -56,9 +56,8 @@ export const listLocations = createServerFn({ method: "GET" })
       .eq("organization_id", caller.organizationId)
       .order("name");
     if (!includeInactive) query = query.eq("is_active", true);
-    const { loadDisabledSessionFieldsByLocation } = await import(
-      "@/lib/cash/session-fields-access"
-    );
+    const { loadDisabledSessionFieldsByLocation } =
+      await import("@/lib/cash/session-fields-access");
     const [rowsRes, orgRes, disabledByLoc] = await Promise.all([
       query,
       supabaseAdmin

@@ -1994,7 +1994,6 @@ export async function addSessionSatelliteCore(caller: AdminCaller, data: AddSate
 
 const SATELLITE_TABLE = {
   expense: "session_expenses",
-  other_income: "session_other_incomes",
   advance: "session_advances",
   card_transaction: "session_card_transactions",
   bank_deposit: "session_bank_deposits",
@@ -2032,16 +2031,20 @@ export const removeSessionSatellite = createServerFn({ method: "POST" })
         cashLockedThroughDate: waterline,
       });
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const table = SATELLITE_TABLE[data.kind];
       // SE1: neue Positionstabelle über den Typ-Shim, alles andere wie bisher.
-      const del =
+      const { error } =
         data.kind === "other_income"
-          ? otherIncomesTable(supabaseAdmin).delete()
-          : supabaseAdmin.from(table).delete();
-      const { error } = await del
-        .eq("id", data.id)
-        .eq("session_id", session.id)
-        .eq("organization_id", caller.organizationId);
+          ? await otherIncomesTable(supabaseAdmin)
+              .delete()
+              .eq("id", data.id)
+              .eq("session_id", session.id)
+              .eq("organization_id", caller.organizationId)
+          : await supabaseAdmin
+              .from(SATELLITE_TABLE[data.kind])
+              .delete()
+              .eq("id", data.id)
+              .eq("session_id", session.id)
+              .eq("organization_id", caller.organizationId);
       if (error) throw error;
       return {
         result: { ok: true as const },

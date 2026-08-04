@@ -191,12 +191,14 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
   const sumHilf = active.reduce((a, s) => a + s.hilf_mahl_cents, 0);
   const sumAdvances = data.advances.reduce((a, b) => a + b.amountCents, 0);
   const sumExpenses = data.expenses.reduce((a, b) => a + b.amountCents, 0);
+  // SE1: Summe der sonstigen Einnahmen aus der Positionsliste.
+  const sumOtherIncomes = data.otherIncomes.reduce((a, b) => a + b.amountCents, 0);
 
   const vouchersSold = Number(sess.vouchers_sold_cents ?? 0);
   const vouchersRedeemed = Number(sess.vouchers_redeemed_cents ?? 0);
   const finedine = Number(sess.finedine_vouchers_cents ?? 0);
   const einladung = Number(sess.einladung_cents ?? 0);
-  const sonstige = Number(sess.sonstige_einnahme_cents ?? 0);
+  const sonstige = sumOtherIncomes;
 
   const dayInput: DayInput = sessionToDayInput(sess, {
     cardTotalCents: cardTerminalTotal,
@@ -205,6 +207,7 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
     openInvoicesCents: active.map((s) => s.open_invoices_cents),
     expensesCents: data.expenses.map((e) => e.amountCents),
     advancesCents: data.advances.map((a) => a.amountCents),
+    otherIncomesCents: data.otherIncomes.map((o) => o.amountCents),
     tipRemainderCents: data.tipRemainderCents ?? 0,
   });
   const bargeldCents = computeDailyCashWithTipRemainder(dayInput);
@@ -388,6 +391,21 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
     }
     rightParts.push(
       `<tr class="total"><td>Summe</td><td class="num">${fmtEur(sumExpenses)}</td></tr></tbody></table></section>`,
+    );
+  }
+
+  // SE1: Sonstige Einnahmen als eigener Block analog Ausgaben.
+  if (data.otherIncomes.length > 0) {
+    rightParts.push(
+      `<section><h2>Sonstige Einnahmen</h2><table><thead><tr><th>Beschreibung</th><th class="num">Betrag</th></tr></thead><tbody>`,
+    );
+    for (const o of data.otherIncomes) {
+      rightParts.push(
+        `<tr class="row"><td>${esc(o.description)}</td><td class="num">${fmtEur(o.amountCents)}</td></tr>`,
+      );
+    }
+    rightParts.push(
+      `<tr class="total"><td>Summe</td><td class="num">${fmtEur(sumOtherIncomes)}</td></tr></tbody></table></section>`,
     );
   }
 

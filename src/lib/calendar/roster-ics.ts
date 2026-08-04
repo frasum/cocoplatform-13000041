@@ -11,6 +11,8 @@ export type RosterIcsEvent =
       uid: string;
       summary: string;
       location: string;
+      /** Optional: maschinenlesbare Tags (CATEGORIES), z. B. URLAUB_UNBEZAHLT. */
+      categories?: string[];
       allDay: true;
       date: string; // YYYY-MM-DD
       // Optional: exklusives Ende für mehrtägige Ganztags-Events.
@@ -21,6 +23,7 @@ export type RosterIcsEvent =
       uid: string;
       summary: string;
       location: string;
+      categories?: string[];
       allDay: false;
       startIso: string; // ISO-8601 UTC
       endIso: string;
@@ -109,6 +112,9 @@ export function buildRosterIcs(input: BuildRosterIcsInput): string {
     }
     lines.push(`SUMMARY:${escapeIcsText(ev.summary)}`);
     lines.push(`LOCATION:${escapeIcsText(ev.location)}`);
+    if (ev.categories && ev.categories.length > 0) {
+      lines.push(`CATEGORIES:${ev.categories.map(escapeIcsText).join(",")}`);
+    }
     lines.push("END:VEVENT");
   }
   lines.push("END:VCALENDAR");

@@ -14,7 +14,6 @@ export type SessionDayFields = {
   vouchers_redeemed_cents?: number | null;
   finedine_vouchers_cents?: number | null;
   einladung_cents?: number | null;
-  sonstige_einnahme_cents?: number | null;
   vorschuss_cents?: number | null;
 };
 
@@ -25,6 +24,12 @@ export type SessionDayInputArgs = {
   expensesCents: number[];
   advancesCents: number[];
   openInvoicesCents: number[];
+  /**
+   * SE1: Sonstige Einnahmen sind eine Positionsliste (wie Ausgaben). Die
+   * SUMME dieser Positionen ersetzt das frühere Session-Feld
+   * `sonstige_einnahme_cents` — EINE Stelle im Core, alle Konsumenten folgen.
+   */
+  otherIncomesCents: number[];
   /**
    * Trinkgeld-Rest des Tages (Summe kitchen+service). Optional — Aufrufer
    * ohne Pool-Kontext (z. B. PDF, Telegram-Report) übergeben nichts, dann
@@ -46,7 +51,7 @@ export function sessionToDayInput(sess: SessionDayFields, args: SessionDayInputA
     finedineVouchersCents: Number(sess.finedine_vouchers_cents ?? 0),
     einladungCents: Number(sess.einladung_cents ?? 0),
     openInvoicesCents: args.openInvoicesCents,
-    sonstigeEinnahmeCents: Number(sess.sonstige_einnahme_cents ?? 0),
+    sonstigeEinnahmeCents: args.otherIncomesCents.reduce((s, x) => s + x, 0),
     vorschussCents: Number(sess.vorschuss_cents ?? 0),
     tipRemainderCents: args.tipRemainderCents ?? 0,
     satellites: {

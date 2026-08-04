@@ -39,6 +39,7 @@ import { assertCashWritable, CashLockedError } from "./cash-lock";
 import type { Json } from "@/integrations/supabase/types";
 import { ForbiddenError } from "@/lib/admin/role-guard";
 import { sessionToDayInput } from "./session-day-input";
+import { otherIncomesTable } from "./other-incomes-access";
 import { loadTipSettings, type TipSettings } from "./tip-settings";
 import {
   openInvoiceEntriesSchema,
@@ -474,6 +475,12 @@ export async function getCashOverviewCore(
         amountCents: number;
         createdAt: string;
       }>,
+      otherIncomes: [] as Array<{
+        id: string;
+        description: string;
+        amountCents: number;
+        createdAt: string;
+      }>,
       advances: [] as Array<{
         id: string;
         staffId: string;
@@ -512,6 +519,7 @@ export async function getCashOverviewCore(
     terminalAmtRes,
     expensesRes,
     advancesRes,
+    otherIncomesRes,
     cardRes,
     bankRes,
     transferRes,
@@ -544,6 +552,12 @@ export async function getCashOverviewCore(
     supabaseAdmin
       .from("session_advances")
       .select("id, staff_id, amount_cents, note, created_at")
+      .eq("organization_id", caller.organizationId)
+      .eq("session_id", session.id)
+      .order("created_at", { ascending: true }),
+    // SE1: Sonstige Einnahmen als Positionsliste (Muster session_expenses).
+    otherIncomesTable(supabaseAdmin)
+      .select("id, description, amount_cents, created_at")
       .eq("organization_id", caller.organizationId)
       .eq("session_id", session.id)
       .order("created_at", { ascending: true }),
@@ -635,6 +649,12 @@ export async function getCashOverviewCore(
       staffId: r.staff_id,
       amountCents: Number(r.amount_cents),
       note: r.note,
+      createdAt: r.created_at,
+    })),
+    otherIncomes: (otherIncomesRes.data ?? []).map((r) => ({
+      id: r.id,
+      description: r.description,
+      amountCents: Number(r.amount_cents),
       createdAt: r.created_at,
     })),
     cardTransactions: (cardRes.data ?? []).map((r) => ({
@@ -1817,6 +1837,13 @@ const satelliteAddSchema = z.discriminatedUnion("kind", [
     description: z.string().min(1).max(500),
     amountCents: z.number().int().positive(),
   }),
+  // SE1: sonstige Einnahme als Position (identisches Muster zur Ausgabe).
+  z.object({
+    sessionId: z.string().uuid(),
+    kind: z.literal("other_income"),
+    description: z.string().min(1).max(500),
+    amountCents: z.number().int().positive(),
+  }),
   z.object({
     sessionId: z.string().uuid(),
     kind: z.literal("advance"),
@@ -1872,6 +1899,18 @@ export async function addSessionSatelliteCore(caller: AdminCaller, data: AddSate
     if (data.kind === "expense") {
       const { data: r, error } = await supabaseAdmin
         .from("session_expenses")
+        .insert({
+          organization_id: caller.organizationId,
+          session_id: session.id,
+          description: data.description,
+          amount_cents: data.amountCents,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      createdId = r.id;
+    } else if (data.kind === "other_income") {
+      const { data: r, error } = await otherIncomesTable(supabaseAdmin)
         .insert({
           organization_id: caller.organizationId,
           session_id: session.id,
@@ -1955,6 +1994,7 @@ export async function addSessionSatelliteCore(caller: AdminCaller, data: AddSate
 
 const SATELLITE_TABLE = {
   expense: "session_expenses",
+  other_income: "session_other_incomes",
   advance: "session_advances",
   card_transaction: "session_card_transactions",
   bank_deposit: "session_bank_deposits",
@@ -1969,6 +2009,7 @@ export const removeSessionSatellite = createServerFn({ method: "POST" })
         sessionId: z.string().uuid(),
         kind: z.enum([
           "expense",
+          "other_income",
           "advance",
           "card_transaction",
           "bank_deposit",
@@ -1992,9 +2033,12 @@ export const removeSessionSatellite = createServerFn({ method: "POST" })
       });
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const table = SATELLITE_TABLE[data.kind];
-      const { error } = await supabaseAdmin
-        .from(table)
-        .delete()
+      // SE1: neue Positionstabelle über den Typ-Shim, alles andere wie bisher.
+      const del =
+        data.kind === "other_income"
+          ? otherIncomesTable(supabaseAdmin).delete()
+          : supabaseAdmin.from(table).delete();
+      const { error } = await del
         .eq("id", data.id)
         .eq("session_id", session.id)
         .eq("organization_id", caller.organizationId);

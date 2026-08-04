@@ -245,6 +245,7 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
 function renderPage(input: {
   blocks: PtLocationBlock[];
   days: string[];
+  weather: PtWeatherCell[];
   todayIso: string;
   now: Date;
 }): string {
@@ -328,6 +329,13 @@ function renderPage(input: {
   .entry .dot { width: 12px; height: 12px; border-radius: 999px; background: #000; margin-right: 8px; display: inline-block; }
   .entry .sym { margin-left: 8px; font-size: 22px; }
   .footer { position: absolute; left: 36px; right: 36px; bottom: 16px; border-top: 2px solid #000; padding-top: 8px; font-size: 18px; display: flex; justify-content: space-between; }
+  /* WX3-b: Wetterzeile — Fernlesbarkeit, volle Schwärze (e-ink stellt Grau schlecht dar). */
+  .grid { padding-bottom: 0; margin-bottom: 64px; }
+  .grid > .wx-head { border-top: 4px solid #000; }
+  .grid > .wx-cell { border-top: 4px solid #000; min-height: 0; color: #000; text-align: center; }
+  .wx-cell .wx-temp { font-size: 36px; font-weight: 800; color: #000; }
+  .wx-cell .wx-label { font-size: 24px; color: #000; }
+  .wx-cell .wx-rain { font-size: 20px; color: #000; }
 </style>
 </head>
 <body>
@@ -341,6 +349,7 @@ function renderPage(input: {
       .replace(/<div class="day-head/g, '<div class="col-head day-head')
       .replace(/day-head col-head/g, "col-head day-head")}
     ${bodyHtml}
+    ${renderWeatherRow(input.weather, input.days)}
   </div>
   <footer class="footer">
     <span>● Cross-Standort · Abwesende (Urlaub/krank) werden nicht angezeigt.</span>

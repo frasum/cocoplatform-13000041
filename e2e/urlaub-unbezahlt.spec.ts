@@ -17,7 +17,7 @@
 // geblockter Tage — eine fehlende Migration darf nicht als UB1-Regression
 // erscheinen, und ein grüner Lauf darf sie nicht verschweigen.
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { seedUnpaidLeave, UB1_MIGRATION_HINT, type E2EUnpaidLeaveSeed } from "./seed";
 
 /**
@@ -32,6 +32,40 @@ function assertMigrationApplied(seed: E2EUnpaidLeaveSeed): void {
   expect(seed.migrationError).not.toBeNull();
   expect(seed.migrationError).toContain(UB1_MIGRATION_HINT);
   throw new Error(seed.migrationError ?? UB1_MIGRATION_HINT);
+}
+
+/**
+ * Öffnet Brutto/Netto für die Seed-Person und liefert die Diagnosezeile.
+ */
+async function openDiagnoseLine(page: Page, seed: E2EUnpaidLeaveSeed): Promise<Locator> {
+  await page.goto("/admin/zeit-uebersicht");
+  await page.getByRole("button", { name: "Brutto/Netto" }).click();
+  await expect(page.getByRole("heading", { name: /Lohnrechner/ })).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.getByText(seed.staffDisplayName, { exact: false }).first().click();
+  const line = page.getByTestId("absence-diagnose-line");
+  await expect(line).toBeVisible({ timeout: 20_000 });
+  return line;
+}
+
+/**
+ * Liest die Zahlenlage aus der Diagnosezeile — exakt, nicht per Teilstring:
+ * die Zeile MUSS „U <n> / K <n> · davon unbezahlt (kein Vorschlag): <n>" sein.
+ */
+async function readDiagnoseSplit(
+  line: Locator,
+): Promise<{ urlaub: number; krank: number; unbezahlt: number }> {
+  const text = ((await line.textContent()) ?? "").replace(/\s+/g, " ").trim();
+  const match = text.match(
+    /^Vorschlag aus Kalender: U (\d+) \/ K (\d+) · davon unbezahlt \(kein Vorschlag\): (\d+)$/,
+  );
+  expect(match, `Diagnosezeile hat unerwartete Form: "${text}"`).not.toBeNull();
+  return {
+    urlaub: Number(match![1]),
+    krank: Number(match![2]),
+    unbezahlt: Number(match![3]),
+  };
 }
 
 async function loginAsAdmin(page: Page, seed: E2EUnpaidLeaveSeed): Promise<void> {

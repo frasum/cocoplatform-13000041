@@ -40,6 +40,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { ForbiddenError } from "@/lib/admin/role-guard";
 import { sessionToDayInput } from "./session-day-input";
 import { otherIncomesTable } from "./other-incomes-access";
+import { assertSessionFieldWritable } from "./session-fields";
 import { loadTipSettings, type TipSettings } from "./tip-settings";
 import {
   openInvoiceEntriesSchema,
@@ -1418,7 +1419,11 @@ const updateSessionSchema = z.object({
     .default([]),
   vouchersSoldCents: z.number().int().default(0),
   vouchersRedeemedCents: z.number().int().default(0),
-  finedineVouchersCents: z.number().int().default(0),
+  // FS1 (04.08.): Session-Felder können am Standort deaktiviert sein. Ein
+  // deaktiviertes Feld wird vom Client WEGGELASSEN (nicht 0 gesendet) — der
+  // Server behandelt „fehlt" als „nicht anfassen", damit historische Werte
+  // nie durch einen späteren Speichervorgang genullt werden.
+  finedineVouchersCents: z.number().int().optional(),
   // N15a (Fachentscheidung 13.07.): kein Client-Feld mehr — das Konzept
   // OpenTabs-Abzug ist durch SoUse abgelöst. Die DB-Spalte
   // `sessions.opentabs_deduction_cents` bleibt bewusst belassen bis
@@ -1472,12 +1477,30 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
       data.terminalAmounts.map((t) => t.terminalId),
     );
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // FS1 — Verteidigung in der Tiefe: explizite Werte ≠ 0 für ein am Standort
+    // deaktiviertes Session-Feld werden abgelehnt. Fehlt das Feld, bleibt der
+    // Bestandswert unangetastet (kein Nullen historischer Werte).
+    const { loadDisabledSessionFields } = await import("./session-fields-access");
+    const disabledFields = await loadDisabledSessionFields(
+      supabaseAdmin,
+      caller.organizationId,
+      session.location_id,
+    );
+    assertSessionFieldWritable(
+      "finedine",
+      disabledFields,
+      data.finedineVouchersCents,
+      "Finedine-Gutscheine",
+    );
     const { error: sErr } = await supabaseAdmin
       .from("sessions")
       .update({
         vouchers_sold_cents: data.vouchersSoldCents,
         vouchers_redeemed_cents: data.vouchersRedeemedCents,
-        finedine_vouchers_cents: data.finedineVouchersCents,
+        // FS1: nur schreiben, wenn der Client das Feld geschickt hat.
+        ...(data.finedineVouchersCents === undefined
+          ? {}
+          : { finedine_vouchers_cents: data.finedineVouchersCents }),
         vorschuss_cents: data.vorschussCents,
         einladung_cents: data.einladungCents,
         vectron_daily_total_cents: data.vectronDailyTotalCents ?? 0,

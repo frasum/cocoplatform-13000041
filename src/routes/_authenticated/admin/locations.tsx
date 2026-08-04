@@ -10,6 +10,7 @@ import {
   listLocations,
   setLocationActive,
   setLocationCashEnabled,
+  setLocationDisabledSessionFields,
   updateLocation,
   updateLocationGeo,
 } from "@/lib/admin/locations.functions";
@@ -19,6 +20,12 @@ import {
   upsertDisplaySettings,
 } from "@/lib/display/display.functions";
 import { LocationCalendarPanel } from "@/components/admin/LocationCalendarPanel";
+import {
+  SESSION_FIELD_KEYS,
+  SESSION_FIELD_LABELS,
+  isSessionFieldEnabled,
+  type SessionFieldKey,
+} from "@/lib/cash/session-fields";
 import { LocationTipPoolPanel } from "@/components/admin/LocationTipPoolPanel";
 import { tabClass } from "@/components/ui/nav-tab";
 
@@ -118,6 +125,7 @@ function LocationsPage() {
   const callDelete = useServerFn(deleteLocation);
   const callSetActive = useServerFn(setLocationActive);
   const callSetCashEnabled = useServerFn(setLocationCashEnabled);
+  const callSetSessionFields = useServerFn(setLocationDisabledSessionFields);
   const { loc: locParam, tab } = Route.useSearch();
   const navigate = useNavigate({ from: "/admin/locations" });
   const [newName, setNewName] = useState("");
@@ -192,6 +200,14 @@ function LocationsPage() {
   const setCashEnabledMut = useMutation({
     mutationFn: ({ id, cashEnabled }: { id: string; cashEnabled: boolean }) =>
       callSetCashEnabled({ data: { locationId: id, cashEnabled } }),
+    onSuccess: refresh,
+    onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler."),
+  });
+
+  // FS1: Kassenfelder je Standort ein-/ausschalten.
+  const setSessionFieldsMut = useMutation({
+    mutationFn: ({ id, disabled }: { id: string; disabled: SessionFieldKey[] }) =>
+      callSetSessionFields({ data: { locationId: id, disabledSessionFields: disabled } }),
     onSuccess: refresh,
     onError: (e: unknown) => setMsg(e instanceof Error ? e.message : "Fehler."),
   });
@@ -336,6 +352,12 @@ function LocationsPage() {
             onToggleCashEnabled={(next) => {
               setMsg(null);
               setCashEnabledMut.mutate({ id: activeLoc.id, cashEnabled: next });
+            }}
+            onToggleSessionField={(key, enabled) => {
+              setMsg(null);
+              const current = (activeLoc.disabledSessionFields ?? []) as SessionFieldKey[];
+              const next = enabled ? current.filter((k) => k !== key) : [...current, key];
+              setSessionFieldsMut.mutate({ id: activeLoc.id, disabled: [...new Set(next)] });
             }}
             onGeoChanged={refresh}
           />
@@ -577,6 +599,7 @@ type LocationRowData = {
   cashBalanceTargetResolvedCents?: number | null;
   isActive?: boolean;
   cashEnabled?: boolean;
+  disabledSessionFields?: string[];
   enabled_service_periods?: string[] | null;
   tip_service_pool_enabled?: boolean;
   kitchen_tip_rate_override?: number | string | null;
@@ -593,6 +616,7 @@ function LocationSectionPanel(props: {
   onDelete: () => void;
   onToggleActive: (next: boolean) => void;
   onToggleCashEnabled: (next: boolean) => void;
+  onToggleSessionField: (key: SessionFieldKey, enabled: boolean) => void;
   onGeoChanged: () => void;
 }) {
   const { loc, section } = props;
@@ -647,6 +671,27 @@ function LocationSectionPanel(props: {
             </span>
           </span>
         </label>
+        {/* FS1: Session-Felder der Kassenmaske je Standort ein-/ausschalten. */}
+        <div className="border-t border-input pt-3 text-sm">
+          <span className="font-medium text-foreground">Kassenfelder</span>
+          <span className="block text-xs text-muted-foreground">
+            Aus: Das Feld erscheint an diesem Standort nicht in der Kassenmaske und nicht im
+            Bankeinzahlungs-Export. Bereits erfasste Werte bleiben erhalten und sichtbar.
+          </span>
+          <div className="mt-2 space-y-1.5">
+            {SESSION_FIELD_KEYS.map((key) => (
+              <label key={key} className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={isSessionFieldEnabled(key, loc.disabledSessionFields)}
+                  onChange={(e) => props.onToggleSessionField(key, e.target.checked)}
+                  className="h-4 w-4 rounded border-input"
+                />
+                <span>{SESSION_FIELD_LABELS[key]}</span>
+              </label>
+            ))}
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-input pt-3">
           <button
             onClick={() => props.onSave(name, details)}

@@ -8,6 +8,7 @@
 // statt des Vorlagen-Tippfehlers „offene rechnunge".
 
 import type { CashDailyRow } from "@/lib/cash/cash.functions";
+import { sessionFieldVisible, type SessionFieldKey } from "@/lib/cash/session-fields";
 
 /**
  * EX2-c — Kanal-Spalten je Blatt.
@@ -21,6 +22,13 @@ export type BargeldSheet = {
   locationName: string;
   rows: CashDailyRow[];
   channelKinds: ReadonlySet<string>;
+  /**
+   * FS1 — am Standort deaktivierte SESSION-FELDER (heute: 'finedine'). Die
+   * Spalte entfällt dann — dieselbe Wahrheit wie die Kassenmaske. Trägt ein
+   * HISTORISCHER Tag des Zeitraums doch einen Wert, erscheint sie trotzdem
+   * (kein Geld verstecken).
+   */
+  disabledSessionFields?: readonly string[];
 };
 
 /** Spalten-Bauplan: Reihenfolge exakt wie die Bankeinzahlungs-Vorlage. */
@@ -28,6 +36,8 @@ type ColumnSpec = {
   header: string;
   /** Kanal-Spalte: nur auf Blättern mit dieser Kanal-Zuordnung. */
   channelKind?: string;
+  /** FS1: Session-Feld-Spalte — entfällt, wenn das Feld am Standort aus ist. */
+  sessionFieldKey?: SessionFieldKey;
   /** Vorzeichen in der Bargeld-Formel (0 = keine Rechengröße). */
   sign: -1 | 0 | 1;
   value: (r: CashDailyRow) => number;
@@ -39,9 +49,9 @@ const COLUMNS: readonly ColumnSpec[] = [
   { header: "SoUse", channelKind: "delivery_souse", sign: -1, value: (r) => r.deliverySouseCents },
   { header: "Wolt", channelKind: "delivery_wolt", sign: -1, value: (r) => r.deliveryWoltCents },
   { header: "gutscheine", sign: -1, value: (r) => r.vouchersRedeemedCents },
-  // EX2-c-Entscheid (04.08.): FineDine ist KEIN Katalog-Kanal (Erfassung als
-  // Session-Feld) — die Spalte bleibt vorerst Struktur-Spalte auf jedem Blatt.
-  { header: "FineDine", sign: -1, value: (r) => r.finedineCents },
+  // FS1 (04.08.): FineDine ist ein SESSION-FELD (kein Katalog-Kanal) — die
+  // Spalte folgt der Standort-Konfiguration `disabled_session_fields`.
+  { header: "FineDine", sessionFieldKey: "finedine", sign: -1, value: (r) => r.finedineCents },
   { header: "Gutscheine VK", sign: 1, value: (r) => r.vouchersSoldCents },
   { header: "einladung gäste", sign: -1, value: (r) => r.einladungCents },
   { header: "offene rechnungen", sign: -1, value: (r) => r.openInvoicesCents },
@@ -50,9 +60,23 @@ const COLUMNS: readonly ColumnSpec[] = [
   { header: "bargeld", sign: 0, value: (r) => betriebsBargeldCents(r) },
 ] as const;
 
-/** Spalten dieses Blatts: Struktur-Spalten immer, Kanal-Spalten nach Katalog. */
-export function columnsForSheet(channelKinds: ReadonlySet<string>): readonly ColumnSpec[] {
-  return COLUMNS.filter((c) => c.channelKind === undefined || channelKinds.has(c.channelKind));
+/**
+ * Spalten dieses Blatts: Struktur-Spalten immer, Kanal-Spalten nach Katalog,
+ * Session-Feld-Spalten nach Standort-Konfiguration (mit Historien-Ausnahme).
+ */
+export function columnsForSheet(
+  channelKinds: ReadonlySet<string>,
+  disabledSessionFields: readonly string[] = [],
+  rows: readonly CashDailyRow[] = [],
+): readonly ColumnSpec[] {
+  return COLUMNS.filter((c) => {
+    if (c.channelKind !== undefined && !channelKinds.has(c.channelKind)) return false;
+    if (c.sessionFieldKey !== undefined) {
+      const hasHistory = rows.some((r) => c.value(r) !== 0);
+      return sessionFieldVisible(c.sessionFieldKey, disabledSessionFields, hasHistory);
+    }
+    return true;
+  });
 }
 
 /**
@@ -71,7 +95,9 @@ export function bargeldFromRowCents(
   channelKinds: ReadonlySet<string> = ALL_CHANNEL_KINDS,
 ): number {
   let sum = 0;
-  for (const c of columnsForSheet(channelKinds)) {
+  // FS1: Für die Rechnung zählen ALLE Session-Felder — eine ausgeblendete
+  // Spalte trägt per Konstruktion 0, ein historischer Wert ≠ 0 wird gezeigt.
+  for (const c of columnsForSheet(channelKinds, [], [r])) {
     if (c.sign !== 0) sum += c.sign * c.value(r);
   }
   return sum;
@@ -139,7 +165,7 @@ export async function buildBargeldXlsx(sheets: BargeldSheet[]): Promise<Blob> {
 
   for (const sheet of sheets) {
     assertBargeldFormula(sheet.rows, sheet.locationName, sheet.channelKinds);
-    const cols = columnsForSheet(sheet.channelKinds);
+    const cols = columnsForSheet(sheet.channelKinds, sheet.disabledSessionFields ?? [], sheet.rows);
     const headers = ["datum", ...cols.map((c) => c.header)];
     const ws = wb.addWorksheet(sheet.locationName.slice(0, 31) || "Standort");
 

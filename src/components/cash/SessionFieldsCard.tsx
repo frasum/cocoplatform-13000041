@@ -12,13 +12,19 @@ import { AdvanceForm } from "./AdvanceForm";
 import { ExpenseForm } from "./ExpenseForm";
 import { CashSummaryBlock } from "./CashSummaryBlock";
 import { ExcelSectionHeader, ExcelInputRow, ExcelReadonlyRow } from "./ExcelRows";
+import { isSessionFieldEnabled } from "@/lib/cash/session-fields";
 
 type UpdatePayload = {
   channelAmounts: { channelId: string; amountCents: number }[];
   terminalAmounts: { terminalId: string; amountCents: number }[];
   vouchersSoldCents: number;
   vouchersRedeemedCents: number;
-  finedineVouchersCents: number;
+  /**
+   * FS1: Am Standort deaktivierte Session-Felder werden NICHT mit 0 gesendet,
+   * sondern WEGGELASSEN — der Server behandelt fehlende Felder als „nicht
+   * anfassen", historische Werte können so nie genullt werden.
+   */
+  finedineVouchersCents?: number;
   vorschussCents: number;
   einladungCents: number;
   vectronDailyTotalCents: number;
@@ -49,8 +55,8 @@ export function SessionFieldsCard({
   kpiSlot,
   previousDeficitCents,
   previousDeficitSourceDate,
-  locationName,
   tipRemainderCents,
+  disabledSessionFields,
 }: {
   sessionId: string;
   overview: Overview;
@@ -90,8 +96,9 @@ export function SessionFieldsCard({
   kpiSlot?: React.ReactNode;
   previousDeficitCents: number;
   previousDeficitSourceDate: string | null;
-  locationName?: string;
   tipRemainderCents: number;
+  /** FS1: am Standort deaktivierte Session-Felder (heute: 'finedine'). */
+  disabledSessionFields?: string[];
 }) {
   type Row = { id: string; euro: string };
   type TerminalRow = Row & { isGl: boolean };
@@ -132,6 +139,8 @@ export function SessionFieldsCard({
   };
 
   const [chRows, setChRows] = useState<Row[]>(initialChannels);
+  // FS1: Feld-Sichtbarkeit am Standort — eine Wahrheit für Maske und Payload.
+  const finedineEnabled = isSessionFieldEnabled("finedine", disabledSessionFields);
   const [tmRows, setTmRows] = useState<TerminalRow[]>(initialTerminals);
   const [misc, setMisc] = useState<Misc>(initialMisc);
   const [saving, setSaving] = useState(false);
@@ -190,12 +199,11 @@ export function SessionFieldsCard({
       gcParsed < 0
     )
       return null;
-    return {
+    const payload: UpdatePayload = {
       channelAmounts: chAmts,
       terminalAmounts: tmAmts,
       vouchersSoldCents: vs,
       vouchersRedeemedCents: vr,
-      finedineVouchersCents: fv,
       vorschussCents: vo,
       einladungCents: ei,
       vectronDailyTotalCents: ve,
@@ -203,6 +211,10 @@ export function SessionFieldsCard({
       guestCount: gcParsed,
       notes: misc.notes.trim() === "" ? null : misc.notes,
     };
+    // FS1: deaktiviertes Feld wird WEGGELASSEN (nicht 0) — der Server lässt
+    // den Bestandswert unangetastet.
+    if (finedineEnabled) payload.finedineVouchersCents = fv;
+    return payload;
   }
 
   async function handleSave() {
@@ -455,7 +467,7 @@ export function SessionFieldsCard({
                 disabled={!writable}
                 onChange={(v) => setMisc({ ...misc, vouchersRedeemed: v })}
               />
-              {locationName !== "YUM" && (
+              {finedineEnabled && (
                 <ExcelInputRow
                   label="Finedine-Gutscheine"
                   value={misc.finedineVouchers}

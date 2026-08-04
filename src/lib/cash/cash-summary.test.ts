@@ -96,7 +96,12 @@ describe("computeWechselgeld", () => {
         previousDeficitCents: 0,
         cashTargetCents: 200_000,
       }),
-    ).toEqual({ diffCents: 5000, tresorCents: 5000, wechselgeldbestandCents: 200_000 });
+    ).toEqual({
+      diffCents: 5000,
+      tresorCents: 5000,
+      wechselgeldbestandCents: 200_000,
+      diffToTargetSignedCents: 5000,
+    });
   });
   it("Vortagsdefizit zieht Wechselgeld unter Soll, Tresor = 0 bei diff<0", () => {
     expect(
@@ -105,6 +110,42 @@ describe("computeWechselgeld", () => {
         previousDeficitCents: -3000,
         cashTargetCents: 200_000,
       }),
-    ).toEqual({ diffCents: -2000, tresorCents: 0, wechselgeldbestandCents: 198_000 });
+    ).toEqual({
+      diffCents: -2000,
+      tresorCents: 0,
+      wechselgeldbestandCents: 198_000,
+      diffToTargetSignedCents: -2000,
+    });
+  });
+
+  // WG1 — Differenz beidseitig, Bestands-Kappung unverändert.
+  it("Unterdeckung: Bestand < Soll UND Differenz negativ", () => {
+    const r = computeWechselgeld({
+      tagesBargeldCents: 1000,
+      previousDeficitCents: -4000,
+      cashTargetCents: 200_000,
+    });
+    expect(r.wechselgeldbestandCents).toBeLessThan(200_000);
+    expect(r.diffToTargetSignedCents).toBe(-3000);
+  });
+  it("Überschuss: Bestand = Soll (gekappt) UND Differenz positiv", () => {
+    const r = computeWechselgeld({
+      tagesBargeldCents: 33_646,
+      previousDeficitCents: 0,
+      cashTargetCents: 200_000,
+    });
+    expect(r.wechselgeldbestandCents).toBe(200_000);
+    expect(r.tresorCents).toBe(33_646);
+    expect(r.diffToTargetSignedCents).toBe(33_646);
+  });
+  it("exakt: Differenz 0, Tresor 0, Bestand = Soll", () => {
+    const r = computeWechselgeld({
+      tagesBargeldCents: 3000,
+      previousDeficitCents: -3000,
+      cashTargetCents: 200_000,
+    });
+    expect(r.diffToTargetSignedCents).toBe(0);
+    expect(r.tresorCents).toBe(0);
+    expect(r.wechselgeldbestandCents).toBe(200_000);
   });
 });

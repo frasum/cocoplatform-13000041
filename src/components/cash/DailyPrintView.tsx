@@ -211,7 +211,7 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
 
   const cashTarget = data.cashBalanceTargetCents ?? 200_000;
   const previousDeficit = data.previousDeficitCents ?? 0;
-  const { wechselgeldbestandCents } = computeWechselgeld({
+  const { wechselgeldbestandCents, diffToTargetSignedCents } = computeWechselgeld({
     tagesBargeldCents: bargeldCents,
     previousDeficitCents: previousDeficit,
     cashTargetCents: cashTarget,
@@ -323,8 +323,9 @@ export function renderDailyPrintHtml(data: PdfExportData): string {
     );
   }
   leftRows.push(
+    // WG1: ungekappte, beidseitige Differenz aus dem Core.
     `<div class="box"><span>Differenz zum Wechselgeldbestand</span><span>${fmtEurSigned(
-      wechselgeldbestandCents - cashTarget,
+      diffToTargetSignedCents,
     )}</span></div>`,
   );
   leftRows.push(

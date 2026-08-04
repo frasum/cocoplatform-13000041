@@ -1,5 +1,5 @@
 import { fmtCents } from "@/lib/format";
-import { parseEuroToCents } from "@/lib/cash/kasse-helpers";
+import { parseEuroToCents, fmtSignedCents } from "@/lib/cash/kasse-helpers";
 import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { computeDailyCashWithTipRemainder } from "@/lib/cash/cash-ledger";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
@@ -85,7 +85,7 @@ export function CashSummaryBlock({
   );
 
   const tagesBargeldCents = computeDailyCashWithTipRemainder(dayInput);
-  const { tresorCents, wechselgeldbestandCents } = computeWechselgeld({
+  const { tresorCents, wechselgeldbestandCents, diffToTargetSignedCents } = computeWechselgeld({
     tagesBargeldCents,
     previousDeficitCents,
     cashTargetCents: cashBalanceTargetCents,
@@ -98,8 +98,8 @@ export function CashSummaryBlock({
   };
   const below = wechselgeldbestandCents < cashBalanceTargetCents;
   const expensesTotalCents = expenses.reduce((s, e) => s + e.amountCents, 0);
-  const diffToTargetCents = wechselgeldbestandCents - cashBalanceTargetCents;
-  const diffNegative = diffToTargetCents < 0;
+  // WG1: beidseitig ehrliche Differenz aus dem Core (ungekappt).
+  const diffToTargetCents = diffToTargetSignedCents;
 
   return (
     <div>
@@ -140,10 +140,14 @@ export function CashSummaryBlock({
         <span className="font-semibold text-foreground">Differenz zum Wechselgeldbestand</span>
         <span
           className={`font-mono tabular-nums font-semibold ${
-            diffNegative ? "text-red-700" : "text-emerald-700"
+            diffToTargetCents < 0
+              ? "text-red-700"
+              : diffToTargetCents > 0
+                ? "text-emerald-700"
+                : "text-foreground"
           }`}
         >
-          {fmtEur(diffToTargetCents)}
+          {fmtSignedCents(diffToTargetCents)}
         </span>
       </div>
       {tresorCents > 0 && (

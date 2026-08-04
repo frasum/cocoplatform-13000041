@@ -370,8 +370,10 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
     tagesBargeldCents: bargeldCents,
     previousDeficitCents: data.previousDeficitCents ?? 0,
     cashTargetCents: _cashTargetForDiff,
-  }).wechselgeldbestandCents;
-  const _diffToTargetCents = _wechselForDiff - _cashTargetForDiff;
+  });
+  // WG1: ungekappte, beidseitige Differenz aus dem Core (Bestand bleibt gekappt).
+  const _diffToTargetCents = _wechselForDiff.diffToTargetSignedCents;
+  const _diffColor = _diffToTargetCents < 0 ? RED : _diffToTargetCents > 0 ? GREEN : undefined;
   summaryRows.push([
     {
       content: "Tages-Bargeld",
@@ -421,6 +423,7 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
         fontSize: 10,
         fillColor: [255, 255, 255],
         halign: "right",
+        ...(_diffColor ? { textColor: _diffColor } : {}),
         lineWidth: 0.5,
         lineColor: [0, 0, 0],
         cellPadding: { top: 3, bottom: 3, left: 2, right: 2 },

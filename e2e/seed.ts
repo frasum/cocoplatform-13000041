@@ -316,3 +316,240 @@ export async function findPoolWarningAuditRow(
   if (!row) return null;
   return { meta: (row.meta ?? {}) as Record<string, unknown> };
 }
+
+// ---------------------------------------------------------------------------
+// UB1 — Seed für „Urlaub (unbezahlt)".
+//
+// Baut einen minimalen Cluster (Organisation, Standort, Admin, ein planbarer
+// Service-Mitarbeiter) und darauf:
+//   * Periode = Mo–So der aktuellen Woche (der Lohnrechner wählt genau die
+//     Periode, in der „heute" liegt),
+//   * Kalender: Mo+Di `urlaub`, Mi+Do+Fr `urlaub_unbezahlt`,
+//   * Referenzfenster: geschlossene Zeiteinträge auf ALLEN 91 Tagen vor
+//     Periodenbeginn → workRate = 1, damit die Diagnose-Schätzung exakt den
+//     Kalendertagen entspricht (U 2 / unbezahlt 3) und nicht rundet,
+//   * Personaldaten + Stundensatz, damit die Lohnvorschau ohne Fehler rechnet.
+//
+// Schlägt der Insert von `urlaub_unbezahlt` fehl (CHECK-Constraint auf
+// `roster_absence.type` noch nicht migriert), bricht der Seed mit klarer
+// Ursache ab — kein stiller Grün-Lauf.
+
+export type E2EUnpaidLeaveSeed = {
+  orgId: string;
+  locationId: string;
+  adminEmail: string;
+  adminPassword: string;
+  staffId: string;
+  staffDisplayName: string;
+  periodStart: string;
+  periodEnd: string;
+  /** Mo+Di — bezahlter Urlaub. */
+  paidDays: string[];
+  /** Mi+Do+Fr — unbezahlter Urlaub. */
+  unpaidDays: string[];
+  cleanup: () => Promise<void>;
+};
+
+function isoPlus(isoDate: string, delta: number): string {
+  const d = new Date(`${isoDate}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Montag (UTC) der Woche, in der `today` liegt. */
+function mondayOfWeek(todayIso: string): string {
+  const d = new Date(`${todayIso}T00:00:00Z`);
+  const dow = d.getUTCDay(); // 0 = So
+  const delta = dow === 0 ? -6 : 1 - dow;
+  return isoPlus(todayIso, delta);
+}
+
+export async function seedUnpaidLeave(label: string): Promise<E2EUnpaidLeaveSeed> {
+  const svc = service();
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const { data: org, error: orgErr } = await svc
+    .from("organizations")
+    .insert({ name: `e2e-${label}-${suffix}` })
+    .select("id")
+    .single();
+  if (orgErr || !org) throw new Error(`org insert failed: ${orgErr?.message}`);
+  const orgId = org.id as string;
+
+  const { data: loc, error: locErr } = await svc
+    .from("locations")
+    .insert({
+      organization_id: orgId,
+      name: "E2E-Standort",
+      latitude: 48.137154,
+      longitude: 11.575382,
+      geofence_radius_m: 100,
+    })
+    .select("id")
+    .single();
+  if (locErr || !loc) throw new Error(`location insert failed: ${locErr?.message}`);
+  const locationId = loc.id as string;
+
+  const createdUserIds: string[] = [];
+  const createdStaffIds: string[] = [];
+
+  async function mkUser(role: "admin" | "staff", tag: string) {
+    const email = `${tag}-${suffix}@e2e.local`;
+    const { data: u, error: uErr } = await svc.auth.admin.createUser({
+      email,
+      password: PASSWORD,
+      email_confirm: true,
+    });
+    if (uErr || !u.user) throw new Error(`auth createUser failed: ${uErr?.message}`);
+    createdUserIds.push(u.user.id);
+
+    const displayName = `${tag} E2E`;
+    const { data: staff, error: sErr } = await svc
+      .from("staff")
+      .insert({
+        organization_id: orgId,
+        first_name: tag,
+        last_name: "E2E",
+        display_name: displayName,
+        email,
+        is_active: true,
+        must_change_password: false,
+      })
+      .select("id")
+      .single();
+    if (sErr || !staff) throw new Error(`staff insert failed: ${sErr?.message}`);
+    createdStaffIds.push(staff.id as string);
+
+    const { error: linkErr } = await svc
+      .from("user_links")
+      .insert({ user_id: u.user.id, staff_id: staff.id, organization_id: orgId });
+    if (linkErr) throw new Error(`user_links insert failed: ${linkErr.message}`);
+
+    const { error: raErr } = await svc
+      .from("role_assignments")
+      .insert({ staff_id: staff.id, organization_id: orgId, role });
+    if (raErr) throw new Error(`role_assignments insert failed: ${raErr.message}`);
+
+    const { error: slErr } = await svc.from("staff_locations").insert({
+      organization_id: orgId,
+      staff_id: staff.id,
+      location_id: locationId,
+      department: "service",
+    });
+    if (slErr) throw new Error(`staff_locations insert failed: ${slErr.message}`);
+
+    return { staffId: staff.id as string, email, displayName };
+  }
+
+  const admin = await mkUser("admin", "admin");
+  const worker = await mkUser("staff", "urlauber");
+
+  const { data: bd, error: bdErr } = await svc.rpc("current_business_date");
+  if (bdErr) throw new Error(`current_business_date failed: ${bdErr.message}`);
+  const today = bd as unknown as string;
+
+  const monday = mondayOfWeek(today);
+  const periodStart = monday;
+  const periodEnd = isoPlus(monday, 6);
+  const paidDays = [isoPlus(monday, 0), isoPlus(monday, 1)];
+  const unpaidDays = [isoPlus(monday, 2), isoPlus(monday, 3), isoPlus(monday, 4)];
+
+  const { error: perErr } = await svc.from("periods").insert({
+    organization_id: orgId,
+    label: `E2E-KW ${periodStart}`,
+    start_date: periodStart,
+    end_date: periodEnd,
+  });
+  if (perErr) throw new Error(`periods insert failed: ${perErr.message}`);
+
+  // Personaldaten + Stundensatz: ohne beides bricht die Lohnvorschau ab.
+  const { error: pdErr } = await svc.from("staff_personal_details").insert({
+    organization_id: orgId,
+    staff_id: worker.staffId,
+    tax_class: 1,
+    soll_hours_per_day: 8,
+  });
+  if (pdErr) throw new Error(`staff_personal_details insert failed: ${pdErr.message}`);
+
+  const { error: rateErr } = await svc.from("staff_compensation_rates").insert({
+    staff_id: worker.staffId,
+    organization_id: orgId,
+    department: "service",
+    valid_from: isoPlus(periodStart, -365),
+    hourly_rate: 15,
+  });
+  if (rateErr) throw new Error(`staff_compensation_rates insert failed: ${rateErr.message}`);
+
+  // Referenzfenster (91 Tage vor Periodenbeginn) vollständig bearbeitet →
+  // workRate = 1 → Diagnose-Schätzung = Kalendertage (exakt prüfbar).
+  const refEntries = Array.from({ length: 91 }, (_, i) => {
+    const day = isoPlus(periodStart, -91 + i);
+    return {
+      organization_id: orgId,
+      staff_id: worker.staffId,
+      location_id: locationId,
+      business_date: day,
+      started_at: new Date(`${day}T10:00:00Z`).toISOString(),
+      ended_at: new Date(`${day}T18:00:00Z`).toISOString(),
+    };
+  });
+  const { error: teErr } = await svc.from("time_entries").insert(refEntries);
+  if (teErr) throw new Error(`time_entries insert failed: ${teErr.message}`);
+
+  const absenceRows = [
+    ...paidDays.map((date) => ({
+      organization_id: orgId,
+      staff_id: worker.staffId,
+      date,
+      type: "urlaub",
+    })),
+    ...unpaidDays.map((date) => ({
+      organization_id: orgId,
+      staff_id: worker.staffId,
+      date,
+      type: "urlaub_unbezahlt",
+    })),
+  ];
+  const { error: absErr } = await svc.from("roster_absence").insert(absenceRows);
+  if (absErr) {
+    throw new Error(
+      `roster_absence insert failed: ${absErr.message} — ` +
+        "Ist die UB1-Migration (docs/ub1-roster-absence-urlaub-unbezahlt.sql) " +
+        "auf diesem Stack angewendet? Ohne sie lehnt der CHECK 'urlaub_unbezahlt' ab.",
+    );
+  }
+
+  const cleanup = async () => {
+    await svc.from("audit_log").delete().eq("organization_id", orgId);
+    await svc.from("roster_absence").delete().eq("organization_id", orgId);
+    await svc.from("roster_shifts").delete().eq("organization_id", orgId);
+    await svc.from("time_entries").delete().eq("organization_id", orgId);
+    await svc.from("lohn_absence_days").delete().eq("organization_id", orgId);
+    await svc.from("staff_compensation_rates").delete().eq("organization_id", orgId);
+    await svc.from("staff_personal_details").delete().eq("organization_id", orgId);
+    await svc.from("periods").delete().eq("organization_id", orgId);
+    await svc.from("role_assignments").delete().eq("organization_id", orgId);
+    await svc.from("user_links").delete().eq("organization_id", orgId);
+    await svc.from("staff_locations").delete().eq("organization_id", orgId);
+    if (createdStaffIds.length > 0) await svc.from("staff").delete().in("id", createdStaffIds);
+    await svc.from("locations").delete().eq("organization_id", orgId);
+    await svc.from("organizations").delete().eq("id", orgId);
+    for (const uid of createdUserIds) {
+      await svc.auth.admin.deleteUser(uid).catch(() => undefined);
+    }
+  };
+
+  return {
+    orgId,
+    locationId,
+    adminEmail: admin.email,
+    adminPassword: PASSWORD,
+    staffId: worker.staffId,
+    staffDisplayName: worker.displayName,
+    periodStart,
+    periodEnd,
+    paidDays,
+    unpaidDays,
+    cleanup,
+  };
+}

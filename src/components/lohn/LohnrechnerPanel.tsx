@@ -515,6 +515,7 @@ export function LohnrechnerPanel() {
               usedKrankTage={result.usedKrankTage}
               estUrlaubTage={result.diagnose.urlaubTage}
               estKrankTage={result.diagnose.krankTage}
+              estUrlaubUnbezahltTage={result.diagnose.urlaubUnbezahltTage}
               onSaved={() => {
                 void qc.invalidateQueries({ queryKey: ["lohn-uebersicht"] });
                 mut.mutate(staffId);
@@ -597,6 +598,7 @@ function AbsenceDaysCard({
   usedKrankTage,
   estUrlaubTage,
   estKrankTage,
+  estUrlaubUnbezahltTage,
   onSaved,
 }: {
   staffId: string;
@@ -606,6 +608,8 @@ function AbsenceDaysCard({
   usedKrankTage: number;
   estUrlaubTage: number;
   estKrankTage: number;
+  /** UB1 — unbezahlte Urlaubstage aus dem Kalender, separat ausgewiesen (nicht fortzahlungsrelevant). */
+  estUrlaubUnbezahltTage: number;
   onSaved: () => void;
 }) {
   const [urlaub, setUrlaub] = useState<string>(String(usedUrlaubTage));
@@ -670,8 +674,9 @@ function AbsenceDaysCard({
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <span>
-          Vorschlag aus Kalender: U {estUrlaubTage} / K {estKrankTage}
+        <span data-testid="absence-diagnose-line">
+          Vorschlag aus Kalender: U {estUrlaubTage} / K {estKrankTage} · davon unbezahlt (kein
+          Vorschlag): {estUrlaubUnbezahltTage}
         </span>
         <Button
           variant="outline"

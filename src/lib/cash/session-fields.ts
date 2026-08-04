@@ -42,3 +42,19 @@ export function sessionFieldVisible(
 ): boolean {
   return isSessionFieldEnabled(key, disabled) || hasHistoricalValue;
 }
+
+/**
+ * Schreibpfad-Guard (Verteidigung in der Tiefe): ein EXPLIZITER Wert ≠ 0 für
+ * ein deaktiviertes Feld wird abgelehnt. `undefined` heißt „nicht anfassen"
+ * und ist immer erlaubt — Bestandswerte bleiben so erhalten.
+ */
+export function assertSessionFieldWritable(
+  key: SessionFieldKey,
+  disabled: readonly string[] | undefined | null,
+  value: number | undefined,
+  label = SESSION_FIELD_LABELS[key],
+): void {
+  if (value === undefined || value === 0) return;
+  if (isSessionFieldEnabled(key, disabled)) return;
+  throw new Error(`Feld „${label}" ist an diesem Standort deaktiviert.`);
+}

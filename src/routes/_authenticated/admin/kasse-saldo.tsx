@@ -24,7 +24,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getCashDailyBreakdown, type CashDailyRow } from "@/lib/cash/cash.functions";
-import { buildBargeldXlsx, type BargeldSheet } from "@/lib/cash/bargeld-export";
+import {
+  buildBargeldXlsx,
+  betriebsBargeldCents,
+  type BargeldSheet,
+} from "@/lib/cash/bargeld-export";
 import { cashBusinessMonthAnchor } from "@/lib/cash/cash-today";
 import { downloadBlob } from "@/lib/time/weekly-export";
 import { formatShortDate } from "@/lib/format-date";
@@ -98,6 +102,7 @@ function KasseSaldoPage() {
   const months = useMemo(() => buildMonthOptions(now), [now]);
   const [monthKey, setMonthKey] = useState<string>(months[0].key);
   const [locationId, setLocationId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const selected = months.find((m) => m.key === monthKey) ?? months[0];
   const { fromDate, toDate } = monthRange(selected.year, selected.month);
@@ -151,6 +156,8 @@ function KasseSaldoPage() {
       expenses: 0,
       bargeld: 0,
       tipRemainder: 0,
+      sonstige: 0,
+      sonstigeTage: 0,
     };
     for (const r of rows) {
       t.tagesumsatz += r.tagesumsatzCents;
@@ -165,13 +172,16 @@ function KasseSaldoPage() {
       t.openInvoices += r.openInvoicesCents;
       t.vorschuss += r.vorschussCents;
       t.expenses += r.expensesCents;
-      t.bargeld += r.bargeldCents;
+      t.bargeld += betriebsBargeldCents(r);
       t.tipRemainder += r.tipRemainderCents;
+      t.sonstige += r.sonstigeEinnahmeCents;
+      if (r.sonstigeEinnahmeCents !== 0) t.sonstigeTage += 1;
     }
     return t;
   }, [rows]);
 
   async function handleExport() {
+    setExporting(true);
     try {
       // EX2 — eine Mappe, ein Blatt je Kassen-Standort (wie die Vorlage).
       const sheets: BargeldSheet[] = [];
@@ -187,9 +197,13 @@ function KasseSaldoPage() {
       }
       const blob = await buildBargeldXlsx(sheets);
       downloadBlob(blob, `bankeinzahlung_${fromDate}_bis_${toDate}.xlsx`);
+      toast.success("Excel-Export erstellt.");
     } catch (e) {
       console.error("Excel-Export fehlgeschlagen", e);
-      toast.error("Excel-Export fehlgeschlagen: " + (e as Error).message);
+      // EX2-b — Formeltreue-Diagnosen müssen lesbar stehen bleiben.
+      toast.error("Excel-Export fehlgeschlagen: " + (e as Error).message, { duration: 15000 });
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -228,8 +242,8 @@ function KasseSaldoPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" disabled={rows.length === 0} onClick={handleExport}>
-            Export Excel
+          <Button variant="outline" disabled={rows.length === 0 || exporting} onClick={handleExport}>
+            {exporting ? "Exportiere…" : "Export Excel"}
           </Button>
         </div>
       </div>

@@ -379,6 +379,34 @@ function renderCell(cell: PtCell | undefined, iso: string, isLast: boolean): str
   const dow = d.getUTCDay();
   const we = dow === 0 || dow === 6 ? " we" : "";
   const last = isLast ? " last-col" : "";
+  return renderCellInner(cell, we, last);
+}
+
+// WX3-b — Wetterzeile: gleiche Grid-Struktur wie renderLocationBlock, damit
+// die Tagesspalten nicht verrutschen. Nur Text, keine Bildsymbole.
+function renderWeatherRow(cells: readonly PtWeatherCell[], days: readonly string[]): string {
+  const head = `<div class="row-head wx-head"><div>Wetter</div></div>`;
+  const body = days
+    .map((iso, i) => {
+      const cell = cells.find((c) => c.date === iso);
+      const d = new Date(iso + "T00:00:00Z");
+      const dow = d.getUTCDay();
+      const we = dow === 0 || dow === 6 ? " we" : "";
+      const last = i === days.length - 1 ? " last-col" : "";
+      const hasTemp = !!cell && cell.tempMaxC !== null && cell.tempMinC !== null;
+      const temp = hasTemp ? `${cell.tempMaxC}° / ${cell.tempMinC}°` : "—";
+      const label = hasTemp && cell.label !== "—" ? cell.label : "";
+      const rain =
+        cell && cell.rainMm !== null
+          ? `<div class="wx-rain">${escapeHtml(String(cell.rainMm).replace(".", ","))} mm</div>`
+          : "";
+      return `<div class="cell wx-cell${we}${last}"><div class="wx-temp">${escapeHtml(temp)}</div><div class="wx-label">${escapeHtml(label)}</div>${rain}</div>`;
+    })
+    .join("");
+  return `${head}${body}`;
+}
+
+function renderCellInner(cell: PtCell | undefined, we: string, last: string): string {
   if (!cell || cell.kind === "not_released") {
     return `<div class="cell not-released${we}${last}">— noch nicht freigegeben —</div>`;
   }

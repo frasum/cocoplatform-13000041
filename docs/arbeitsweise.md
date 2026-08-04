@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 04.08.2026 (§137: Export-Reifung EX2-b/c; SE1 Einnahmen-Positionen; FS1 Feld-Sichtbarkeit; WG1/KA2)
+Stand: 05.08.2026 (§138: SE1-b Kassen-Symmetrie; Block A0 aufgelöst — LAM/NET-Aufteilung entschieden, Lohnbüro-Mail raus)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -5082,3 +5082,33 @@ PB3 · KM1 · TB1 · 034/035 · AV1b/c-Rest · Stk/BE · DL1 · AP1 · Kanal-/Te
 **Produktions-Vollzug:** SE1- und FS1-Migration ausgeführt (Beleg: Kontroll-Resultset `disabled_session_fields`, 22:21); YUM-Schalter FineDine [gesetzt / ausstehend].
 
 **Offene Merkposten:** wie §136, **PLUS** SE1-Button-Label prüfen · YUM-FineDine-Schalter (falls ausstehend) · `sessions.sonstige_einnahme_cents`-Spalten-Entfernung (später, eigener Schritt). Der **A0-Engpass** (LAM/NET-Aufteilung, JOY-AU) bleibt der kritische Pfad.
+
+---
+
+## §138 — SE1-b; Block A0 aufgelöst (04./05.08.)
+
+**Abnahme-Anker:** HEAD `91cca997` — vier Gates vom Prüfer eigenhändig gemessen: `bun install --frozen-lockfile` Exit 0 (727 Pakete) · tsc 0 · `eslint . --max-warnings=0` 0 · `prettier --check .` clean · vitest 247 Dateien / 2498 Tests grün, 0 Skips. Rechnung: 2495 (§137) + 3 = 2498. Keine neuen Migrationen in der Serie (SE1/FS1-Dateien lagen bereits vor §137). 18 Commits über `34c1b452`, davon fünf reine Doku-Umsortierung (§136/§137 waren in falscher Reihenfolge eingefügt).
+
+**SE1-b — Kassen-Symmetrie (Merkposten „SE1-Button-Label" GESCHLOSSEN):** `ExpenseForm` bekommt die Prop `submitLabel`; die Einnahmen-Karte sagt „Einnahme hinzufügen" statt „Ausgabe hinzufügen". Vorzeichen-Darstellung vereinheitlicht über `fmtSignedCents`: Ausgaben und Vorschuss mindern (−), sonstige Einnahmen erhöhen (+, grün). Die Vorschuss-Zeile erscheint nur bei Betrag > 0; die Positionsliste hat Vorrang vor dem Altfeld (`effVorschussCents`). Drei neue Tests in `other-incomes-daily-cash.test.ts` — Rechen-Nachweis, dass die POSITIONS-SUMME im Tages-Bargeld addiert wird (`computeDailyCash`: `+ sonstigeEinnahmeCents`); getestet ist der Kern, nicht die UI.
+
+**Block A0 AUFGELÖST** (August-Export-Sichtkontrolle). Zwei Lese-SQL gegen COCO-Produktion (Abwesenheiten periodengetrennt · Urlaubskonten), Bauherr per CSV verifiziert:
+
+**Befund 1 — kein Konto ungepflegt.** Alle zehn betroffenen Personen haben `vacation_days_previous_year` / `_current_year` / `_taken` gesetzt; `availablePaidVacationDays` rechnet durch, kein `null`-Fall. `lohn_absence_days` leer ⇒ `confirmedNotInTaken = 0`. Der vermutete Engpass „fehlende Zahl vom Lohnbüro" bestand nicht.
+
+**Befund 2 — Periodenfalle bestätigt.** Die A0-Liste aus §136 war am KALENDERMONAT gesichtet, die Abrechnung läuft 26.–25. In der Periode August (26.07.–25.08.) liegen fünf weitere, vom Bauherrn bestätigte Fälle, alle im 26.–31.07.-Bereich: DEREJE #4 krank 6 Tage · Andre #23 krank 6 Tage · COCO #19 krank 1 Tag · PON #334 urlaub 5 Tage · GIG #360 urlaub 2 Tage. Ebenso reicht EUROPE #7 von 27.07. bis 03.08. (8 Tage), nicht erst ab 01.08. **Lehre:** Abwesenheits-Sichtungen immer am PERIODENFENSTER ziehen, nie am Kalendermonat.
+
+**NET #27 — Zählweise bestätigt, kein unbezahlter Anteil.** Konto 0 + 21 − 0 = 21 verfügbar. Abwesend 01.–31.08. Die Bauherren-Zerlegung („25 Tage weg, davon 17 bezahlter Urlaub, 8 Tage ohnehin frei") deckt sich exakt mit `isVacationWorkday`: die August-Periode enthält 25 Kalendertage = 17 Werktage + 8 Wochenendtage. Die Mo–Fr-Zählung des UB2-Modells trifft den Fall damit genau; der Prüfer-Verdacht „Modell passt nicht zur Gastronomie" war ein SCHEINPROBLEM und geht NICHT in den Backlog. Aufteilung: 17 Tage August-Periode, 4 Tage September-Periode (26.–31.08. = 4 Werktage).
+
+**LAM #320 — unbezahlte Freistellung (Bauherren-Entscheid Variante a).** Abwesend durchgehend 27.07.–14.09. (nicht „ganzer August" — die §136-Notiz war zu kurz gefasst), 36 Werktage. Konto −11 + 24 − 0 = 13 verfügbar; der negative Vorjahreswert ist bestätigt (gleiches Muster bei DEREJE −7 und PON −8). Entscheid: erst Resturlaub aufzehren, dann unbezahlt — nicht durchgehende Freistellung unter Schonung des Kontingents.
+
+```text
+bezahlt     27.07.–12.08.   13 Werktage
+unbezahlt   13.08.–25.08.    9 Werktage  (Periode August)
+unbezahlt   26.08.–14.09.   14 Werktage  (Periode September)
+```
+
+**Reihenfolge-Auflage (verbindlich):** UK2-Bestätigung August ZUERST, danach September. `loadProposal` arbeitet periodenbezogen und zieht bestätigte Tage anderer Perioden über `confirmedOtherPeriods` ab — nach der August-Bestätigung sinkt LAMs `available` auf 0, sodass der September korrekt alle 14 Tage als unbezahlt vorschlägt. In umgekehrter Reihenfolge bekäme der September fälschlich die 13 bezahlten Tage. Kein Bauauftrag nötig: die Ein-Klick-Übernahme der UK2-Maske stellt die Kalendertage auf `urlaub_unbezahlt` um (admin/payroll, Audit).
+
+**Lohnbüro-Mail raus** (Frau Schaffer, 05.08.): LAM-Freistellung periodengetrennt, NET zur Information. Damit ist der A0-Engpass geschlossen; offen bleibt die Sichtkontrolle des August-Exports selbst.
+
+**Offene Merkposten:** wie §137, **MINUS** A0-Engpass LAM/NET-Aufteilung (entschieden), **MINUS** Lohnbüro-Mail (raus), **MINUS** SE1-Button-Label (geschlossen), **PLUS** AU-Nachweise für DEREJE #4 und Andre #23 (je 6 Krank-Tage ⇒ AU-pflichtig; JOYs einzelner Krank-Tag am 02.08. ist ein Sonntag, ohne AU-Pflicht) · UK2-Bestätigung in der Reihenfolge August→September ausführen · August-Export-Sichtkontrolle.

@@ -39,7 +39,8 @@ export interface PdfSession {
   vouchers_redeemed_cents?: Cents | null;
   finedine_vouchers_cents?: Cents | null;
   einladung_cents?: Cents | null;
-  sonstige_einnahme_cents?: Cents | null;
+  // SE1: „sonstige Einnahme" ist kein Session-Feld mehr — siehe
+  // PdfExportData.otherIncomes (Positionsliste wie `expenses`).
   vorschuss_cents?: Cents | null;
 }
 
@@ -80,6 +81,8 @@ export interface PdfExportData {
   terminalAmounts: { terminalId: string; amountCents: Cents }[];
   settlements: PdfSettlement[];
   expenses: { description: string | null; amountCents: Cents }[];
+  /** SE1: sonstige Einnahmen als Positionsliste (Muster `expenses`). */
+  otherIncomes: { description: string; amountCents: Cents }[];
   advances: { staffName: string; amountCents: Cents; note: string | null }[];
   /** Soll-Wechselgeldbestand (resolved: Location ?? Org) in Cents. */
   cashBalanceTargetCents?: Cents;
@@ -267,6 +270,7 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
   const sumHilf = active.reduce((a, s) => a + s.hilf_mahl_cents, 0);
   const sumAdvances = data.advances.reduce((a, b) => a + b.amountCents, 0);
   const sumExpenses = data.expenses.reduce((a, b) => a + b.amountCents, 0);
+  const sumOtherIncomes = data.otherIncomes.reduce((a, b) => a + b.amountCents, 0);
 
   // Anzeigewerte aus den Session-Feldern (gleiche Quelle wie aggToDayInput),
   // damit die im PDF gedruckten Zahlen identisch mit der Bargeld-Berechnung sind.
@@ -274,7 +278,7 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
   const vouchersRedeemed = Number(sess.vouchers_redeemed_cents ?? 0);
   const finedine = Number(sess.finedine_vouchers_cents ?? 0);
   const einladung = Number(sess.einladung_cents ?? 0);
-  const sonstige = Number(sess.sonstige_einnahme_cents ?? 0);
+  const sonstige = sumOtherIncomes;
 
   // Tages-Bargeld: 1:1 über computeDailyCash (cash-ledger), Einzel-Session-DayInput
   // über den geteilten Helper (verhalten-identisch zur vorigen Inline-Variante).
@@ -285,6 +289,7 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
     openInvoicesCents: active.map((s) => s.open_invoices_cents),
     expensesCents: data.expenses.map((e) => e.amountCents),
     advancesCents: data.advances.map((a) => a.amountCents),
+    otherIncomesCents: data.otherIncomes.map((o) => o.amountCents),
     tipRemainderCents: data.tipRemainderCents ?? 0,
   });
   const bargeldCents = computeDailyCashWithTipRemainder(dayInput);
@@ -561,6 +566,28 @@ export async function generateDailySummaryPdf(data: PdfExportData): Promise<{
         [
           { content: "Summe", styles: { fontStyle: "bold" } },
           { content: fmtEur(sumExpenses), styles: { fontStyle: "bold", halign: "right" } },
+        ],
+      ],
+      theme: "plain",
+      headStyles: { fillColor: SLATE_BG, fontSize: 9, fontStyle: "bold", textColor: SLATE_FG },
+      bodyStyles: { fontSize: 9, cellPadding: { top: 1, bottom: 1, left: 2, right: 2 } },
+      columnStyles: { 1: { halign: "right" } },
+      tableWidth: rightColWidth,
+    });
+    rightEndY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  }
+
+  // SE1: Sonstige Einnahmen (rechte Spalte) — Block analog Ausgaben.
+  if (data.otherIncomes.length > 0) {
+    autoTable(doc, {
+      startY: rightEndY + 2,
+      margin: { left: rightX, right: margin },
+      head: [["Sonstige Einnahmen", "Betrag"]],
+      body: [
+        ...data.otherIncomes.map((o) => [o.description, fmtEur(o.amountCents)] as RowInput),
+        [
+          { content: "Summe", styles: { fontStyle: "bold" } },
+          { content: fmtEur(sumOtherIncomes), styles: { fontStyle: "bold", halign: "right" } },
         ],
       ],
       theme: "plain",

@@ -53,8 +53,8 @@ describe("TG5 — Berichtszeile", () => {
   });
 
   it("ohne Kennzahl bleibt die Zeile unverändert", () => {
-    expect(buildDailyReport(loc(undefined), DEFAULT_REPORT_FLAGS)).toContain(
-      "Vectron: 1.000,00 €\n",
-    );
+    const text = buildDailyReport(loc(undefined), DEFAULT_REPORT_FLAGS);
+    expect(text).toContain("Vectron: 1.000,00 €");
+    expect(text).not.toContain("€/Std");
   });
 });

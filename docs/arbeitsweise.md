@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 03.08.2026 (§134: Merkposten-Statusliste — ab hier EINE Liste mit Status je Punkt; §133: 7-Tage-Wetter, Notices folgen dem gewählten Geschäftstag, Realtime-Vollzug belegt)
+Stand: 04.08.2026 (§135: SM1 Sourcemaps; ZS1 Overlap-Guard + Plan-Abgleich; Lohnbüro-Antworten Ursula/TSB; §134: Merkposten-Statusliste mit Status je Punkt)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -5018,3 +5018,25 @@ Offene Merkposten (Sammelstand, ersetzt §121-Liste): **MB1-Produktions-Vollzug 
 PB3 · KM1 · TB1 · 034/035 · AV1b/c-Rest · Stk/BE · DL1 · AP1 · Kanal-/Terminalnamen-Notfallblatt.
 
 **Kritischer Pfad unverändert:** **August-Export** (bis 25.08., mit Prüfer-Sichtkontrolle) → **CODE-AUDIT-1** → **PG-Serie**.
+
+## §135 — Sourcemaps, Zeiterfassungs-Härtung, Lohnbüro-Klärungen (03./04.08.)
+
+**Nachzug-Situation:** §135 wurde nach dem Commit „§137 eingeführt, §135/136 fehlen“ nachgetragen. Da dieses Dokument keinen §137-Abschnitt enthält (Datei endete mit §134), steht §135 hier am Dateiende; §136/§137 fehlen weiterhin.
+
+**Abnahme-Anker:** HEAD `8a9d031b` — vier Gates grün (tsc 0 · eslint 0 · prettier clean · vitest 2418, 0 Skips; 2403 + 15).
+
+**SM1 (`225b58c8`):** Sentry-Sourcemap-Kette geschlossen — das vite-plugin war bereits verdrahtet (hidden maps, Upload-dann-löschen, nie öffentlich); es fehlten **Release-Kopplung** (Client-Init `release = APP_VERSION`, identisch zum Upload-Release — sonst matcht Sentry nie) und **No-op-Log** bei fehlenden Credentials. **Bauherren-Handgriff:** `SENTRY_AUTH_TOKEN` (Scopes `project:releases` + `org:read`) + `SENTRY_ORG` + `SENTRY_PROJECT` als Lovable-Build-Secrets [hinterlegt / ausstehend]. **Prüfer-Korrektur an der Fertigmeldung:** Lovable zählte 2402 Tests, gemessen 2403 — kein Test verschwunden, Sandbox-Zählfehler.
+
+**Sentry-Fall GERARD** (03.08., 12:48, `/admin/dienstplan`, planer, Safari): „Error: undefined“ minifiziert — Diagnose OHNE Sourcemaps bewusst **nicht erzwungen** (kein Blindfix aus n=1). **Status OFFEN**; drei Bauherren-Fragen ausstehend (Event-Zahl, Ursula-Schalter + Schichten, GERARDs Ablauf). Verdachtsrichtung: RS1-Personenliste vs. bestehende Schichten (CH1-Muster) ODER Deploy-Moment. Nächstes Event trägt dank SM1 Klartext-Frames.
+
+**ZS1 (`8a9d031b`)** — Anlass Bauherren-Fall 03.08. (kurzfristige Planänderung nach Session-Start):
+
+① **Overlap-Guard:** `overlap.ts` (halb-offene Intervalle auf echten Zeitstempeln — Ende == Anfang der Folgeschicht keine Überlappung; Mitternachts-Schichten strukturell korrekt, ±1-Tag-Ladefenster), `assertNoTimeConflict` serverseitig in `createTimeEntryShift` + `setTimeEntryShift` (identisch ⇒ Ablehnung mit Bestandszeiten im Fehlertext; überlappend ⇒ eigener Text; Doppelschichten mit Pause bleiben möglich). `runBatchTimes` dokumentiert konfliktfrei (update-statt-insert).
+
+② **„Nicht mehr im Plan“** (Variante b, konservativ): `not-in-plan.ts` (Markierung + Unberührt-Matrix: kein clock-Stempel, kein Settlement, keine manuelle Übersteuerung), Badge + Ein-Klick-Entfernen in Kassen-Kellnerliste UND Wochenplan; Server-Functions `removeUnplannedPoolEntry` / `removeUnplannedTimeEntry` prüfen Plan-Abwesenheit UND Unberührtheit **ERNEUT serverseitig** (Anzeige entscheidet nie) und laufen durch die bestehenden Delete-Cores (Sperren/Waterline/Audit). **KEIN Auto-Löschen.** Aufklärung an den Bauherrn: Der additive Nach-Sync für **PLAN-ZUGÄNGE** in laufende Sessions existierte bereits — frühes Session-Öffnen ist unbedenklich; nur **Abgänge** brauchen (jetzt sichtbar) einen Klick.
+
+**Lohnbüro-Antworten (Bauherr, 03.08.) — zwei Merkposten GESCHLOSSEN:** ① **Ursula (PN 30):** normale Personalnummern-Zeile im Export, keine Sonderbehandlung. ② **TSB-Personalgestellung:** Andres TSB-Stunden laufen über die YUM-Abrechnung; Verrechnung regeln die GmbHs untereinander — COCO-Export unverändert. Der Weg zu **Block A0** (August-Export-Sichtkontrolle) ist damit frei.
+
+**Offene Merkposten:** wie §134, **MINUS** Ursula-Export-Frage, **MINUS** TSB-Personalgestellung, **PLUS** GERARD-Auflösung (drei Fragen) · Sentry-Build-Secrets (falls ausstehend) · Aufräum-Nachweis EH-Duplikat
+
+**SUMITR-Eintrag** (Bauherr, Zeit-Übersicht). **Kritischer Pfad:** August-Export **Block A0** — Abwesenheiten August erfassen, Export-Entwurf an den Prüfer.

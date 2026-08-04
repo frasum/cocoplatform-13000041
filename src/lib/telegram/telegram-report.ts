@@ -4,6 +4,8 @@
 // formatiert. escapeHtml() wird auf ALLE dynamischen Strings angewandt,
 // weil Telegram im HTML-Modus sonst bei `<b>` in einer Notiz bricht.
 
+import { fmtEuroPerHour } from "./revenue-per-hour";
+
 export type ReportFlags = {
   umsatz: boolean;
   gaeste: boolean;
@@ -51,6 +53,8 @@ export type ReportLocationInput = {
   hasSession: boolean;
   vectronCents?: number;
   guestCount?: number;
+  /** TG5 — Umsatz je Arbeitsstunde in Cents; null = keine Stunden erfasst. */
+  revenuePerWorkHourCents?: number | null;
   kontrolle?: ReportKontrolle;
   waiters?: ReportWaiter[];
   kitchen?: ReportKitchen[];
@@ -142,7 +146,13 @@ function renderLocation(loc: ReportLocationInput, flags: ReportFlags): string {
   const lines: string[] = [title];
 
   if (flags.umsatz && loc.vectronCents !== undefined) {
-    lines.push(`Vectron: ${escapeHtml(fmtCents(loc.vectronCents))}`);
+    // TG5 — Umsatz je Arbeitsstunde direkt an der Umsatzzeile; Wert kommt
+    // fertig aus der Statistik-Kennzahl (keine Rechnung hier).
+    const perHour =
+      loc.revenuePerWorkHourCents === undefined
+        ? ""
+        : ` · ${escapeHtml(fmtEuroPerHour(loc.revenuePerWorkHourCents))}`;
+    lines.push(`Vectron: ${escapeHtml(fmtCents(loc.vectronCents))}${perHour}`);
   }
   if (flags.gaeste && (loc.guestCount ?? 0) > 0) {
     const avg = (loc.vectronCents ?? 0) / (loc.guestCount ?? 1);

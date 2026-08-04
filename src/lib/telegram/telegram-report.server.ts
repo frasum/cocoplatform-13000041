@@ -12,6 +12,11 @@ import { computeDailyCash, type DayInput } from "@/lib/cash/cash-ledger";
 import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
 import { sumNonGlTerminalCents } from "@/lib/cash/session-channels";
+import { buildChannelKindMap } from "@/lib/cash/channel-mapping";
+import { decomposeRevenue } from "@/lib/statistics/revenue-core";
+import { loadPausenBezahlt, loadWorkMinutesEntries } from "@/lib/statistics/work-minutes.server";
+import { workMinutesByDate } from "@/lib/statistics/work-minutes";
+import { revenuePerWorkHourCents } from "./revenue-per-hour";
 import { sendTelegramToStaff } from "./telegram.functions";
 import { decideReportGate } from "./report-gate";
 import {
@@ -119,6 +124,19 @@ async function loadReportInputForOrg(
     role: "admin",
   };
 
+  // CH1/TG5 — Kanal-Landkarte ORG-WEIT (kein Standort-Race) für die
+  // kind-Auflösung von Lieferkanälen und für den Tagesumsatz (STAT1).
+  const { data: allChannels } = await supabaseAdmin
+    .from("revenue_channels")
+    .select("id, kind")
+    .eq("organization_id", organizationId);
+  const kindById = buildChannelKindMap(
+    (allChannels ?? []).map((c) => ({ id: c.id as string, kind: String(c.kind) })),
+  );
+
+  // TG5 — Netto-Arbeitsminuten aus der EINEN Statistik-Stundenquelle (STAT2).
+  const pausenBezahlt = await loadPausenBezahlt(supabaseAdmin, organizationId);
+
   const locationInputs: ReportLocationInput[] = [];
   for (const l of locations ?? []) {
     const ov = await getCashOverviewCore(caller, {
@@ -158,20 +176,36 @@ async function loadReportInputForOrg(
       },
       {} as Record<string, number>,
     );
-    // Wir brauchen delivery_souse / delivery_wolt aus den Channels — dazu
-    // die Channel-Kinds nachladen (klein, org-lokal).
-    const { data: channels } = await supabaseAdmin
-      .from("revenue_channels")
-      .select("id, kind")
-      .eq("organization_id", organizationId)
-      .eq("location_id", l.id);
+    // delivery_souse / delivery_wolt aus der org-weiten Kanal-Landkarte.
     let deliverySouse = 0;
     let deliveryWolt = 0;
-    for (const c of channels ?? []) {
-      const amt = channelTotals[c.id] ?? 0;
-      if (c.kind === "delivery_souse") deliverySouse += amt;
-      else if (c.kind === "delivery_wolt") deliveryWolt += amt;
+    for (const [channelId, amt] of Object.entries(channelTotals)) {
+      const kind = kindById.get(channelId);
+      if (kind === "delivery_souse") deliverySouse += amt;
+      else if (kind === "delivery_wolt") deliveryWolt += amt;
     }
+
+    // TG5 — Tagesumsatz identisch zur Statistik (STAT1-Zerlegung) und
+    // Netto-Arbeitsminuten des Geschäftstags am Standort (STAT2-Quelle).
+    const sessionChannels = Object.entries(channelTotals)
+      .map(([channelId, amountCents]) => ({
+        kind: kindById.get(channelId),
+        amountCents,
+      }))
+      .filter((c): c is { kind: string; amountCents: number } => typeof c.kind === "string");
+    const dayTotalCents = decomposeRevenue({
+      vectronCents: Number(sess.vectron_daily_total_cents ?? 0),
+      channels: sessionChannels,
+    }).totalCents;
+    const workEntries = await loadWorkMinutesEntries(supabaseAdmin, {
+      organizationId,
+      startDate: businessDate,
+      endDate: businessDate,
+      locationId: l.id,
+      pausenBezahlt,
+    });
+    const workMinutes = workMinutesByDate(workEntries).get(businessDate) ?? 0;
+    const perHourCents = revenuePerWorkHourCents({ totalCents: dayTotalCents, workMinutes });
 
     const dayInput: DayInput = sessionToDayInput(
       {
@@ -273,6 +307,7 @@ async function loadReportInputForOrg(
       hasSession: true,
       vectronCents: Number(sess.vectron_daily_total_cents ?? 0),
       guestCount: Number(sess.guest_count ?? 0),
+      revenuePerWorkHourCents: perHourCents,
       kontrolle: {
         fehlbetragVortagCents: deficitCents,
         ausgabenCents,

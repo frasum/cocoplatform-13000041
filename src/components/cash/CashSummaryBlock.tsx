@@ -1,5 +1,5 @@
 import { fmtCents } from "@/lib/format";
-import { parseEuroToCents } from "@/lib/cash/kasse-helpers";
+import { parseEuroToCents, fmtSignedCents } from "@/lib/cash/kasse-helpers";
 import { computeWechselgeld } from "@/lib/cash/cash-summary";
 import { computeDailyCashWithTipRemainder } from "@/lib/cash/cash-ledger";
 import { sessionToDayInput } from "@/lib/cash/session-day-input";
@@ -147,7 +147,7 @@ export function CashSummaryBlock({
                 : "text-foreground"
           }`}
         >
-          {fmtEur(diffToTargetCents)}
+          {fmtSignedCents(diffToTargetCents)}
         </span>
       </div>
       {tresorCents > 0 && (

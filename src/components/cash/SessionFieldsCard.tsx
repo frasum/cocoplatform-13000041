@@ -98,6 +98,8 @@ export function SessionFieldsCard({
   previousDeficitSourceDate: string | null;
   locationName?: string;
   tipRemainderCents: number;
+  /** FS1: am Standort deaktivierte Session-Felder (heute: 'finedine'). */
+  disabledSessionFields?: string[];
 }) {
   type Row = { id: string; euro: string };
   type TerminalRow = Row & { isGl: boolean };

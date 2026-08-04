@@ -18,7 +18,12 @@ type UpdatePayload = {
   terminalAmounts: { terminalId: string; amountCents: number }[];
   vouchersSoldCents: number;
   vouchersRedeemedCents: number;
-  finedineVouchersCents: number;
+  /**
+   * FS1: Am Standort deaktivierte Session-Felder werden NICHT mit 0 gesendet,
+   * sondern WEGGELASSEN — der Server behandelt fehlende Felder als „nicht
+   * anfassen", historische Werte können so nie genullt werden.
+   */
+  finedineVouchersCents?: number;
   vorschussCents: number;
   einladungCents: number;
   vectronDailyTotalCents: number;
@@ -51,6 +56,7 @@ export function SessionFieldsCard({
   previousDeficitSourceDate,
   locationName,
   tipRemainderCents,
+  disabledSessionFields,
 }: {
   sessionId: string;
   overview: Overview;

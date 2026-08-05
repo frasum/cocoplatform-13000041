@@ -67,6 +67,7 @@ describe("runWeatherSyncForOrg", () => {
 describe("runWeatherSyncForOrgs", () => {
   it("ein Org-Fehler bricht die Schleife nicht ab", async () => {
     const seen: string[] = [];
+    const seen: string[] = [];
     const results = await runWeatherSyncForOrgs(["a", "b", "c"], async (id) => {
       seen.push(id);
       if (id === "b") throw new Error("Open-Meteo antwortete mit HTTP 429.");

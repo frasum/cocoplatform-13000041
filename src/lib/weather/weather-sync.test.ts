@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   runWeatherSyncForOrg,
   runWeatherSyncForOrgs,
+  needsForecastRefresh,
   type WeatherSyncDeps,
 } from "./weather-sync.server";
 import type { OpenMeteoDaily, WeatherDayRow } from "./weather-core";
@@ -77,5 +78,24 @@ describe("runWeatherSyncForOrgs", () => {
       { organizationId: "b", error: "Open-Meteo antwortete mit HTTP 429." },
       { organizationId: "c", forecastWritten: 1, archiveWritten: 1, skipped: 0 },
     ]);
+  });
+});
+
+describe("needsForecastRefresh", () => {
+  it("noch nie geholt ⇒ true", () => {
+    expect(needsForecastRefresh(null, "2026-08-05")).toBe(true);
+  });
+
+  it("Abruf von gestern ⇒ true", () => {
+    expect(needsForecastRefresh("2026-08-04T09:00:00+02:00", "2026-08-05")).toBe(true);
+  });
+
+  it("Abruf von heute 09:00 ⇒ false", () => {
+    expect(needsForecastRefresh("2026-08-05T09:00:00+02:00", "2026-08-05")).toBe(false);
+  });
+
+  it("Abruf heute 02:00 (vor der 3-Uhr-Grenze) ⇒ true", () => {
+    // 02:00 Berlin zählt zum Geschäftstag 04.08., jetzt ist 05.08.
+    expect(needsForecastRefresh("2026-08-05T02:00:00+02:00", "2026-08-05")).toBe(true);
   });
 });

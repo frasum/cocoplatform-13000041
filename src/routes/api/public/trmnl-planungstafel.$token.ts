@@ -216,6 +216,39 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
           releases,
         });
 
+        // WX3-c — Selbstversorgung: die Tafel holt höchstens EINMAL je
+        // Geschäftstag frische Vorhersagedaten. Jeder Fehler (Netz, Timeout,
+        // Open-Meteo-Ausfall, Schreibfehler) wird verworfen; die Tafel rendert
+        // mit dem, was in der Tabelle liegt. Bei Fehlschlag bleibt fetched_at
+        // stehen ⇒ der nächste Geräteabruf versucht es erneut (gewollt).
+        try {
+          const { data: lastRow } = await supabaseAdmin
+            .from("weather_days")
+            .select("fetched_at")
+            .eq("organization_id", orgId)
+            .eq("source", "forecast")
+            .order("fetched_at", { ascending: false })
+            .limit(1);
+          const { needsForecastRefresh, runWeatherSyncForOrg } = await import(
+            "@/lib/weather/weather-sync.server"
+          );
+          const lastFetchedAt = lastRow?.[0]?.fetched_at ?? null;
+          if (needsForecastRefresh(lastFetchedAt, today)) {
+            await Promise.race([
+              runWeatherSyncForOrg(orgId),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Wetter-Abruf Zeitüberschreitung")), 4000),
+              ),
+            ]);
+          }
+        } catch (e) {
+          // Höchstens eine Zeile je Fehlversuch — kein Spam.
+          console.error(
+            "[trmnl-planungstafel] Wetter-Auffrischung fehlgeschlagen:",
+            e instanceof Error ? e.message : String(e),
+          );
+        }
+
         // WX3-b — Wetterzeile. Ein Fehler hier darf die Tafel NICHT stürzen
         // lassen: der Dienstplan ist wichtiger als das Wetter, bei Fehler
         // zeigt die Zeile durchgehend „—".

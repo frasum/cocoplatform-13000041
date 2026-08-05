@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   runWeatherSyncForOrg,
   runWeatherSyncForOrgs,
+  needsForecastRefresh,
   type WeatherSyncDeps,
 } from "./weather-sync.server";
 import type { OpenMeteoDaily, WeatherDayRow } from "./weather-core";

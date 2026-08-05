@@ -229,11 +229,12 @@ export const Route = createFileRoute("/api/public/trmnl-planungstafel/$token")({
             .eq("source", "forecast")
             .order("fetched_at", { ascending: false })
             .limit(1);
+          const { businessDateOf } = await import("@/lib/business-date");
           const { needsForecastRefresh, runWeatherSyncForOrg } = await import(
             "@/lib/weather/weather-sync.server"
           );
           const lastFetchedAt = lastRow?.[0]?.fetched_at ?? null;
-          if (needsForecastRefresh(lastFetchedAt, today)) {
+          if (needsForecastRefresh(lastFetchedAt, businessDateOf(new Date()))) {
             await Promise.race([
               runWeatherSyncForOrg(orgId),
               new Promise((_, reject) =>

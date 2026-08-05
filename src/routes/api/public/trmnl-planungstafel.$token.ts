@@ -326,6 +326,7 @@ function renderPage(input: {
   body {
     width: 1872px; height: 1404px;
     padding: 28px 36px;
+    display: flex; flex-direction: column;
     font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
     font-size: 22px; line-height: 1.25;
     -webkit-font-smoothing: none;
@@ -334,7 +335,7 @@ function renderPage(input: {
   .muted { color: #000; opacity: 0.55; }
   .header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 4px solid #000; padding-bottom: 10px; }
   .header .right { font-size: 22px; text-align: right; }
-  .grid { display: grid; grid-template-columns: ${gridCols}; margin-top: 14px; }
+  .grid { display: grid; grid-template-columns: ${gridCols}; margin-top: 14px; flex: 1 1 auto; align-content: start; }
   .grid > * { border-bottom: 1.5px solid #000; padding: 8px 12px; }
   .grid > .row-head { border-right: 1.5px solid #000; }
   .grid > .col-head { border-right: 1.5px solid #000; }
@@ -349,7 +350,7 @@ function renderPage(input: {
   .loc-title { grid-column: 1 / -1; font-size: 28px; font-weight: 800; border-top: 4px solid #000; border-bottom: 2px solid #000; padding: 10px 12px; background: #f2f2f2; }
   .row-head { font-size: 22px; font-weight: 700; }
   .row-head .sub { font-size: 15px; font-weight: 500; opacity: 0.7; }
-  .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 130px; }
+  .cell { border-right: 1.5px solid #000; padding: 8px 12px; min-height: 110px; }
   /* EP2b: Tafel rechts offen wie links — kein Randstrich hinter der letzten Spalte. */
   .grid > .last-col { border-right: none; }
   .cell.not-released { color: #000; opacity: 0.45; font-style: italic; font-size: 18px; }
@@ -361,9 +362,11 @@ function renderPage(input: {
   .entry.absent { opacity: 0.45; text-decoration: line-through; }
   .entry .dot { width: 12px; height: 12px; border-radius: 999px; background: #000; margin-right: 8px; display: inline-block; }
   .entry .sym { margin-left: 8px; font-size: 22px; }
-  .footer { position: absolute; left: 36px; right: 36px; bottom: 16px; border-top: 2px solid #000; padding-top: 8px; font-size: 18px; display: flex; justify-content: space-between; }
+  /* WX3-d: Fußzeile im Fluss — sonst läuft die Wetterzeile darunter hindurch.
+     Seitliche Abstände kommen aus dem body-padding (36px). */
+  .footer { position: static; margin-top: auto; flex: 0 0 auto; border-top: 2px solid #000; padding-top: 8px; font-size: 18px; display: flex; justify-content: space-between; }
   /* WX3-b: Wetterzeile — Fernlesbarkeit, volle Schwärze (e-ink stellt Grau schlecht dar). */
-  .grid { padding-bottom: 0; margin-bottom: 64px; }
+  .grid { padding-bottom: 0; margin-bottom: 0; }
   .grid > .wx-head { border-top: 4px solid #000; }
   .grid > .wx-cell { border-top: 4px solid #000; min-height: 0; color: #000; text-align: center; }
   .wx-cell .wx-temp { font-size: 36px; font-weight: 800; color: #000; }

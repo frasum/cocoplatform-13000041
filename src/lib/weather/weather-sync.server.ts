@@ -162,6 +162,20 @@ export async function runWeatherSyncForOrg(
 }
 
 /** Alle Organisationen — der Cron arbeitet serviceseitig ohne Caller. */
+/**
+ * WX3-c: Braucht die Tafel frische Vorhersagedaten?
+ * Regel: höchstens EIN Abruf je Geschäftstag (3-Uhr-Grenze, KA1).
+ */
+export function needsForecastRefresh(
+  lastForecastFetchedAt: string | null,
+  todayBusinessDate: string,
+): boolean {
+  if (!lastForecastFetchedAt) return true;
+  const parsed = new Date(lastForecastFetchedAt);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return businessDateOf(parsed) < todayBusinessDate;
+}
+
 export async function listAllOrganizationIds(): Promise<string[]> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.from("organizations").select("id");

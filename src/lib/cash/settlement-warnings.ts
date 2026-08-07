@@ -17,6 +17,14 @@ export type SettlementWarning =
       waiterCardCents: number;
       glCardCents: number;
       diffCents: number;
+    }
+  | {
+      // Wolt steckt fachlich IM Vectron-Takeaway-Marker. Ist Wolt größer,
+      // ist die Erfassung fehlerhaft (Tippfehler in einer der beiden Zeilen).
+      kind: "wolt_exceeds_marker";
+      woltCents: number;
+      markerCents: number;
+      diffCents: number;
     };
 
 export type SettlementWarningInput = {
@@ -31,6 +39,8 @@ export type SettlementWarningInput = {
   // Nur physische Terminals (OHNE GL). GL-Karten gehören auf die
   // Kellner-Seite und werden via glCardCents addiert.
   glCardCents: number;
+  // Nur für die Plausibilitätswarnung „Wolt > Marker" — nie ein Summand.
+  deliveryWoltCents: number;
   waiterPosSalesCents: number[];
   waiterCardTotalCents: number[];
 };
@@ -47,10 +57,25 @@ function sumInts(arr: number[], name: string): number {
 }
 
 export function computeSettlementWarnings(input: SettlementWarningInput): SettlementWarning[] {
-  if (!input.hasSettlements) return [];
+  const warnings: SettlementWarning[] = [];
+
+  // Erfassungsfehler-Warnung: unabhängig von Kellner-Abrechnungen, damit sie
+  // direkt beim Eintippen der Kanäle auffällt.
+  const woltCents = asInt(input.deliveryWoltCents, "deliveryWoltCents");
+  const markerCents = asInt(input.deliveryVectronCents, "deliveryVectronCents");
+  if (woltCents > markerCents) {
+    warnings.push({
+      kind: "wolt_exceeds_marker",
+      woltCents,
+      markerCents,
+      diffCents: woltCents - markerCents,
+    });
+  }
+
+  if (!input.hasSettlements) return warnings;
 
   const posTotal = asInt(input.posTotalCents, "posTotalCents");
-  const deliveryVectron = asInt(input.deliveryVectronCents, "deliveryVectronCents");
+  const deliveryVectron = markerCents;
   const deliverySouse = asInt(input.deliverySouseCents, "deliverySouseCents");
   const terminalsTotal = asInt(input.terminalsTotalCents, "terminalsTotalCents");
   const glCard = asInt(input.glCardCents, "glCardCents");
@@ -61,7 +86,6 @@ export function computeSettlementWarnings(input: SettlementWarningInput): Settle
   const posDiff = posTotal - waiterPos - delivery;
   const terminalDiff = terminalsTotal - (waiterCard + glCard);
 
-  const warnings: SettlementWarning[] = [];
   if (Math.abs(posDiff) >= 1) {
     warnings.push({
       kind: "pos_diff",

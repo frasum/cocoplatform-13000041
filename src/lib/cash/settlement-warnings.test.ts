@@ -9,6 +9,7 @@ function base() {
     deliverySouseCents: 0,
     terminalsTotalCents: 0,
     glCardCents: 0,
+    deliveryWoltCents: 0,
     waiterPosSalesCents: [] as number[],
     waiterCardTotalCents: [] as number[],
   };

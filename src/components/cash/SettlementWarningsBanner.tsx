@@ -45,6 +45,7 @@ export function SettlementWarningsBanner({
     deliverySouseCents: agg.byKind.delivery_souse,
     terminalsTotalCents: physicalTerminalCents,
     glCardCents,
+    deliveryWoltCents: agg.byKind.delivery_wolt,
     waiterPosSalesCents: activeSettlements.map((s) => Number(s.pos_sales_cents)),
     waiterCardTotalCents: activeSettlements.map((s) => Number(s.card_total_cents)),
   });
@@ -55,21 +56,33 @@ export function SettlementWarningsBanner({
     <Card className="border-destructive/40 bg-destructive/10 p-4 text-destructive">
       <div className="mb-2 text-sm font-semibold">Abgleichs-Warnungen</div>
       <ul className="space-y-1 text-sm">
-        {warnings.map((w) =>
-          w.kind === "pos_diff" ? (
-            <li key="pos">
-              <strong>POS-Differenz</strong> — Vectron-Total ({fmtCents(w.posTotalCents)} €) ≠
-              Kellner-Umsätze ({fmtCents(w.waiterPosCents)} €) + Take-away/Lieferungen (
-              {fmtCents(w.deliveryCents)} €). Differenz: {fmtSignedCents(w.diffCents)}.
-            </li>
-          ) : (
+        {warnings.map((w) => {
+          if (w.kind === "pos_diff") {
+            return (
+              <li key="pos">
+                <strong>POS-Differenz</strong> — Vectron-Total ({fmtCents(w.posTotalCents)} €) ≠
+                Kellner-Umsätze ({fmtCents(w.waiterPosCents)} €) + Take-away/Lieferungen (
+                {fmtCents(w.deliveryCents)} €). Differenz: {fmtSignedCents(w.diffCents)}.
+              </li>
+            );
+          }
+          if (w.kind === "wolt_exceeds_marker") {
+            return (
+              <li key="wolt">
+                <strong>Wolt über Takeaway-Marker</strong> — Wolt ({fmtCents(w.woltCents)} €)
+                übersteigt den Vectron-Takeaway-Betrag ({fmtCents(w.markerCents)} €). Differenz:{" "}
+                {fmtSignedCents(w.diffCents)}. Erfassung prüfen.
+              </li>
+            );
+          }
+          return (
             <li key="term">
               <strong>Terminal-Differenz</strong> — Σ Terminals ({fmtCents(w.terminalsCents)} €) ≠
               Kellner-Karten ({fmtCents(w.waiterCardCents)} €) + GL ({fmtCents(w.glCardCents)} €).
               Differenz: {fmtSignedCents(w.diffCents)}.
             </li>
-          ),
-        )}
+          );
+        })}
       </ul>
     </Card>
   );

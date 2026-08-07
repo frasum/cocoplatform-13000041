@@ -9,6 +9,7 @@ function base() {
     deliverySouseCents: 0,
     terminalsTotalCents: 0,
     glCardCents: 0,
+    deliveryWoltCents: 0,
     waiterPosSalesCents: [] as number[],
     waiterCardTotalCents: [] as number[],
   };
@@ -146,5 +147,53 @@ describe("computeSettlementWarnings", () => {
     });
     expect(r).toHaveLength(1);
     expect(r[0]).toMatchObject({ kind: "terminal_diff", diffCents: 1_590, glCardCents: 0 });
+  });
+});
+
+describe("wolt_exceeds_marker", () => {
+  it("warns when Wolt exceeds the vectron takeaway marker", () => {
+    const r = computeSettlementWarnings({
+      ...base(),
+      deliveryVectronCents: 24_000,
+      deliveryWoltCents: 224_000,
+      posTotalCents: 24_000,
+      waiterPosSalesCents: [0],
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({
+      kind: "wolt_exceeds_marker",
+      woltCents: 224_000,
+      markerCents: 24_000,
+      diffCents: 200_000,
+    });
+  });
+
+  it("does not warn when Wolt equals the marker", () => {
+    const r = computeSettlementWarnings({
+      ...base(),
+      deliveryVectronCents: 24_000,
+      deliveryWoltCents: 24_000,
+      posTotalCents: 24_000,
+      waiterPosSalesCents: [0],
+    });
+    expect(r).toEqual([]);
+  });
+
+  it("warns even without settlements", () => {
+    const r = computeSettlementWarnings({
+      ...base(),
+      hasSettlements: false,
+      deliveryVectronCents: 100,
+      deliveryWoltCents: 500,
+      posTotalCents: 999_999,
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ kind: "wolt_exceeds_marker", diffCents: 400 });
+  });
+
+  it("throws on non-integer wolt cents", () => {
+    expect(() => computeSettlementWarnings({ ...base(), deliveryWoltCents: 1.5 })).toThrow(
+      /deliveryWoltCents/,
+    );
   });
 });

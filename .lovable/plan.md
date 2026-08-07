@@ -8,15 +8,16 @@ Umfang laut Abstimmung: nur Tagesabrechnung (Kasse), Anzeige als Karte im Tag, F
 
 Heute setzt `reopenSession` `finalized_at` auf NULL zurück — danach ist nicht mehr erkennbar, dass der Tag schon einmal fertig war.
 
-- Migration: `sessions.reopened_at timestamptz`, `sessions.reopened_by uuid` (Muster wie `finalized_by`).
-- `reopenSessionCore` setzt beide Felder beim Wiederöffnen.
+- Migration: `sessions.reopened_at timestamptz`, `sessions.reopened_by uuid` (Muster wie `finalized_by`), `sessions.reopen_reason text`.
+- `reopenSessionCore` setzt diese Felder beim Wiederöffnen.
+- Der Wiederöffnen-Dialog verlangt einen **Pflicht-Grund** (Freitext, mindestens 5 Zeichen). Ohne Grund bleibt der Knopf gesperrt, und der Server weist die Anfrage ohne Grund ab. Der Grund landet im Audit-Eintrag `cash.session.reopened` und in `sessions.reopen_reason`, damit die Karte ihn auch bei den Folgeänderungen des Tages anzeigen kann.
 - Ein Tag gilt als „nachträglich geändert", solange `reopened_at` gesetzt ist.
 
 ## 2. Feld-Diff beim Speichern
 
 - Neues reines Modul `src/lib/cash/session-change-diff.ts`: vergleicht den Zustand vor dem Speichern (Session-Kopfzahlen, Kanal-Beträge, Terminal-Beträge) mit den neuen Werten und liefert eine Liste `{ field, label, before, after }`. Unveränderte Felder erscheinen nicht.
 - Kanäle/Terminals werden mit ihrem Anzeigenamen (z. B. „Wolt") in den Eintrag geschrieben, damit die Historie auch nach späteren Umbenennungen lesbar bleibt.
-- `updateSessionCore` lädt die Vorher-Werte nur dann zusätzlich, wenn `reopened_at` gesetzt ist, und schreibt in diesem Fall den Audit-Eintrag `cash.session.updated_after_finalize` mit `meta.changes` (statt des bisherigen inhaltslosen `cash.session.updated`). Läuft nichts auseinander, wird kein Eintrag geschrieben (Log-Hygiene wie beim Personal-Import).
+- `updateSessionCore` lädt die Vorher-Werte nur dann zusätzlich, wenn `reopened_at` gesetzt ist, und schreibt in diesem Fall den Audit-Eintrag `cash.session.updated_after_finalize` mit `meta.changes` und dem Grund aus `reopen_reason` (statt des bisherigen inhaltslosen `cash.session.updated`). Läuft nichts auseinander, wird kein Eintrag geschrieben (Log-Hygiene wie beim Personal-Import).
 - Der Ablauf am laufenden, noch nie abgeschlossenen Tag bleibt exakt wie heute.
 - Unit-Tests für das Diff-Modul: geänderter Kanal-Betrag, neu hinzugekommener Kanal, entfernter Kanal, Kopfzahl geändert, „keine Änderung".
 
@@ -27,7 +28,7 @@ Heute setzt `reopenSession` `finalized_at` auf NULL zurück — danach ist nicht
 
 ## 4. Anzeige in der Tagesabrechnung
 
-- Neue Komponente `src/components/cash/SessionChangeLogCard.tsx`: aufklappbare Karte „Änderungen nach Abschluss" mit einer Zeile je Ereignis (Zeitpunkt, Benutzer, Aktion) und darunter einer schlanken Feld-Tabelle Feld / Vorher / Nachher — Optik und Formatierung analog `ChangeRequestsTab`.
+- Neue Komponente `src/components/cash/SessionChangeLogCard.tsx`: aufklappbare Karte „Änderungen nach Abschluss" mit einer Zeile je Ereignis (Zeitpunkt, Benutzer, Aktion), darunter dem angegebenen Grund und einer schlanken Feld-Tabelle Feld / Vorher / Nachher — Optik und Formatierung analog `ChangeRequestsTab`.
 - Einbau in `src/routes/_authenticated/admin/kasse.tsx` unterhalb der bestehenden Blöcke; die Karte wird nur gerendert, wenn Einträge existieren.
 - Nach Wiederöffnen und nach Speichern wird die Abfrage mit invalidiert, damit die Karte sofort aktuell ist.
 

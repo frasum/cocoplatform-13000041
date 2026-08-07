@@ -888,6 +888,16 @@ export async function getTipPoolOverviewCore(
 export type LoadedSession = Awaited<ReturnType<typeof loadSessionWithLock>>;
 export type LoadedOrgSettings = Awaited<ReturnType<typeof loadOrgSettings>>;
 
+/**
+ * Minimal-Sicht auf eine Session, die die Pool-Rechnung braucht. Bewusst
+ * schmaler als `LoadedSession`, damit Aufrufer mit eigenen, engeren
+ * SELECTs (z.B. Trinkgeld-Rest-Liste) nicht an neuen Spalten scheitern.
+ */
+export type PoolSessionRef = Pick<
+  LoadedSession,
+  "id" | "business_date" | "location_id" | "status" | "tip_pool_settlement_only" | "locked_at"
+>;
+
 // Rechnet den Trinkgeld-Pool für eine bereits geladene Session + settings.
 // Reiner Refactor aus getTipPoolOverviewCore — keine Verhaltensänderung.
 export async function computeSessionTipPoolCore(

@@ -892,7 +892,7 @@ export type LoadedOrgSettings = Awaited<ReturnType<typeof loadOrgSettings>>;
 // Reiner Refactor aus getTipPoolOverviewCore — keine Verhaltensänderung.
 export async function computeSessionTipPoolCore(
   caller: AdminCaller,
-  session: LoadedSession,
+  session: PoolSessionRef,
   settings: TipSettings,
 ): Promise<
   TipPoolResult & {

@@ -1,6 +1,6 @@
 # Arbeitsweise & Stammdaten-Referenz — COCO
 
-Stand: 05.08.2026 (§138: SE1-b Kassen-Symmetrie; Block A0 aufgelöst — LAM/NET-Aufteilung entschieden, Lohnbüro-Mail raus)
+Stand: 07.08.2026 (§139: WX3-Wetterzeile auf der Planungstafel — Selbstversorgung statt Cron; §138-Korrektur; Kassen-Änderungsprotokoll)
 
 Schlankes Betriebshandbuch für die laufende Entwicklung. Wird bei jedem neuen Baublock konsultiert. Bewusst kurz gehalten — Architektur-Begründungen stehen im gruendungsdokument.md, nicht hier.
 
@@ -5112,3 +5112,67 @@ unbezahlt   26.08.–14.09.   14 Werktage  (Periode September)
 **Lohnbüro-Mail raus** (Frau Schaffer, 05.08.): LAM-Freistellung periodengetrennt, NET zur Information. Damit ist der A0-Engpass geschlossen; offen bleibt die Sichtkontrolle des August-Exports selbst.
 
 **Offene Merkposten:** wie §137, **MINUS** A0-Engpass LAM/NET-Aufteilung (entschieden), **MINUS** Lohnbüro-Mail (raus), **MINUS** SE1-Button-Label (geschlossen), **PLUS** AU-Nachweise für DEREJE #4 und Andre #23 (je 6 Krank-Tage ⇒ AU-pflichtig; JOYs einzelner Krank-Tag am 02.08. ist ein Sonntag, ohne AU-Pflicht) · UK2-Bestätigung in der Reihenfolge August→September ausführen · August-Export-Sichtkontrolle.
+
+## §139 — WX3-Kette, §138-Korrektur, Kassen-Änderungsprotokoll (05.–07.08.)
+
+**Anker-Kette dieser Serie**, jeder Stand vom Prüfer eigenhändig gemessen (tsc 0 · eslint 0 · prettier clean · vitest grün, jeweils 0 Skips):
+
+```text
+eb69421a   2498 Tests   §138-Doku + Bugfix Urlaubskonto-Quelle
+59285f73   2507 Tests   WX3-a Sync-Kern + WX3-b Wetterzeile
+50ec447e   2511 Tests   WX3-c Selbstversorgung, Cron-Weg verworfen
+39c38475   2511 Tests   WX3-d Layoutkorrektur Fußzeile
+98c660fb   2516 Tests   Kassen-Änderungsprotokoll (Direktrunde)
+```
+
+Aktueller Anker: `98c660fb`, vitest 2516, 0 Skips.
+
+### §104 — Korrektur an §138 (Prüferfehler)
+
+§138 hält fest: „Kein Bauauftrag nötig: die Ein-Klick-Übernahme der UK2-Maske stellt die Kalendertage auf `urlaub_unbezahlt` um." Diese Aussage war falsch. Der Prüfer hatte `vacation-balance.functions.ts` gelesen und die RECHENLOGIK geprüft, aber nicht den LESEPFAD: die Kontofelder wurden aus `staff` gelesen, wo sie nicht existieren — sie liegen in `staff_personal_details` (Migration `20260614122335`). Die UK2-Maske hätte bei jedem Aufruf einen Postgres-Fehler geworfen; der Ein-Klick-Vorschlag war nie lauffähig.
+
+Aufgefallen ist es dem Baumeister, der den Fix in `960f004f` mitlieferte — formal ein Überschreiten des Doku-Auftrags („Nicht anfassen: jede Datei außer arbeitsweise.md"), inhaltlich richtig und richtig gemeldet. Der Fix liefert bei fehlendem Stammblatt `null`-Felder statt eines Fehlers, konsistent zur UB2-Regel „Konto ungepflegt" statt 0-Fake.
+
+**Lehre (verschärft die SQL-Disziplin auf Code):** Die Grep-Regel gilt nicht nur für ad-hoc-SQL, sondern für JEDEN Lesepfad, der Spalten benennt. Wer eine Server-Function prüft, prüft die Quelltabelle gegen die Migrationen — nicht nur die Formel.
+
+**Offen:** Der Fix hat KEINEN Regressionstest. Ein Test, der die Quelltabelle festnagelt, fehlt weiterhin; sonst wandert die Abfrage beim nächsten Anfassen zurück auf `staff`.
+
+### WX3 — Wettervorhersage auf der TRMNL-Planungstafel
+
+**Bauherren-Wunsch (05.08.):** unten eine Zeile mit der Vorhersage je Tag, groß und deutlich (das Gerät wird aus Entfernung gelesen).
+
+**WX3-a — Sync-Kern extrahiert.** `runWeatherSyncForOrg` und `listAllOrganizationIds` in neuer Datei `weather-sync.server.ts`. `syncWeather` (Knopf, admin-only) behält Signatur, Auth und Rückgabe und ruft nur noch den Kern — KGL, eine Implementierung. Archiv wird vor Forecast upsertet, damit gemessene Werte Vorhersagen ersetzen.
+
+**WX3-b — Wetterzeile.** Reine Funktion `buildWeatherRow` in `planungstafel-weather.ts`: liefert genau so viele Zellen wie Tage, Temperaturen `Math.round`, Regen `<= 0` ⇒ `null` (keine „0 mm"-Zeile), Label immer über `weatherSymbol(code).label` — dieselbe Quelle wie die Kassen-Kopfzeile, keine zweite Wahrheit. Fehlender Tag ⇒ „—" (Variante B, kein 0-Fake). Darstellung: 36px Max/Min, 24px Label, 20px Regen mit deutschem Dezimalkomma. Lucide-Icons stehen im Tafel-Endpoint nicht zur Verfügung — er rendert HTML ohne React; der icon-Name wird ignoriert, nur Text.
+
+**WX3-c — Selbstversorgung statt pg_cron (Bauherren-Entscheid).** Ursprünglich war ein pg_cron-Aufruf auf einen geschützten Endpoint geplant (Muster Telegram/Bank, `X-Cron-Secret`). Der Bauherr hat den Weg verworfen: die TRMNL-Geräte rufen die Tafel ohnehin laufend ab, also versorgt sie sich selbst. Der Endpoint `api/public/weather/sync.ts` wurde gelöscht, `WEATHER_CRON_SECRET` ersatzlos entfernt. Neue reine Funktion `needsForecastRefresh(lastFetchedAt, todayBusinessDate)` — höchstens EIN Abruf je Geschäftstag über `businessDateOf` (3-Uhr-Grenze aus KA1), nicht über den Kalendertag. Der Abruf läuft in `try/catch` mit 4-Sekunden-`Promise.race`; jeder Fehler wird mit genau einer Zeile geloggt und verworfen. Der Dienstplan ist wichtiger als das Wetter — die Tafel rendert im Zweifel mit „—". Bei Fehlschlag wird `fetched_at` nicht fortgeschrieben, der nächste Geräteabruf versucht es erneut.
+
+Der Knopf in den Einstellungen bleibt: nur er lädt das Archiv für die Statistik nach; die Selbstversorgung holt bewusst nur die Vorhersage.
+
+**WX3-d — Layoutkorrektur.** Im Live-Betrieb lief die Wetterzeile unter der Fußzeile hindurch: `.footer` war `position: absolute; bottom: 16px`, also aus dem Fluss genommen — das Grid wusste nichts von ihr. Behoben: `body` als Flex-Spalte (feste 1872×1404 px bleiben), `.footer position: static; margin-top: auto`, `.grid flex: 1 1 auto; align-content: start`, `.cell` min-height 130px ⇒ 110px. Schriftgrößen der Wetterzeile unangetastet. Seitliche Bündigkeit trägt das bestehende `body`-Padding von 36px; `box-sizing: border-box` ist global gesetzt, die Höhe wird also nicht gesprengt.
+
+Vom Bauherrn im Betrieb bestätigt (07.08.): Zeile rendert, Vorhersage korrekt, keine Überlappung mehr.
+
+**Betriebs-Merkposten:** Nach JEDEM neuen Routen-Commit gilt weiterhin §84 — erst Publish in Lovable, sonst liefert der SPA-Fallback den alten Stand. In dieser Serie zweimal als vermeintlicher Fehler erschienen, beide Male war es der fehlende Publish.
+
+### Kassen-Änderungsprotokoll (Direktrunde ohne Prüfer, 30 Commits)
+
+Vom Bauherrn direkt mit dem Baumeister gebaut, vom Prüfer nachträglich gemessen (`98c660fb`, alle Gates grün, +5 Tests):
+
+- `session-change-diff.ts` — reines Diff-Modul, vergleicht Session-Zustand vor/nach dem Speichern und liefert nur betroffene Felder. Keine DB, keine Geldformatierung; Cents bleiben Cents. Kanal- und Terminal-Labels werden als Snapshot mitgeführt, damit die Historie nach späteren Umbenennungen lesbar bleibt.
+- `SessionChangeLogCard.tsx`, Anbindung in `cash.functions.ts`, Anzeige in `kasse.tsx`
+- Migration `20260807073122`: `sessions.reopened_at`, `reopened_by` (FK auf `staff`, ON DELETE SET NULL), `reopen_reason`, Index auf `reopened_by`
+
+**Offener Prüferbefund:** `reopen_reason` ist im Kommentar als Pflicht-Grund beschrieben, die Spalte ist aber `text` ohne NOT NULL. Die Pflicht hängt allein an der UI; ein direkter Schreibweg käme ohne Grund durch. Bauherrenentscheid steht aus.
+
+### Meldequalität des Baumeisters (dreimal in Folge)
+
+In dieser Serie meldete der Baumeister dreimal Zahlen, die der Messung nicht standhielten: zweimal „1 skipped, Bestand" (gemessen: 0 Skips, auch auf den Vorgängerständen; die einzigen Skip-Direktiven im Repo sind `describe.skipIf(!dbTestsEnabled)` in drei DB-Testdateien, die bei abgeschalteten DB-Tests gar keine Fälle registrieren), zweimal eine um 1 zu niedrige Testzahl, und dreimal „SHA nicht meldbar", obwohl der Stand jeweils bereits auf `origin/main` lag. Konsequenz unverändert: Abnahme ausschließlich auf eigener Messung, auf dem SHA, der auf `origin/main` liegt.
+
+### Codex-Vorbereitung (L1)
+
+Der Bauherr hat den Tag `prod-lovable-before-codex-2026-08-05` gesetzt; er zeigt auf `030ec4ce` — ein Stand MITTEN in der Direktrunde, vom Prüfer nie gemessen. Als Rettungsanker nur bedingt tauglich. Empfehlung des Prüfers: geprüfte Stände taggen, hier also `98c660fb`.
+
+Rahmenbedingungen bleiben: Tag und Zusatz-Branch sind additiv und stören Lovable nicht — Lovable arbeitet ausschließlich auf `main`. Gefährlich ist ausschließlich das Trennen der GitHub-Verbindung (§113: jeder Reconnect erzeugt ein neues Repo). Ein Git-Tag sichert außerdem nur den Code; der Wert von COCO liegt in der Datenbank — ein „Ausgangspunkt unter Glas" braucht ein Supabase-Backup desselben Zeitpunkts.
+
+**Offene Merkposten:** wie §138, **MINUS** WX3 (abgeschlossen und im Betrieb bestätigt), **PLUS** Regressionstest auf die Urlaubskonto-Quelltabelle · Entscheid `reopen_reason` NOT NULL · Ausführung der Migration `20260807073122` in Produktion bestätigen · geprüften Tag für die Codex-Vorbereitung setzen.

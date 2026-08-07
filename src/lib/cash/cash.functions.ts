@@ -1599,6 +1599,11 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
       data.terminalAmounts.map((t) => t.terminalId),
     );
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Änderungs-Log: nur für wieder geöffnete Geschäftstage. Vorher-Zustand
+    // VOR den Schreibvorgängen einlesen.
+    const changeBase = session.reopened_at
+      ? await loadSessionChangeSnapshot(caller.organizationId, session)
+      : null;
     // FS1 — Verteidigung in der Tiefe: explizite Werte ≠ 0 für ein am Standort
     // deaktiviertes Session-Feld werden abgelehnt. Fehlt das Feld, bleibt der
     // Bestandswert unangetastet (kein Nullen historischer Werte).
@@ -1666,6 +1671,30 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
         })),
       );
       if (error) throw error;
+    }
+
+    let changes: SessionFieldChange[] = [];
+    if (changeBase) {
+      changes = diffSessionSnapshot(
+        changeBase.snapshot,
+        snapshotFromInput(changeBase.snapshot, data, changeBase.labels),
+      );
+    }
+    if (changeBase && changes.length > 0) {
+      return {
+        result: { ok: true as const },
+        audit: {
+          action: "cash.session.updated_after_finalize",
+          entity: "session",
+          entityId: session.id,
+          meta: {
+            businessDate: session.business_date,
+            reason: session.reopen_reason,
+            reopenedAt: session.reopened_at,
+            changes,
+          },
+        },
+      };
     }
 
     return {

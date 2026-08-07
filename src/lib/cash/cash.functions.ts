@@ -17,6 +17,11 @@ import { loadStaffCaller, performClockOut, type StaffCaller } from "@/lib/time/t
 import { assertRealIdentity } from "@/lib/admin/impersonation";
 import { runGuarded } from "@/lib/admin/admin-call";
 import { writeAuditLog, makeAuditWriter } from "@/lib/admin/audit";
+import {
+  diffSessionSnapshot,
+  type SessionFieldChange,
+  type SessionSnapshot,
+} from "./session-change-diff";
 import { arbzgMinimumBreak, grossMinutesBetween } from "@/lib/time/break-rules";
 import { syncPoolTimeEntry } from "./pool-time-writeback";
 import { assertBusinessDateUnlocked, TimeLockedError } from "@/lib/time/time-lock";
@@ -416,7 +421,9 @@ async function loadSessionWithLock(orgId: string, sessionId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("sessions")
-    .select("id, business_date, status, locked_at, location_id, tip_pool_settlement_only")
+    .select(
+      "id, business_date, status, locked_at, location_id, tip_pool_settlement_only, reopened_at, reopen_reason",
+    )
     .eq("id", sessionId)
     .eq("organization_id", orgId)
     .maybeSingle();
@@ -886,11 +893,21 @@ export async function getTipPoolOverviewCore(
 export type LoadedSession = Awaited<ReturnType<typeof loadSessionWithLock>>;
 export type LoadedOrgSettings = Awaited<ReturnType<typeof loadOrgSettings>>;
 
+/**
+ * Minimal-Sicht auf eine Session, die die Pool-Rechnung braucht. Bewusst
+ * schmaler als `LoadedSession`, damit Aufrufer mit eigenen, engeren
+ * SELECTs (z.B. Trinkgeld-Rest-Liste) nicht an neuen Spalten scheitern.
+ */
+export type PoolSessionRef = Pick<
+  LoadedSession,
+  "id" | "business_date" | "location_id" | "status" | "tip_pool_settlement_only" | "locked_at"
+>;
+
 // Rechnet den Trinkgeld-Pool für eine bereits geladene Session + settings.
 // Reiner Refactor aus getTipPoolOverviewCore — keine Verhaltensänderung.
 export async function computeSessionTipPoolCore(
   caller: AdminCaller,
-  session: LoadedSession,
+  session: PoolSessionRef,
   settings: TipSettings,
 ): Promise<
   TipPoolResult & {
@@ -1450,6 +1467,111 @@ export const updateSession = createServerFn({ method: "POST" })
 
 export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
 
+// --- Änderungs-Log: Vorher-Zustand einer wieder geöffneten Session ---------
+// Nur für Sessions mit `reopened_at` relevant. Liefert den Snapshot samt
+// Kanal-/Terminal-Labels (aktiv UND inaktiv), damit der Log-Eintrag ohne
+// Nachschlagen lesbar bleibt.
+async function loadSessionChangeSnapshot(
+  orgId: string,
+  session: { id: string; location_id: string },
+): Promise<{ snapshot: SessionSnapshot; labels: Map<string, string> }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [row, channels, terminals, chanAmounts, termAmounts] = await Promise.all([
+    supabaseAdmin
+      .from("sessions")
+      .select(
+        "vouchers_sold_cents, vouchers_redeemed_cents, finedine_vouchers_cents, vorschuss_cents, einladung_cents, vectron_daily_total_cents, cash_actual_cents, guest_count, notes",
+      )
+      .eq("id", session.id)
+      .eq("organization_id", orgId)
+      .single(),
+    supabaseAdmin
+      .from("revenue_channels")
+      .select("id, label")
+      .eq("organization_id", orgId)
+      .eq("location_id", session.location_id),
+    supabaseAdmin
+      .from("payment_terminals")
+      .select("id, label")
+      .eq("organization_id", orgId)
+      .eq("location_id", session.location_id),
+    supabaseAdmin
+      .from("session_channel_amounts")
+      .select("channel_id, amount_cents")
+      .eq("organization_id", orgId)
+      .eq("session_id", session.id),
+    supabaseAdmin
+      .from("session_terminal_amounts")
+      .select("terminal_id, amount_cents")
+      .eq("organization_id", orgId)
+      .eq("session_id", session.id),
+  ]);
+  if (row.error) throw row.error;
+  if (channels.error) throw channels.error;
+  if (terminals.error) throw terminals.error;
+  if (chanAmounts.error) throw chanAmounts.error;
+  if (termAmounts.error) throw termAmounts.error;
+
+  const labels = new Map<string, string>();
+  for (const c of channels.data ?? []) labels.set(c.id, c.label);
+  for (const t of terminals.data ?? []) labels.set(t.id, t.label);
+
+  const s = row.data;
+  return {
+    labels,
+    snapshot: {
+      vouchersSoldCents: s.vouchers_sold_cents,
+      vouchersRedeemedCents: s.vouchers_redeemed_cents,
+      finedineVouchersCents: s.finedine_vouchers_cents,
+      vorschussCents: s.vorschuss_cents,
+      einladungCents: s.einladung_cents,
+      vectronDailyTotalCents: s.vectron_daily_total_cents,
+      cashActualCents: s.cash_actual_cents,
+      guestCount: s.guest_count,
+      notes: s.notes,
+      channelAmounts: (chanAmounts.data ?? []).map((a) => ({
+        id: a.channel_id,
+        label: labels.get(a.channel_id) ?? a.channel_id.slice(0, 8),
+        amountCents: a.amount_cents,
+      })),
+      terminalAmounts: (termAmounts.data ?? []).map((a) => ({
+        id: a.terminal_id,
+        label: labels.get(a.terminal_id) ?? a.terminal_id.slice(0, 8),
+        amountCents: a.amount_cents,
+      })),
+    },
+  };
+}
+
+function snapshotFromInput(
+  before: SessionSnapshot,
+  data: UpdateSessionInput,
+  labels: Map<string, string>,
+): SessionSnapshot {
+  return {
+    vouchersSoldCents: data.vouchersSoldCents,
+    vouchersRedeemedCents: data.vouchersRedeemedCents,
+    // FS1: fehlendes Feld = „nicht anfassen" — Vorher-Wert bleibt.
+    finedineVouchersCents: data.finedineVouchersCents ?? before.finedineVouchersCents,
+    vorschussCents: data.vorschussCents,
+    einladungCents: data.einladungCents,
+    vectronDailyTotalCents: data.vectronDailyTotalCents ?? 0,
+    cashActualCents: data.cashActualCents ?? null,
+    guestCount: data.guestCount,
+    notes: data.notes,
+    channelAmounts: data.channelAmounts.map((c) => ({
+      id: c.channelId,
+      label: labels.get(c.channelId) ?? c.channelId.slice(0, 8),
+      amountCents: c.amountCents,
+    })),
+    terminalAmounts: data.terminalAmounts.map((t) => ({
+      id: t.terminalId,
+      label: labels.get(t.terminalId) ?? t.terminalId.slice(0, 8),
+      amountCents: t.amountCents,
+    })),
+  };
+}
+
 export async function updateSessionCore(caller: AdminCaller, data: UpdateSessionInput) {
   return runGuarded(caller.role, "manager", makeAuditWriter(caller), async () => {
     const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
@@ -1477,6 +1599,11 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
       data.terminalAmounts.map((t) => t.terminalId),
     );
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Änderungs-Log: nur für wieder geöffnete Geschäftstage. Vorher-Zustand
+    // VOR den Schreibvorgängen einlesen.
+    const changeBase = session.reopened_at
+      ? await loadSessionChangeSnapshot(caller.organizationId, session)
+      : null;
     // FS1 — Verteidigung in der Tiefe: explizite Werte ≠ 0 für ein am Standort
     // deaktiviertes Session-Feld werden abgelehnt. Fehlt das Feld, bleibt der
     // Bestandswert unangetastet (kein Nullen historischer Werte).
@@ -1546,6 +1673,30 @@ export async function updateSessionCore(caller: AdminCaller, data: UpdateSession
       if (error) throw error;
     }
 
+    let changes: SessionFieldChange[] = [];
+    if (changeBase) {
+      changes = diffSessionSnapshot(
+        changeBase.snapshot,
+        snapshotFromInput(changeBase.snapshot, data, changeBase.labels),
+      );
+    }
+    if (changeBase && changes.length > 0) {
+      return {
+        result: { ok: true as const },
+        audit: {
+          action: "cash.session.updated_after_finalize",
+          entity: "session",
+          entityId: session.id,
+          meta: {
+            businessDate: session.business_date,
+            reason: session.reopen_reason,
+            reopenedAt: session.reopened_at,
+            changes,
+          },
+        },
+      };
+    }
+
     return {
       result: { ok: true as const },
       audit: {
@@ -1573,6 +1724,67 @@ export const finalizeSession = createServerFn({ method: "POST" })
     assertRealIdentity(caller);
     return finalizeSessionCore(caller, data);
   });
+
+/**
+ * Änderungs-Log eines Geschäftstags: Wieder-Öffnungen und nachträgliche
+ * Änderungen mit Benutzer, Zeit, Grund und betroffenen Feldern.
+ */
+export const listSessionChangeLog = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    return listSessionChangeLogCore(caller, data);
+  });
+
+export type SessionChangeLogEntry = {
+  id: string;
+  action: string;
+  createdAt: string;
+  actorName: string;
+  reason: string | null;
+  changes: SessionFieldChange[];
+};
+
+export async function listSessionChangeLogCore(
+  caller: AdminCaller,
+  data: { sessionId: string },
+): Promise<SessionChangeLogEntry[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: rows, error } = await supabaseAdmin
+    .from("audit_log")
+    .select("id, action, created_at, actor_staff_id, meta")
+    .eq("organization_id", caller.organizationId)
+    .eq("entity", "session")
+    .eq("entity_id", data.sessionId)
+    .in("action", ["cash.session.reopened", "cash.session.updated_after_finalize"])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const staffIds = [...new Set((rows ?? []).map((r) => r.actor_staff_id).filter(Boolean))] as string[];
+  const names = new Map<string, string>();
+  if (staffIds.length > 0) {
+    const { data: staff, error: sErr } = await supabaseAdmin
+      .from("staff")
+      .select("id, display_name")
+      .eq("organization_id", caller.organizationId)
+      .in("id", staffIds);
+    if (sErr) throw sErr;
+    for (const s of staff ?? []) names.set(s.id, s.display_name);
+  }
+
+  return (rows ?? []).map((r) => {
+    const meta = (r.meta ?? {}) as { reason?: unknown; changes?: unknown };
+    return {
+      id: r.id,
+      action: r.action,
+      createdAt: r.created_at,
+      actorName: (r.actor_staff_id ? names.get(r.actor_staff_id) : null) ?? "Unbekannt",
+      reason: typeof meta.reason === "string" ? meta.reason : null,
+      changes: Array.isArray(meta.changes) ? (meta.changes as SessionFieldChange[]) : [],
+    };
+  });
+}
 
 export async function finalizeSessionCore(
   caller: AdminCaller,
@@ -1726,14 +1938,25 @@ export async function unlockSessionCore(caller: AdminCaller, data: { sessionId: 
 // unterhalb der Wasserlinie bleibt die Session gesperrt.
 export const reopenSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({
+        sessionId: z.string().uuid(),
+        // Pflicht-Grund: ohne Begründung keine nachträgliche Öffnung.
+        reason: z.string().trim().min(5, "Bitte einen Grund angeben (mind. 5 Zeichen).").max(500),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
     assertRealIdentity(caller);
     return reopenSessionCore(caller, data);
   });
 
-export async function reopenSessionCore(caller: AdminCaller, data: { sessionId: string }) {
+export async function reopenSessionCore(
+  caller: AdminCaller,
+  data: { sessionId: string; reason: string },
+) {
   return runGuarded(caller.role, "admin", makeAuditWriter(caller), async () => {
     const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
     const waterline = await loadLocationCashLock(caller.organizationId, session.location_id);
@@ -1753,7 +1976,14 @@ export async function reopenSessionCore(caller: AdminCaller, data: { sessionId: 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("sessions")
-      .update({ status: "open", finalized_at: null, finalized_by: null })
+      .update({
+        status: "open",
+        finalized_at: null,
+        finalized_by: null,
+        reopened_at: new Date().toISOString(),
+        reopened_by: caller.staffId,
+        reopen_reason: data.reason,
+      })
       .eq("id", session.id)
       .eq("organization_id", caller.organizationId);
     if (error) throw error;
@@ -1763,7 +1993,7 @@ export async function reopenSessionCore(caller: AdminCaller, data: { sessionId: 
         action: "cash.session.reopened",
         entity: "session",
         entityId: session.id,
-        meta: { businessDate: session.business_date },
+        meta: { businessDate: session.business_date, reason: data.reason },
       },
     };
   });

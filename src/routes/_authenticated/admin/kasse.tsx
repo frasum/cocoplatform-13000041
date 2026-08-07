@@ -424,15 +424,20 @@ function KassePage() {
   const reopenMut = useMutation({
     mutationFn: () => {
       if (!sessionId) throw new Error("Keine Session");
-      return callReopen({ data: { sessionId } });
+      const reason = reopenReason.trim();
+      if (reason.length < 5) throw new Error("Bitte einen Grund angeben (mind. 5 Zeichen).");
+      return callReopen({ data: { sessionId, reason } });
     },
     onSuccess: () => {
       toast.success("Session wieder geöffnet.");
+      setReopenReason("");
       void invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
   const [reopenConfirm, setReopenConfirm] = useState(false);
+  // Pflicht-Grund für die nachträgliche Öffnung (landet in Session + Audit-Log).
+  const [reopenReason, setReopenReason] = useState("");
 
   // KAB2: Ein-Knopf-Druckfluss – „Drucken = Finalisieren".
   const [printBusy, setPrintBusy] = useState(false);
@@ -1251,12 +1256,26 @@ function KassePage() {
               finalisiert) werden.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-1">
+            <Label htmlFor="reopen-reason">Grund der Änderung (Pflicht)</Label>
+            <Textarea
+              id="reopen-reason"
+              value={reopenReason}
+              onChange={(e) => setReopenReason(e.target.value)}
+              placeholder="z. B. Take-away Wolt falsch erfasst (2.240 statt 240 €)"
+              rows={3}
+            />
+            <p className="text-muted-foreground text-xs">
+              Wird mit Benutzer und Zeitpunkt protokolliert; alle Änderungen danach werden
+              feldweise im Änderungs-Log festgehalten.
+            </p>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReopenConfirm(false)}>
               Abbrechen
             </Button>
             <Button
-              disabled={reopenMut.isPending}
+              disabled={reopenMut.isPending || reopenReason.trim().length < 5}
               onClick={() =>
                 reopenMut.mutate(undefined, { onSuccess: () => setReopenConfirm(false) })
               }

@@ -1240,6 +1240,33 @@ function KassePage() {
       </Dialog>
 
       {/* --- Sperr-/Entsperr-Dialoge (Admin) --- */}
+      <Dialog open={reopenConfirm} onOpenChange={setReopenConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Session wieder öffnen?</DialogTitle>
+            <DialogDescription>
+              Setzt den Status zurück auf „offen", damit Eingabefehler dieses Geschäftstags
+              korrigiert werden können. Die Finalisierung und damit der gedruckte Stand verfallen —
+              nach der Korrektur muss die Tagesabrechnung erneut gedruckt (und dabei neu
+              finalisiert) werden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReopenConfirm(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              disabled={reopenMut.isPending}
+              onClick={() =>
+                reopenMut.mutate(undefined, { onSuccess: () => setReopenConfirm(false) })
+              }
+            >
+              Wieder öffnen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={lockConfirm} onOpenChange={setLockConfirm}>
         <DialogContent>
           <DialogHeader>

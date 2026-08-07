@@ -17,6 +17,11 @@ import { loadStaffCaller, performClockOut, type StaffCaller } from "@/lib/time/t
 import { assertRealIdentity } from "@/lib/admin/impersonation";
 import { runGuarded } from "@/lib/admin/admin-call";
 import { writeAuditLog, makeAuditWriter } from "@/lib/admin/audit";
+import {
+  diffSessionSnapshot,
+  type SessionFieldChange,
+  type SessionSnapshot,
+} from "./session-change-diff";
 import { arbzgMinimumBreak, grossMinutesBetween } from "@/lib/time/break-rules";
 import { syncPoolTimeEntry } from "./pool-time-writeback";
 import { assertBusinessDateUnlocked, TimeLockedError } from "@/lib/time/time-lock";

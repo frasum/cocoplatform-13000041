@@ -4075,6 +4075,9 @@ export type Database = {
           opening_balance_cents: number | null
           opentabs_deduction_cents: number
           organization_id: string
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
           sonstige_einnahme_cents: number
           status: Database["public"]["Enums"]["session_status"]
           tip_pool_settlement_only: boolean
@@ -4101,6 +4104,9 @@ export type Database = {
           opening_balance_cents?: number | null
           opentabs_deduction_cents?: number
           organization_id: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           sonstige_einnahme_cents?: number
           status?: Database["public"]["Enums"]["session_status"]
           tip_pool_settlement_only?: boolean
@@ -4127,6 +4133,9 @@ export type Database = {
           opening_balance_cents?: number | null
           opentabs_deduction_cents?: number
           organization_id?: string
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
           sonstige_einnahme_cents?: number
           status?: Database["public"]["Enums"]["session_status"]
           tip_pool_settlement_only?: boolean
@@ -4163,6 +4172,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessions_reopened_by_fkey"
+            columns: ["reopened_by"]
+            isOneToOne: false
+            referencedRelation: "staff"
             referencedColumns: ["id"]
           },
         ]

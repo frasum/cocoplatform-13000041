@@ -1462,6 +1462,111 @@ export const updateSession = createServerFn({ method: "POST" })
 
 export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
 
+// --- Änderungs-Log: Vorher-Zustand einer wieder geöffneten Session ---------
+// Nur für Sessions mit `reopened_at` relevant. Liefert den Snapshot samt
+// Kanal-/Terminal-Labels (aktiv UND inaktiv), damit der Log-Eintrag ohne
+// Nachschlagen lesbar bleibt.
+async function loadSessionChangeSnapshot(
+  orgId: string,
+  session: { id: string; location_id: string },
+): Promise<{ snapshot: SessionSnapshot; labels: Map<string, string> }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const [row, channels, terminals, chanAmounts, termAmounts] = await Promise.all([
+    supabaseAdmin
+      .from("sessions")
+      .select(
+        "vouchers_sold_cents, vouchers_redeemed_cents, finedine_vouchers_cents, vorschuss_cents, einladung_cents, vectron_daily_total_cents, cash_actual_cents, guest_count, notes",
+      )
+      .eq("id", session.id)
+      .eq("organization_id", orgId)
+      .single(),
+    supabaseAdmin
+      .from("revenue_channels")
+      .select("id, label")
+      .eq("organization_id", orgId)
+      .eq("location_id", session.location_id),
+    supabaseAdmin
+      .from("payment_terminals")
+      .select("id, label")
+      .eq("organization_id", orgId)
+      .eq("location_id", session.location_id),
+    supabaseAdmin
+      .from("session_channel_amounts")
+      .select("channel_id, amount_cents")
+      .eq("organization_id", orgId)
+      .eq("session_id", session.id),
+    supabaseAdmin
+      .from("session_terminal_amounts")
+      .select("terminal_id, amount_cents")
+      .eq("organization_id", orgId)
+      .eq("session_id", session.id),
+  ]);
+  if (row.error) throw row.error;
+  if (channels.error) throw channels.error;
+  if (terminals.error) throw terminals.error;
+  if (chanAmounts.error) throw chanAmounts.error;
+  if (termAmounts.error) throw termAmounts.error;
+
+  const labels = new Map<string, string>();
+  for (const c of channels.data ?? []) labels.set(c.id, c.label);
+  for (const t of terminals.data ?? []) labels.set(t.id, t.label);
+
+  const s = row.data;
+  return {
+    labels,
+    snapshot: {
+      vouchersSoldCents: s.vouchers_sold_cents,
+      vouchersRedeemedCents: s.vouchers_redeemed_cents,
+      finedineVouchersCents: s.finedine_vouchers_cents,
+      vorschussCents: s.vorschuss_cents,
+      einladungCents: s.einladung_cents,
+      vectronDailyTotalCents: s.vectron_daily_total_cents,
+      cashActualCents: s.cash_actual_cents,
+      guestCount: s.guest_count,
+      notes: s.notes,
+      channelAmounts: (chanAmounts.data ?? []).map((a) => ({
+        id: a.channel_id,
+        label: labels.get(a.channel_id) ?? a.channel_id.slice(0, 8),
+        amountCents: a.amount_cents,
+      })),
+      terminalAmounts: (termAmounts.data ?? []).map((a) => ({
+        id: a.terminal_id,
+        label: labels.get(a.terminal_id) ?? a.terminal_id.slice(0, 8),
+        amountCents: a.amount_cents,
+      })),
+    },
+  };
+}
+
+function snapshotFromInput(
+  before: SessionSnapshot,
+  data: UpdateSessionInput,
+  labels: Map<string, string>,
+): SessionSnapshot {
+  return {
+    vouchersSoldCents: data.vouchersSoldCents,
+    vouchersRedeemedCents: data.vouchersRedeemedCents,
+    // FS1: fehlendes Feld = „nicht anfassen" — Vorher-Wert bleibt.
+    finedineVouchersCents: data.finedineVouchersCents ?? before.finedineVouchersCents,
+    vorschussCents: data.vorschussCents,
+    einladungCents: data.einladungCents,
+    vectronDailyTotalCents: data.vectronDailyTotalCents ?? 0,
+    cashActualCents: data.cashActualCents ?? null,
+    guestCount: data.guestCount,
+    notes: data.notes,
+    channelAmounts: data.channelAmounts.map((c) => ({
+      id: c.channelId,
+      label: labels.get(c.channelId) ?? c.channelId.slice(0, 8),
+      amountCents: c.amountCents,
+    })),
+    terminalAmounts: data.terminalAmounts.map((t) => ({
+      id: t.terminalId,
+      label: labels.get(t.terminalId) ?? t.terminalId.slice(0, 8),
+      amountCents: t.amountCents,
+    })),
+  };
+}
+
 export async function updateSessionCore(caller: AdminCaller, data: UpdateSessionInput) {
   return runGuarded(caller.role, "manager", makeAuditWriter(caller), async () => {
     const session = await loadSessionWithLock(caller.organizationId, data.sessionId);

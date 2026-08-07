@@ -169,6 +169,7 @@ function KassePage() {
   const callFinalize = useServerFn(finalizeSession);
   const callLock = useServerFn(lockSession);
   const callUnlock = useServerFn(unlockSession);
+  const callReopen = useServerFn(reopenSession);
   const callCorrect = useServerFn(correctWaiterSettlement);
   const callAdminCreate = useServerFn(adminCreateWaiterSettlement);
   const callCashLock = useServerFn(setCashLock);
@@ -416,6 +417,23 @@ function KassePage() {
   });
   const [unlockConfirm, setUnlockConfirm] = useState(false);
 
+  // „Session wieder öffnen" (Admin) — hebt die Finalisierung auf, damit ein
+  // Eingabefehler des Vortags (z. B. falscher Take-away-Betrag) korrigiert
+  // werden kann. Server-seitig blockiert bei `locked` und unter der
+  // Wasserlinie; Audit-Eintrag `cash.session.reopened`.
+  const reopenMut = useMutation({
+    mutationFn: () => {
+      if (!sessionId) throw new Error("Keine Session");
+      return callReopen({ data: { sessionId } });
+    },
+    onSuccess: () => {
+      toast.success("Session wieder geöffnet.");
+      void invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const [reopenConfirm, setReopenConfirm] = useState(false);
+
   // KAB2: Ein-Knopf-Druckfluss – „Drucken = Finalisieren".
   const [printBusy, setPrintBusy] = useState(false);
   // KAB2 + FZD: Vor dem Finalisieren erscheint ein Bestätigungs-Dialog mit
@@ -584,6 +602,16 @@ function KassePage() {
               status={sessionStatus}
               lockedAt={(ovQ.data.session as { locked_at?: string | null }).locked_at ?? null}
             />
+            {isAdmin && sessionStatus === "finalized" && !underWaterline && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reopenMut.isPending}
+                onClick={() => setReopenConfirm(true)}
+              >
+                Session wieder öffnen
+              </Button>
+            )}
             {isAdmin && sessionStatus === "finalized" && !underWaterline && (
               <Button
                 variant="outline"

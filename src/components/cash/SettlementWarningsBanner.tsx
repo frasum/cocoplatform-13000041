@@ -59,11 +59,11 @@ export function SettlementWarningsBanner({
         {warnings.map((w) => {
           if (w.kind === "pos_diff") {
             return (
-            <li key="pos">
-              <strong>POS-Differenz</strong> — Vectron-Total ({fmtCents(w.posTotalCents)} €) ≠
-              Kellner-Umsätze ({fmtCents(w.waiterPosCents)} €) + Take-away/Lieferungen (
-              {fmtCents(w.deliveryCents)} €). Differenz: {fmtSignedCents(w.diffCents)}.
-            </li>
+              <li key="pos">
+                <strong>POS-Differenz</strong> — Vectron-Total ({fmtCents(w.posTotalCents)} €) ≠
+                Kellner-Umsätze ({fmtCents(w.waiterPosCents)} €) + Take-away/Lieferungen (
+                {fmtCents(w.deliveryCents)} €). Differenz: {fmtSignedCents(w.diffCents)}.
+              </li>
             );
           }
           if (w.kind === "wolt_exceeds_marker") {

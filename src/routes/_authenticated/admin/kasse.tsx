@@ -47,6 +47,7 @@ import {
   listRevenueChannels,
   lockSession,
   removeSessionSatellite,
+  reopenSession,
   setCashLock,
   unlockSession,
   updateSession,
@@ -168,6 +169,7 @@ function KassePage() {
   const callFinalize = useServerFn(finalizeSession);
   const callLock = useServerFn(lockSession);
   const callUnlock = useServerFn(unlockSession);
+  const callReopen = useServerFn(reopenSession);
   const callCorrect = useServerFn(correctWaiterSettlement);
   const callAdminCreate = useServerFn(adminCreateWaiterSettlement);
   const callCashLock = useServerFn(setCashLock);
@@ -415,6 +417,23 @@ function KassePage() {
   });
   const [unlockConfirm, setUnlockConfirm] = useState(false);
 
+  // „Session wieder öffnen" (Admin) — hebt die Finalisierung auf, damit ein
+  // Eingabefehler des Vortags (z. B. falscher Take-away-Betrag) korrigiert
+  // werden kann. Server-seitig blockiert bei `locked` und unter der
+  // Wasserlinie; Audit-Eintrag `cash.session.reopened`.
+  const reopenMut = useMutation({
+    mutationFn: () => {
+      if (!sessionId) throw new Error("Keine Session");
+      return callReopen({ data: { sessionId } });
+    },
+    onSuccess: () => {
+      toast.success("Session wieder geöffnet.");
+      void invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const [reopenConfirm, setReopenConfirm] = useState(false);
+
   // KAB2: Ein-Knopf-Druckfluss – „Drucken = Finalisieren".
   const [printBusy, setPrintBusy] = useState(false);
   // KAB2 + FZD: Vor dem Finalisieren erscheint ein Bestätigungs-Dialog mit
@@ -583,6 +602,16 @@ function KassePage() {
               status={sessionStatus}
               lockedAt={(ovQ.data.session as { locked_at?: string | null }).locked_at ?? null}
             />
+            {isAdmin && sessionStatus === "finalized" && !underWaterline && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={reopenMut.isPending}
+                onClick={() => setReopenConfirm(true)}
+              >
+                Session wieder öffnen
+              </Button>
+            )}
             {isAdmin && sessionStatus === "finalized" && !underWaterline && (
               <Button
                 variant="outline"
@@ -1211,6 +1240,33 @@ function KassePage() {
       </Dialog>
 
       {/* --- Sperr-/Entsperr-Dialoge (Admin) --- */}
+      <Dialog open={reopenConfirm} onOpenChange={setReopenConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Session wieder öffnen?</DialogTitle>
+            <DialogDescription>
+              Setzt den Status zurück auf „offen", damit Eingabefehler dieses Geschäftstags
+              korrigiert werden können. Die Finalisierung und damit der gedruckte Stand verfallen —
+              nach der Korrektur muss die Tagesabrechnung erneut gedruckt (und dabei neu
+              finalisiert) werden.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReopenConfirm(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              disabled={reopenMut.isPending}
+              onClick={() =>
+                reopenMut.mutate(undefined, { onSuccess: () => setReopenConfirm(false) })
+              }
+            >
+              Wieder öffnen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={lockConfirm} onOpenChange={setLockConfirm}>
         <DialogContent>
           <DialogHeader>

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,7 @@ import { buildDailySummaryData } from "@/lib/cash/daily-summary-data";
 import { buildChannelKindMap } from "@/lib/cash/channel-mapping";
 import { CardErrorBoundary } from "@/components/cash/CardErrorBoundary";
 import { printDailySummary } from "@/components/cash/DailyPrintView";
+import { SessionChangeLogCard } from "@/components/cash/SessionChangeLogCard";
 import { DateSelector } from "@/components/shared/DateSelector";
 import { filterCashEnabled } from "@/lib/locations/cash-enabled";
 import { LocationPills } from "@/components/shared/LocationPills";
@@ -969,6 +971,8 @@ function KassePage() {
           />
         </>
       )}
+
+      {sessionId && <SessionChangeLogCard sessionId={sessionId} />}
 
       {isAdmin && (
         <Card className="space-y-3 p-4">

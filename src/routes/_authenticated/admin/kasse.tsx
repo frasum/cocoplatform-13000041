@@ -1265,7 +1265,7 @@ function KassePage() {
             <Textarea
               id="reopen-reason"
               value={reopenReason}
-              onChange={(e) => setReopenReason(e.target.value)}
+              onChange={(ev) => setReopenReason(ev.target.value)}
               placeholder="z. B. Take-away Wolt falsch erfasst (2.240 statt 240 €)"
               rows={3}
             />

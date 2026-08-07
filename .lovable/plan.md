@@ -28,7 +28,7 @@ Heute setzt `reopenSession` `finalized_at` auf NULL zurück — danach ist nicht
 
 ## 4. Anzeige in der Tagesabrechnung
 
-- Neue Komponente `src/components/cash/SessionChangeLogCard.tsx`: aufklappbare Karte „Änderungen nach Abschluss" mit einer Zeile je Ereignis (Zeitpunkt, Benutzer, Aktion) und darunter einer schlanken Feld-Tabelle Feld / Vorher / Nachher — Optik und Formatierung analog `ChangeRequestsTab`.
+- Neue Komponente `src/components/cash/SessionChangeLogCard.tsx`: aufklappbare Karte „Änderungen nach Abschluss" mit einer Zeile je Ereignis (Zeitpunkt, Benutzer, Aktion), darunter dem angegebenen Grund und einer schlanken Feld-Tabelle Feld / Vorher / Nachher — Optik und Formatierung analog `ChangeRequestsTab`.
 - Einbau in `src/routes/_authenticated/admin/kasse.tsx` unterhalb der bestehenden Blöcke; die Karte wird nur gerendert, wenn Einträge existieren.
 - Nach Wiederöffnen und nach Speichern wird die Abfrage mit invalidiert, damit die Karte sofort aktuell ist.
 

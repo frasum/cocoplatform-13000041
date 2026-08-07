@@ -1738,14 +1738,25 @@ export async function unlockSessionCore(caller: AdminCaller, data: { sessionId: 
 // unterhalb der Wasserlinie bleibt die Session gesperrt.
 export const reopenSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
+  .inputValidator((input) =>
+    z
+      .object({
+        sessionId: z.string().uuid(),
+        // Pflicht-Grund: ohne Begründung keine nachträgliche Öffnung.
+        reason: z.string().trim().min(5, "Bitte einen Grund angeben (mind. 5 Zeichen).").max(500),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const caller = await loadAdminCaller(context.supabase, context.userId, "admin");
     assertRealIdentity(caller);
     return reopenSessionCore(caller, data);
   });
 
-export async function reopenSessionCore(caller: AdminCaller, data: { sessionId: string }) {
+export async function reopenSessionCore(
+  caller: AdminCaller,
+  data: { sessionId: string; reason: string },
+) {
   return runGuarded(caller.role, "admin", makeAuditWriter(caller), async () => {
     const session = await loadSessionWithLock(caller.organizationId, data.sessionId);
     const waterline = await loadLocationCashLock(caller.organizationId, session.location_id);
@@ -1765,7 +1776,14 @@ export async function reopenSessionCore(caller: AdminCaller, data: { sessionId: 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("sessions")
-      .update({ status: "open", finalized_at: null, finalized_by: null })
+      .update({
+        status: "open",
+        finalized_at: null,
+        finalized_by: null,
+        reopened_at: new Date().toISOString(),
+        reopened_by: caller.staffId,
+        reopen_reason: data.reason,
+      })
       .eq("id", session.id)
       .eq("organization_id", caller.organizationId);
     if (error) throw error;
@@ -1775,7 +1793,7 @@ export async function reopenSessionCore(caller: AdminCaller, data: { sessionId: 
         action: "cash.session.reopened",
         entity: "session",
         entityId: session.id,
-        meta: { businessDate: session.business_date },
+        meta: { businessDate: session.business_date, reason: data.reason },
       },
     };
   });

@@ -1270,8 +1270,8 @@ function KassePage() {
               rows={3}
             />
             <p className="text-muted-foreground text-xs">
-              Wird mit Benutzer und Zeitpunkt protokolliert; alle Änderungen danach werden
-              feldweise im Änderungs-Log festgehalten.
+              Wird mit Benutzer und Zeitpunkt protokolliert; alle Änderungen danach werden feldweise
+              im Änderungs-Log festgehalten.
             </p>
           </div>
           <DialogFooter>

@@ -1761,7 +1761,9 @@ export async function listSessionChangeLogCore(
     .order("created_at", { ascending: false });
   if (error) throw error;
 
-  const staffIds = [...new Set((rows ?? []).map((r) => r.actor_staff_id).filter(Boolean))] as string[];
+  const staffIds = [
+    ...new Set((rows ?? []).map((r) => r.actor_staff_id).filter(Boolean)),
+  ] as string[];
   const names = new Map<string, string>();
   if (staffIds.length > 0) {
     const { data: staff, error: sErr } = await supabaseAdmin

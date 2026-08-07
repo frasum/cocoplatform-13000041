@@ -42,7 +42,11 @@ const MONEY_FIELDS: { key: keyof SessionSnapshot; field: string; label: string }
   { key: "finedineVouchersCents", field: "finedine_vouchers_cents", label: "Finedine-Gutscheine" },
   { key: "vorschussCents", field: "vorschuss_cents", label: "Vorschuss" },
   { key: "einladungCents", field: "einladung_cents", label: "Einladung" },
-  { key: "vectronDailyTotalCents", field: "vectron_daily_total_cents", label: "Vectron-Tagesumsatz" },
+  {
+    key: "vectronDailyTotalCents",
+    field: "vectron_daily_total_cents",
+    label: "Vectron-Tagesumsatz",
+  },
   { key: "cashActualCents", field: "cash_actual_cents", label: "Bargeld gezählt" },
 ];
 

@@ -62,7 +62,8 @@ export function SessionChangeLogCard({ sessionId }: { sessionId: string }) {
                 {e.changes.map((c) => (
                   <li key={c.field} className="tabular-nums">
                     <span className="text-muted-foreground">{c.label}:</span>{" "}
-                    {fmtValue(c, c.before)} → <span className="font-medium">{fmtValue(c, c.after)}</span>
+                    {fmtValue(c, c.before)} →{" "}
+                    <span className="font-medium">{fmtValue(c, c.after)}</span>
                   </li>
                 ))}
               </ul>

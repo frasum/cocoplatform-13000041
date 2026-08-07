@@ -33,7 +33,10 @@ describe("diffSessionSnapshot", () => {
   it("meldet neu hinzugekommenen Kanal", () => {
     const after: SessionSnapshot = {
       ...base,
-      channelAmounts: [...base.channelAmounts, { id: "c2", label: "Lieferando", amountCents: 5000 }],
+      channelAmounts: [
+        ...base.channelAmounts,
+        { id: "c2", label: "Lieferando", amountCents: 5000 },
+      ],
     };
     expect(diffSessionSnapshot(base, after)).toEqual([
       { field: "channel:c2", label: "Lieferando", kind: "money", before: null, after: 5000 },

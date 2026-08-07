@@ -1725,6 +1725,67 @@ export const finalizeSession = createServerFn({ method: "POST" })
     return finalizeSessionCore(caller, data);
   });
 
+/**
+ * Änderungs-Log eines Geschäftstags: Wieder-Öffnungen und nachträgliche
+ * Änderungen mit Benutzer, Zeit, Grund und betroffenen Feldern.
+ */
+export const listSessionChangeLog = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({ sessionId: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const caller = await loadAdminCaller(context.supabase, context.userId, "manager");
+    return listSessionChangeLogCore(caller, data);
+  });
+
+export type SessionChangeLogEntry = {
+  id: string;
+  action: string;
+  createdAt: string;
+  actorName: string;
+  reason: string | null;
+  changes: SessionFieldChange[];
+};
+
+export async function listSessionChangeLogCore(
+  caller: AdminCaller,
+  data: { sessionId: string },
+): Promise<SessionChangeLogEntry[]> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: rows, error } = await supabaseAdmin
+    .from("audit_log")
+    .select("id, action, created_at, actor_staff_id, meta")
+    .eq("organization_id", caller.organizationId)
+    .eq("entity", "session")
+    .eq("entity_id", data.sessionId)
+    .in("action", ["cash.session.reopened", "cash.session.updated_after_finalize"])
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+
+  const staffIds = [...new Set((rows ?? []).map((r) => r.actor_staff_id).filter(Boolean))] as string[];
+  const names = new Map<string, string>();
+  if (staffIds.length > 0) {
+    const { data: staff, error: sErr } = await supabaseAdmin
+      .from("staff")
+      .select("id, display_name")
+      .eq("organization_id", caller.organizationId)
+      .in("id", staffIds);
+    if (sErr) throw sErr;
+    for (const s of staff ?? []) names.set(s.id, s.display_name);
+  }
+
+  return (rows ?? []).map((r) => {
+    const meta = (r.meta ?? {}) as { reason?: unknown; changes?: unknown };
+    return {
+      id: r.id,
+      action: r.action,
+      createdAt: r.created_at,
+      actorName: (r.actor_staff_id ? names.get(r.actor_staff_id) : null) ?? "Unbekannt",
+      reason: typeof meta.reason === "string" ? meta.reason : null,
+      changes: Array.isArray(meta.changes) ? (meta.changes as SessionFieldChange[]) : [],
+    };
+  });
+}
+
 export async function finalizeSessionCore(
   caller: AdminCaller,
   data: { sessionId: string; confirmPoolWarning?: boolean },

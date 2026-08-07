@@ -47,6 +47,7 @@ import {
   listRevenueChannels,
   lockSession,
   removeSessionSatellite,
+  reopenSession,
   setCashLock,
   unlockSession,
   updateSession,

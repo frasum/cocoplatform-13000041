@@ -2510,7 +2510,8 @@ export async function submitWaiterSettlementCore(
       idempotent: false,
     };
   }
-  const foreignConfirmed = !existing && foreignConfirmationAccepted(plausibility, data.confirmedForeign);
+  const foreignConfirmed =
+    !existing && foreignConfirmationAccepted(plausibility, data.confirmedForeign);
 
   // Rate snapshotten: draft/neu → aktuelle Org-Rate; submitted → Bestand erhalten.
   const kitchenTipRate =
@@ -2665,20 +2666,18 @@ export async function submitWaiterSettlementCore(
       // angelegt (Service, ohne Start), damit applyServicePoolEnd ihn findet
       // und der B-2-Writeback keinen leeren Nachzügler-Eintrag mehr erzeugt.
       if (!plausibility.hasPoolEntry) {
-        const { error: poolInsErr } = await supabaseAdmin
-          .from("session_tip_pool_entries")
-          .upsert(
-            {
-              organization_id: caller.organizationId,
-              session_id: session.id,
-              staff_id: caller.staffId,
-              department: "service",
-              shift_start: null,
-              shift_end: null,
-              hours_minutes: 0,
-            },
-            { onConflict: "session_id,staff_id", ignoreDuplicates: true },
-          );
+        const { error: poolInsErr } = await supabaseAdmin.from("session_tip_pool_entries").upsert(
+          {
+            organization_id: caller.organizationId,
+            session_id: session.id,
+            staff_id: caller.staffId,
+            department: "service",
+            shift_start: null,
+            shift_end: null,
+            hours_minutes: 0,
+          },
+          { onConflict: "session_id,staff_id", ignoreDuplicates: true },
+        );
         if (poolInsErr) throw poolInsErr;
       }
       // Nicht-Stempler-Zweig: Service-Pool-Ende aus dem

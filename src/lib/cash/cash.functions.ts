@@ -2661,6 +2661,26 @@ export async function submitWaiterSettlementCore(
       }
     } else {
       noOpenTimeEntry = true;
+      // KA3 Teil 2 — Reihenfolge: Fehlt der Pool-Eintrag, wird er ZUERST
+      // angelegt (Service, ohne Start), damit applyServicePoolEnd ihn findet
+      // und der B-2-Writeback keinen leeren Nachzügler-Eintrag mehr erzeugt.
+      if (!plausibility.hasPoolEntry) {
+        const { error: poolInsErr } = await supabaseAdmin
+          .from("session_tip_pool_entries")
+          .upsert(
+            {
+              organization_id: caller.organizationId,
+              session_id: session.id,
+              staff_id: caller.staffId,
+              department: "service",
+              shift_start: null,
+              shift_end: null,
+              hours_minutes: 0,
+            },
+            { onConflict: "session_id,staff_id", ignoreDuplicates: true },
+          );
+        if (poolInsErr) throw poolInsErr;
+      }
       // Nicht-Stempler-Zweig: Service-Pool-Ende aus dem
       // Abgabezeitpunkt setzen, damit der B-2-Writeback unten einen
       // time_entry (source='pool') erzeugen kann.
@@ -2823,6 +2843,8 @@ export async function submitWaiterSettlementCore(
   });
 
   return {
+    requiresConfirmation: false,
+    plausibility,
     settlementId,
     differenzCents: calc.differenzCents,
     kitchenTipCents: calc.kitchenTipCents,

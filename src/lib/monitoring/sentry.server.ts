@@ -52,7 +52,12 @@ export type ServerErrorContext = {
   critical?: boolean;
 };
 
-function buildEvent(err: unknown, ctx: ServerErrorContext, requestUrl: string | null) {
+function buildEvent(
+  err: unknown,
+  ctx: ServerErrorContext,
+  requestUrl: string | null,
+  level: "error" | "info" = "error",
+) {
   const error = err instanceof Error ? err : new Error(String(err));
   const now = new Date().toISOString();
   const environment = process.env.NODE_ENV === "production" ? "production" : "development";
@@ -81,7 +86,7 @@ function buildEvent(err: unknown, ctx: ServerErrorContext, requestUrl: string | 
     event_id: crypto.randomUUID().replace(/-/g, ""),
     timestamp: now,
     platform: "node" as const,
-    level: "error" as const,
+    level,
     server_name: "coco-worker",
     environment,
     tags,
@@ -129,6 +134,25 @@ export async function captureServerError(
   err: unknown,
   ctx: ServerErrorContext = {},
 ): Promise<void> {
+  await sendEvent(err, ctx, "error");
+}
+
+/**
+ * KA3 — Info-Meldung (level: "info"). Für auffindbare, aber NICHT alarmierende
+ * Vorgänge: bestätigte Fremdabgaben u. Ä. No-op ohne SENTRY_DSN. Wirft NIE.
+ */
+export async function captureServerMessage(
+  message: string,
+  ctx: ServerErrorContext = {},
+): Promise<void> {
+  await sendEvent(new Error(message), ctx, "info");
+}
+
+async function sendEvent(
+  err: unknown,
+  ctx: ServerErrorContext,
+  level: "error" | "info",
+): Promise<void> {
   try {
     const dsn = process.env.SENTRY_DSN;
     if (!dsn) return;
@@ -136,7 +160,7 @@ export async function captureServerError(
     if (!parts) return;
 
     const requestUrl = await currentRequestUrl();
-    const event = buildEvent(err, ctx, requestUrl);
+    const event = buildEvent(err, ctx, requestUrl, level);
 
     const envelopeHeader = JSON.stringify({
       event_id: event.event_id,

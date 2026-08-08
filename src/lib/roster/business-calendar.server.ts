@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { isClosedDay, isoWeekday, type CalendarExceptionKind } from "./business-calendar";
+import { ValidationRejection } from "@/lib/monitoring/validation-rejection";
 
 const WEEKDAY_LABEL: Record<number, string> = {
   1: "Montag",
@@ -48,5 +49,7 @@ export async function assertDayOpen(
         ? `Standort geschlossen (${reason})`
         : "Standort geschlossen"
       : `Ruhetag (${WEEKDAY_LABEL[isoWeekday(shiftDate)]})`;
-  throw new Error(`${label}. Anlage an geschlossenen Tagen nicht möglich.`);
+  // KA3: fachliche Ablehnung — bewusst ValidationRejection, damit der zentrale
+  // Sentry-Wrapper sie nicht als Serverfehler meldet. Prüf-Logik unverändert.
+  throw new ValidationRejection(`${label}. Anlage an geschlossenen Tagen nicht möglich.`);
 }

@@ -111,8 +111,9 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 10000,
+        confirmedForeign: true,
       });
-      settlementId = r.settlementId;
+      settlementId = r.settlementId!;
     } else {
       const ws = expectData(
         await org.service
@@ -173,6 +174,7 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
+        confirmedForeign: true,
       }),
     ).rejects.toBeInstanceOf(NoOpenSessionError);
     await expect(updateSessionCore(mgr(), emptyUpdate(sessionId))).rejects.toBeInstanceOf(
@@ -218,6 +220,7 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
+        confirmedForeign: true,
       }),
     ).rejects.toBeInstanceOf(CashLockedError);
     await expect(updateSessionCore(mgr(), emptyUpdate(sessionId))).rejects.toBeInstanceOf(

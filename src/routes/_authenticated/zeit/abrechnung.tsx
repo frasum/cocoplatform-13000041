@@ -87,6 +87,8 @@ function AbrechnungPage() {
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // KA3 — Rückfrage bei Fremd-/Geisterabgabe (dreifach-negative Plausibilität).
+  const [foreignOpen, setForeignOpen] = useState(false);
 
   const parsed = useMemo(() => {
     const posSalesCents = parseEuroToCents(form.posSales);
@@ -154,7 +156,7 @@ function AbrechnungPage() {
       : null;
 
   const submitMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (opts?: { confirmedForeign?: boolean }) => {
       if (!allValid) throw new Error("Bitte alle Felder als Eurobetrag eintragen.");
       return doSubmit({
         data: {
@@ -166,11 +168,19 @@ function AbrechnungPage() {
           openInvoiceEntries: parsed.openInvoiceEntries,
           cashHandedInCents: parsed.cashHandedInCents!,
           partnerStaffIds: form.partnerStaffIds.filter(Boolean),
+          ...(opts?.confirmedForeign ? { confirmedForeign: true } : {}),
         },
       });
     },
     onSuccess: (res) => {
       setConfirmOpen(false);
+      // KA3 Teil 1 — dreifach-negative Plausibilität: nichts angelegt, laute
+      // Rückfrage statt stiller Abgabe.
+      if (res.requiresConfirmation) {
+        setForeignOpen(true);
+        return;
+      }
+      setForeignOpen(false);
       if (res.noOpenTimeEntry) {
         toast.warning("Abrechnung gespeichert. Kein offener Zeiteintrag — nichts ausgestempelt.");
       } else if (res.idempotent) {
@@ -487,8 +497,32 @@ function AbrechnungPage() {
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
               Abbrechen
             </Button>
-            <Button disabled={submitMut.isPending} onClick={() => submitMut.mutate()}>
+            <Button disabled={submitMut.isPending} onClick={() => submitMut.mutate({})}>
               {submitMut.isPending ? "Wird gesendet…" : "Absenden"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={foreignOpen} onOpenChange={setForeignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rechnest du unter deinem Namen ab?</DialogTitle>
+            <DialogDescription>
+              Du bist heute nicht eingeplant, nicht eingestempelt und nicht im Trinkgeld-Pool.
+              Rechnest du wirklich unter <strong>deinem</strong> Namen ab?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForeignOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={submitMut.isPending}
+              onClick={() => submitMut.mutate({ confirmedForeign: true })}
+            >
+              {submitMut.isPending ? "Wird gesendet…" : "Trotzdem abrechnen"}
             </Button>
           </DialogFooter>
         </DialogContent>

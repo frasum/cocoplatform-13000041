@@ -111,8 +111,9 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
       // enthalten Geld, aber nichts wird verteilt → finalize MUSS eine
       // PoolHoursWarningError werfen, bevor confirmPoolWarning bestätigt.
       cashHandedInCents: 79000,
+      confirmedForeign: true,
     });
-    settlementId = r.settlementId;
+    settlementId = r.settlementId!;
   });
   afterAll(async () => {
     await org.cleanup();

@@ -87,8 +87,9 @@ describe.skipIf(!dbTestsEnabled)("correctWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 80000,
+      confirmedForeign: true,
     });
-    settlementId = r.settlementId;
+    settlementId = r.settlementId!;
   });
   afterAll(async () => {
     await org.cleanup();

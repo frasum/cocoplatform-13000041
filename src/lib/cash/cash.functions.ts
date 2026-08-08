@@ -2839,8 +2839,24 @@ export async function submitWaiterSettlementCore(
       idempotent: existing?.status === "submitted",
       autoClockoutTimeEntryId: autoClockoutId,
       noOpenTimeEntry,
+      foreignConfirmed,
     },
   });
+
+  // KA3 Teil 1 — bestätigte Fremdabgabe: Info (kein Error), damit der Fall
+  // auffindbar bleibt, ohne den Alarmkanal zu belasten.
+  if (foreignConfirmed) {
+    try {
+      const m = await import(/* @vite-ignore */ "@/lib/monitoring/sentry.server");
+      await m.captureServerMessage("Abgabe unter dreifach-negativer Plausibilität bestätigt", {
+        op: "cash.settlement.foreign_confirmed",
+        orgId: caller.organizationId,
+        extra: { sessionId: session.id, businessDate, settlementId },
+      });
+    } catch {
+      /* Monitoring darf die Abgabe nicht kippen. */
+    }
+  }
 
   return {
     requiresConfirmation: false,

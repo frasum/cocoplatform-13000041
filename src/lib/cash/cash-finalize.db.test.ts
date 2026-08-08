@@ -181,7 +181,6 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 90000,
-      confirmedForeign: true,
       reason: "nach finalize korrigiert",
     });
     expect(res.newId).not.toBe(settlementId);
@@ -211,7 +210,6 @@ describe.skipIf(!dbTestsEnabled)("finalize → update vs. correct (DB)", () => {
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
-        confirmedForeign: true,
         reason: "x",
       }),
     ).rejects.toBeInstanceOf(CashLockedError);

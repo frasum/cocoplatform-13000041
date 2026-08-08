@@ -188,7 +188,6 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 99,
-        confirmedForeign: true,
         reason: "test",
       }),
     ).rejects.toBeInstanceOf(CashLockedError);
@@ -235,7 +234,6 @@ describe.skipIf(!dbTestsEnabled)("cash lock — Session-Sperre + Wasserlinie (DB
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
-        confirmedForeign: true,
         reason: "test",
       }),
     ).rejects.toBeInstanceOf(CashLockedError);

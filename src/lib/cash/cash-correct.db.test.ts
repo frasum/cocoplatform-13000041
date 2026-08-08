@@ -111,7 +111,6 @@ describe.skipIf(!dbTestsEnabled)("correctWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 500,
       openInvoicesCents: 0,
       cashHandedInCents: 80500,
-      confirmedForeign: true,
       reason: "Tippfehler bei pos_sales",
     });
     expect(res.newId).not.toBe(settlementId);
@@ -157,7 +156,6 @@ describe.skipIf(!dbTestsEnabled)("correctWaiterSettlementCore (DB)", () => {
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
-        confirmedForeign: true,
         reason: "nochmal",
       }),
     ).rejects.toBeInstanceOf(SettlementNotCorrectableError);

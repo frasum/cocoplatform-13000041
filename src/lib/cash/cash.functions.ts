@@ -4115,7 +4115,12 @@ async function applyServicePoolEnd(input: {
     .eq("session_id", input.sessionId)
     .eq("staff_id", input.staffId)
     .maybeSingle();
-  if (!entry || entry.department !== "service") {
+  if (entry && entry.department !== "service") {
+    // KA3 Teil 3: Küche/GL sind ausdrücklich kein Eingriffsfall — stiller
+    // Return, KEINE Sentry-Meldung.
+    return;
+  }
+  if (!entry) {
     void import(/* @vite-ignore */ "@/lib/monitoring/sentry.server").then((m) =>
       m.captureServerError(new Error("applyServicePoolEnd: no pool entry"), {
         op: "cash.applyServicePoolEnd",

@@ -64,13 +64,14 @@ describe.skipIf(!dbTestsEnabled)("settlement_partners (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 1000,
+      confirmedForeign: true,
       partnerStaffIds: [partnerA.staffId, partnerB.staffId],
     });
     const parts = expectData(
       await org.service
         .from("settlement_partners")
         .select("staff_id")
-        .eq("settlement_id", res.settlementId)
+        .eq("settlement_id", res.settlementId!)
         .order("staff_id"),
       "settlement_partners select (cash-partners)",
     );
@@ -87,6 +88,7 @@ describe.skipIf(!dbTestsEnabled)("settlement_partners (DB)", () => {
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
+        confirmedForeign: true,
         partnerStaffIds: [primary.staffId],
       }),
     ).rejects.toThrow(/Haupt-Kellner/);
@@ -99,6 +101,7 @@ describe.skipIf(!dbTestsEnabled)("settlement_partners (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 1,
+      confirmedForeign: true,
       partnerStaffIds: [partnerA.staffId],
     });
     await expect(
@@ -108,6 +111,7 @@ describe.skipIf(!dbTestsEnabled)("settlement_partners (DB)", () => {
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
+        confirmedForeign: true,
         partnerStaffIds: [partnerA.staffId],
       }),
     ).rejects.toThrow(/aktive Abrechnung|Partner/);

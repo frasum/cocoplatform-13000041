@@ -103,6 +103,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 40000,
+      confirmedForeign: true,
     });
     expect(res.autoClockoutTimeEntryId).toBe(teId);
     expect(res.noOpenTimeEntry).toBe(false);
@@ -112,7 +113,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       await org.service
         .from("waiter_settlements")
         .select("auto_clockout_time_entry_id, status")
-        .eq("id", res.settlementId)
+        .eq("id", res.settlementId!)
         .single(),
       "waiter_settlements select happy-path (cash-submit)",
     );
@@ -135,7 +136,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
     );
     const matching = audits.filter((a) => {
       const m = a.meta as Record<string, unknown> | null;
-      return m?.settlement_id === res.settlementId;
+      return m?.settlement_id === res.settlementId!;
     });
     expect(matching.length).toBe(1);
     const meta = matching[0].meta as Record<string, unknown>;
@@ -151,6 +152,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 40000,
+      confirmedForeign: true,
     });
     const beforeAudits = await org.service
       .from("audit_log")
@@ -164,8 +166,9 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 0,
+      confirmedForeign: true,
     });
-    expect(second.settlementId).toBe(first.settlementId);
+    expect(second.settlementId!).toBe(first.settlementId!);
     expect(second.idempotent).toBe(true);
 
     const afterAudits = await org.service
@@ -179,7 +182,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       await org.service
         .from("waiter_settlements")
         .select("pos_sales_cents, cash_handed_in_cents")
-        .eq("id", first.settlementId)
+        .eq("id", first.settlementId!)
         .single(),
       "waiter_settlements select idempotent (cash-submit)",
     );
@@ -191,7 +194,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
         .from("audit_log")
         .select("action")
         .eq("organization_id", org.orgId)
-        .eq("entity_id", first.settlementId)
+        .eq("entity_id", first.settlementId!)
         .eq("action", "cash.settlement.resubmit_noop"),
       "audit_log select resubmit_noop (cash-submit)",
     );
@@ -210,6 +213,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 1000,
+      confirmedForeign: true,
     });
     expect(res.noOpenTimeEntry).toBe(true);
     expect(res.autoClockoutTimeEntryId).toBeNull();
@@ -229,6 +233,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 1,
+      confirmedForeign: true,
     });
     const te7row = expectData(
       await org.service.from("time_entries").select("break_minutes").eq("id", te7).single(),
@@ -244,6 +249,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
       hilfMahlCents: 0,
       openInvoicesCents: 0,
       cashHandedInCents: 1,
+      confirmedForeign: true,
     });
     const te10row = expectData(
       await org.service.from("time_entries").select("break_minutes").eq("id", te10).single(),
@@ -261,6 +267,7 @@ describe.skipIf(!dbTestsEnabled)("submitWaiterSettlementCore (DB)", () => {
         hilfMahlCents: 0,
         openInvoicesCents: 0,
         cashHandedInCents: 1,
+        confirmedForeign: true,
       }),
     ).rejects.toBeInstanceOf(NoOpenSessionError);
   });

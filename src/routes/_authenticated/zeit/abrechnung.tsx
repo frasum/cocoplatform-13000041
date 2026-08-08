@@ -154,7 +154,7 @@ function AbrechnungPage() {
       : null;
 
   const submitMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (opts?: { confirmedForeign?: boolean }) => {
       if (!allValid) throw new Error("Bitte alle Felder als Eurobetrag eintragen.");
       return doSubmit({
         data: {
@@ -166,11 +166,19 @@ function AbrechnungPage() {
           openInvoiceEntries: parsed.openInvoiceEntries,
           cashHandedInCents: parsed.cashHandedInCents!,
           partnerStaffIds: form.partnerStaffIds.filter(Boolean),
+          ...(opts?.confirmedForeign ? { confirmedForeign: true } : {}),
         },
       });
     },
     onSuccess: (res) => {
       setConfirmOpen(false);
+      // KA3 Teil 1 — dreifach-negative Plausibilität: nichts angelegt, laute
+      // Rückfrage statt stiller Abgabe.
+      if (res.requiresConfirmation) {
+        setForeignOpen(true);
+        return;
+      }
+      setForeignOpen(false);
       if (res.noOpenTimeEntry) {
         toast.warning("Abrechnung gespeichert. Kein offener Zeiteintrag — nichts ausgestempelt.");
       } else if (res.idempotent) {

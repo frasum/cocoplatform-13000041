@@ -40,6 +40,11 @@ import { kitchenShiftMinutes } from "./kitchen-shift-hours";
 import { applyRosterPoolSnapshot } from "./roster-pool-sync";
 import { isUntouched, removalBlockedReason } from "@/lib/roster/not-in-plan";
 import { resolveServicePoolEnd } from "./service-pool-end";
+import {
+  foreignConfirmationAccepted,
+  needsForeignConfirmation,
+  type SettlementPlausibility,
+} from "./settlement-plausibility";
 import { assertCashWritable, CashLockedError } from "./cash-lock";
 import type { Json } from "@/integrations/supabase/types";
 import { ForbiddenError } from "@/lib/admin/role-guard";
@@ -2340,18 +2345,40 @@ const settlementInputSchema = z.object({
   partnerStaffIds: z.array(z.string().uuid()).default([]),
 });
 
+// KA3 Teil 1 — Bestätigung einer dreifach-negativen (Fremd-/Geister-)Abgabe.
+// Wird serverseitig NUR akzeptiert, wenn die Plausibilität tatsächlich
+// dreifach-negativ ist.
+const settlementInputWithConfirmSchema = settlementInputSchema.extend({
+  confirmedForeign: z.boolean().optional(),
+});
+
 export const submitWaiterSettlement = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) => settlementInputSchema.parse(input))
+  .inputValidator((input) => settlementInputWithConfirmSchema.parse(input))
   .handler(async ({ data, context }) => {
     const caller = await loadStaffCaller(context.supabase, context.userId);
     assertRealIdentity(caller);
     return submitWaiterSettlementCore(caller, data);
   });
 
-export type SubmitSettlementInput = z.input<typeof settlementInputSchema>;
+export type SubmitSettlementInput = z.input<typeof settlementInputWithConfirmSchema>;
 
-export async function submitWaiterSettlementCore(caller: StaffCaller, data: SubmitSettlementInput) {
+export type SubmitSettlementResult = {
+  /** true = nichts angelegt, UI muss zurückfragen (KA3 Teil 1). */
+  requiresConfirmation: boolean;
+  plausibility: SettlementPlausibility;
+  settlementId: string | null;
+  differenzCents: number;
+  kitchenTipCents: number;
+  autoClockoutTimeEntryId: string | null;
+  noOpenTimeEntry: boolean;
+  idempotent: boolean;
+};
+
+export async function submitWaiterSettlementCore(
+  caller: StaffCaller,
+  data: SubmitSettlementInput,
+): Promise<SubmitSettlementResult> {
   if (!caller.isActive) throw new Error("Mitarbeiter ist inaktiv.");
   const businessDate = await getCurrentBusinessDate();
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -2436,6 +2463,54 @@ export async function submitWaiterSettlementCore(caller: StaffCaller, data: Subm
     [caller.staffId, ...partnerStaffIds],
     existing?.id ?? null,
   );
+
+  // KA3 Teil 1 — Abgabe-Plausibilität: offene Stempelung, Pool-Eintrag,
+  // Dienstplan-Eintrag. Sind ALLE DREI negativ, wird nicht stillschweigend
+  // angelegt, sondern zurückgefragt (Produktionsvorfall 06.08.2026).
+  const [openTeCheck, poolCheck, rosterCheck] = await Promise.all([
+    supabaseAdmin
+      .from("time_entries")
+      .select("id")
+      .eq("staff_id", caller.staffId)
+      .is("ended_at", null)
+      .limit(1),
+    supabaseAdmin
+      .from("session_tip_pool_entries")
+      .select("id")
+      .eq("organization_id", caller.organizationId)
+      .eq("session_id", session.id)
+      .eq("staff_id", caller.staffId)
+      .limit(1),
+    supabaseAdmin
+      .from("roster_shifts")
+      .select("id")
+      .eq("organization_id", caller.organizationId)
+      .eq("staff_id", caller.staffId)
+      .eq("shift_date", businessDate)
+      .in("status", ["planned", "confirmed"])
+      .limit(1),
+  ]);
+  if (openTeCheck.error) throw openTeCheck.error;
+  if (poolCheck.error) throw poolCheck.error;
+  if (rosterCheck.error) throw rosterCheck.error;
+  const plausibility: SettlementPlausibility = {
+    hasOpenTimeEntry: (openTeCheck.data ?? []).length > 0,
+    hasPoolEntry: (poolCheck.data ?? []).length > 0,
+    hasRosterShift: (rosterCheck.data ?? []).length > 0,
+  };
+  if (!existing && needsForeignConfirmation(plausibility, data.confirmedForeign)) {
+    return {
+      requiresConfirmation: true,
+      plausibility,
+      settlementId: null,
+      differenzCents: 0,
+      kitchenTipCents: 0,
+      autoClockoutTimeEntryId: null,
+      noOpenTimeEntry: true,
+      idempotent: false,
+    };
+  }
+  const foreignConfirmed = !existing && foreignConfirmationAccepted(plausibility, data.confirmedForeign);
 
   // Rate snapshotten: draft/neu → aktuelle Org-Rate; submitted → Bestand erhalten.
   const kitchenTipRate =

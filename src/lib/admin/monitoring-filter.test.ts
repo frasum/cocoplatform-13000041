@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import { isMonitoringSuppressed } from "./admin-call";
 import { ForbiddenError } from "./role-guard";
 import { PreviewReadOnlyError, PREVIEW_READ_ONLY_MESSAGE } from "./impersonation";
+import { ValidationRejection } from "@/lib/monitoring/validation-rejection";
 import { SentryTestError } from "@/lib/monitoring/sentry-selftest";
 
 describe("isMonitoringSuppressed", () => {
@@ -25,6 +26,10 @@ describe("isMonitoringSuppressed", () => {
     const err = new PreviewReadOnlyError();
     expect(err.message).toBe(PREVIEW_READ_ONLY_MESSAGE);
     expect(isMonitoringSuppressed(err)).toBe(true);
+  });
+
+  it("unterdrückt ValidationRejection (fachliche Ablehnung, KA3)", () => {
+    expect(isMonitoringSuppressed(new ValidationRejection("Standort geschlossen"))).toBe(true);
   });
 
   it("unterdrückt SentryTestError NICHT (Kanarienvogel-Sicherung)", () => {

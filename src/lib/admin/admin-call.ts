@@ -52,10 +52,15 @@ export type GuardedCallContext = {
  *   strikt lesend; ein Schreibklick darin ist erwartetes Fachverhalten und
  *   darf keinen Sentry-Alarm erzeugen. Erbt von ForbiddenError und wird
  *   deshalb bereits vom ersten Check abgedeckt (kein Sonderfall nötig).
+ * - ValidationRejection: fachliche Ablehnung (KA3), z. B. „Standort
+ *   geschlossen". Gewollte Ablehnungen sind keine Serverfehler und dürfen den
+ *   Alarmkanal nicht verwässern (Sentry ce08327f…). Namensbasierter Check,
+ *   damit keine neuen Import-Kanten in den Wrapper wandern.
  */
 export function isMonitoringSuppressed(err: unknown): boolean {
   if (err instanceof ForbiddenError) return true;
   if (err instanceof Error && err.name === "PoolHoursWarningError") return true;
+  if (err instanceof Error && err.name === "ValidationRejection") return true;
   return false;
 }
 
